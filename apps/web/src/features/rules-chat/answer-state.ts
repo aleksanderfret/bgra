@@ -16,6 +16,8 @@ export interface AnswerState {
   /** Ids of figures cleared for display, in the order the model referenced them. */
   figureIds: string[];
   groundedness: Groundedness | null;
+  /** An engine state to phrase, e.g. "nothing is indexed for this game yet". */
+  notice: { code: string; params: Record<string, string> } | null;
   error: { code: string; message: string } | null;
   /**
    * How many figure references were dropped because they pointed at something
@@ -33,6 +35,7 @@ export const initialAnswerState: AnswerState = {
   text: '',
   figureIds: [],
   groundedness: null,
+  notice: null,
   error: null,
   rejectedFigureCount: 0,
 };
@@ -74,6 +77,9 @@ export function reduceAssistantEvent(state: AnswerState, event: AssistantEvent):
       }
       return { ...state, figureIds: [...state.figureIds, event.sourceId] };
     }
+
+    case 'notice':
+      return { ...state, notice: { code: event.code, params: event.params } };
 
     case 'done':
       return { ...state, isStreaming: false, stage: 'idle', groundedness: event.groundedness };

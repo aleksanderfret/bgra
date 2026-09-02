@@ -6,13 +6,13 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      '@': fileURLToPath(new URL('.', import.meta.url)),
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
   test: {
     environment: 'jsdom',
     setupFiles: ['./vitest.setup.ts'],
-    include: ['{app,features,lib}/**/*.test.{ts,tsx}'],
+    include: ['src/{app,features,i18n,lib}/**/*.test.{ts,tsx}'],
     // Server Components are not renderable outside a Next request; those paths
     // are covered end-to-end instead of in unit tests.
     exclude: ['node_modules/**', '.next/**'],

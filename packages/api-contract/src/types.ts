@@ -92,7 +92,10 @@ export type AssistantEvent =
   | { type: 'figure'; sourceId: string }
   /** Base64 audio from text-to-speech, ordered by `sequence`. */
   | { type: 'audio'; sequence: number; mimeType: string; dataBase64: string }
+  /** A state of the engine itself, phrased by the frontend from `code`. */
+  | { type: 'notice'; code: string; params: Record<string, string> }
   | { type: 'done'; answerId: string; groundedness: Groundedness }
+  /** `message` is an English technical detail for the log, never the screen. */
   | { type: 'error'; code: string; message: string };
 
 export interface GameSummary {

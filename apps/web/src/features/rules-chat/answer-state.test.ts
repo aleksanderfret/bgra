@@ -126,6 +126,22 @@ describe('reduceAssistantEvent', () => {
     });
   });
 
+  it('keeps a notice as a code and its values, never as a sentence', () => {
+    // The engine has no business choosing the wording; if this ever stored
+    // prose, the interface would be stuck in whatever language Python picked.
+    const state = reduceAssistantEvent(startAnswer(), {
+      type: 'notice',
+      code: 'engine_not_indexed',
+      params: { gameId: 'azul', profile: 'starter-32gb' },
+    });
+
+    expect(state.notice).toEqual({
+      code: 'engine_not_indexed',
+      params: { gameId: 'azul', profile: 'starter-32gb' },
+    });
+    expect(state.isStreaming).toBe(true);
+  });
+
   it('starts from a clean slate on every question', () => {
     expect(startAnswer()).toEqual({
       ...initialAnswerState,

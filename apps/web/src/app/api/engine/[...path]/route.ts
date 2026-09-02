@@ -56,13 +56,14 @@ async function proxy(request: NextRequest, segments: string[]): Promise<Response
 
     return new Response(upstream.body, { status: upstream.status, headers });
   } catch (error) {
+    // `code` is what the UI phrases; `message` stays an English diagnostic.
     return Response.json(
       {
         type: 'error',
         code: 'engine_unreachable',
-        message: `Nie mogę połączyć się z silnikiem pod ${ENGINE_URL}. Czy działa? (${
-          error instanceof Error ? error.message : 'nieznany błąd'
-        })`,
+        message: `Cannot reach the engine at ${ENGINE_URL}: ${
+          error instanceof Error ? error.message : 'unknown error'
+        }`,
       },
       { status: 502 },
     );

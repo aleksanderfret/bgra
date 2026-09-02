@@ -1,158 +1,161 @@
-# Plan wykonawczy
+# Execution plan
 
-Etapy są uporządkowane tak, by **każdy kończył się czymś uruchamialnym**, a nie
-kolejną warstwą bez efektu. Kryteria odbioru są napisane jako sprawdzalne fakty —
-można je przekazać agentowi jako definicję ukończenia.
+The stages are ordered so that **each one ends with something runnable**, rather than
+another layer with no visible effect. The acceptance criteria are written as checkable
+facts — they can be handed to an agent as a definition of done.
 
-Zasada obowiązująca na każdym etapie: `pnpm verify` musi przechodzić przed
-zamknięciem etapu.
+A rule that applies to every stage: `pnpm verify` must pass before a stage is closed.
 
 ---
 
-## Etap 0 — Repozytorium i harness ✅ **ukończony**
+## Stage 0 — Repository and harness ✅ **complete**
 
-Monorepo, interfejs, przepływ strumienia i kontrakt API.
+The monorepo, the interface, the streaming flow and the API contract.
 
-- pnpm workspaces + Turborepo, jedna komenda `pnpm dev` uruchamia oba procesy
+- pnpm workspaces + Turborepo, one `pnpm dev` command runs both processes
 - Next.js 16.3 · React 19 · Mantine 9 · TypeScript 7 · Vitest 4 · Biome 2.5
-- FastAPI · Python 3.13 · uv, z `mypy --strict` i `ruff`
-- Wspólny kontrakt z referencyjnym dekoderem SSE i testem parzystości
-- 46 testów, w tym gwarancja odrzucania wymyślonych odwołań do obrazów
+- FastAPI · Python 3.13 · uv, with `mypy --strict` and `ruff`
+- A shared contract with a reference SSE decoder and a parity test
+- Interface in Polish and English (i18next), no user-facing string hardcoded
+- Tests including the guarantee that invented image references are rejected
 
 ---
 
-## Etap 1 — Uruchomienie modeli lokalnie
+## Stage 1 — Running the models locally
 
-**Cel:** silnik faktycznie rozmawia z modelem; `/health` mówi prawdę.
+**Goal:** the engine actually talks to a model; `/health` tells the truth.
 
-- `scripts/pull-models.sh` pobiera modele z aktywnego profilu i **zatrzymuje się z
-  czytelnym błędem**, gdy tag nie istnieje w rejestrze Ollamy (etykiety modeli
-  zmieniają się między wydaniami — to jednorazowa weryfikacja)
-- Klient Ollamy w `rag_engine/engines/llm.py`, ze strumieniowaniem tokenów
-- `/health` sprawdza obecność **konkretnych** modeli z profilu, nie tylko czy Ollama
-  odpowiada
-- Endpoint `/ask` strumieniuje odpowiedź prawdziwego modelu, jeszcze bez wyszukiwania
+- `scripts/pull-models.sh` downloads the models of the active profile and **stops with a
+  readable error** when a tag does not exist in the Ollama registry (model labels change
+  between releases — this is a one-off verification)
+- An Ollama client in `rag_engine/engines/llm.py`, with token streaming
+- `/health` checks for the **specific** models of the profile, not just whether Ollama
+  responds
+- The `/ask` endpoint streams a real model's answer, still without retrieval
 
-**Odbiór:** `curl` na `/ask` zwraca odpowiedź generowaną przez model, token po
-tokenie; `/health` zgłasza `degraded` z nazwą brakującego modelu, gdy któregoś nie ma.
+**Acceptance:** `curl` against `/ask` returns a model-generated answer, token by token;
+`/health` reports `degraded` naming the missing model when one is absent.
 
 ---
 
-## Etap 2 — Wczytywanie dokumentów
+## Stage 2 — Document ingestion
 
-**Cel:** z PDF-a i filmu powstaje uporządkowany, zaadresowany materiał.
+**Goal:** a PDF and a video become ordered, addressable material.
 
 - `uv sync --extra ingest`
-- PDF → Markdown przez `pymupdf4llm`, z **zachowaniem numerów stron** (bez nich nie ma
-  cytowań)
-- Render każdej strony do PNG 150 DPI do `storage/assets/<gameId>/pNN.png`
-- Podział po nagłówkach Markdown; fragment nigdy nie przekracza granicy sekcji
-- Napisy z YouTube: `youtube-transcript-api` (API instancyjne, `.fetch()`), awaryjnie
-  `yt-dlp` + Whisper, gdy autor wyłączył napisy
-- Rejestr gier w `storage/games.json` zgodny z `GameSummary`
-- CLI: `uv run python -m rag_engine.ingest add --game azul --kind rulebook plik.pdf`
+- PDF → Markdown via `pymupdf4llm`, **preserving page numbers** (without them there are
+  no citations)
+- Render each page to a 150 DPI PNG in `storage/assets/<gameId>/pNN.png`
+- Split on Markdown headings; a chunk never crosses a section boundary
+- YouTube subtitles: `youtube-transcript-api` (instance API, `.fetch()`), falling back to
+  `yt-dlp` + Whisper when the author disabled subtitles
+- A game registry in `storage/games.json` matching `GameSummary`
+- CLI: `uv run python -m rag_engine.ingest add --game azul --kind rulebook file.pdf`
 
-**Odbiór:** po wczytaniu dwóch–trzech gier (jedna prosta, jedna złożona — ustalenie
-Z5) `/games` zwraca je z niezerowym `chunkCount`, a `storage/assets/<gameId>/`
-zawiera renderowane strony.
-
----
-
-## Etap 3 — Wyszukiwanie
-
-**Cel:** odpowiedzi oparte na dokumentach, z cytowaniem strony.
-
-- `uv sync --extra retrieval`; LanceDB w `storage/index`
-- Schemat fragmentu: `id`, `gameId`, `documentKind`, `page`, `text`, `heading`, wektor
-- **Obowiązkowy** filtr `gameId` przed wyszukiwaniem (patrz audyt 3.1)
-- Wyszukiwanie hybrydowe: BM25 + wektorowe, wyniki łączone
-- Rerank cross-encoderem, `retrieval_candidates` → `retrieval_top_k`
-- Próg `min_relevance_score`; poniżej → `insufficient_evidence` bez wołania modelu
-- Prompt z hierarchią `DOCUMENT_AUTHORITY` i zakazem wychodzenia poza kontekst
-- Ramka `sources` wysyłana **przed** pierwszym tokenem
-- Odpowiedź po polsku także dla angielskich instrukcji, z oryginalnym terminem w
-  nawiasie — nazwy faz i elementów są wydrukowane po angielsku na komponentach
-  (ustalenie Z1)
-
-**Odbiór:** pytanie o zasadę z wczytanej instrukcji daje odpowiedź z poprawnym
-numerem strony; **polskie pytanie o angielską instrukcję trafia we właściwy
-fragment**; pytanie o grę niewczytaną daje odmowę, nie zmyśloną regułę; pytanie o grę
-A nigdy nie zwraca fragmentów gry B.
+**Acceptance:** after ingesting two or three games (one simple, one complex — decision
+Z5) `/games` returns them with a non-zero `chunkCount`, and `storage/assets/<gameId>/`
+contains the rendered pages.
 
 ---
 
-## Etap 4 — Tryb nauczania
+## Stage 3 — Retrieval
 
-**Cel:** asystent uczy, a nie tylko odpowiada.
+**Goal:** answers grounded in the documents, citing the page.
 
-- Osobne prompty dla `teach` i `arbitrate`
-- Styl nauczania z transkrypcji tutoriali podawany jako przykład w prompcie
-  systemowym, **z oznaczeniem, że nie jest źródłem zasad**
-- Stan sesji po `sessionId`: model pamięta, w którym miejscu lekcji jesteście
-- Struktura lekcji: cel → klimat → mechaniki → tura → przykładowy ruch, z pytaniem
-  sprawdzającym po każdym module
+- `uv sync --extra retrieval`; LanceDB in `storage/index`
+- Chunk schema: `id`, `gameId`, `documentKind`, `page`, `text`, `heading`, vector
+- A **mandatory** `gameId` filter before retrieval (see audit 3.1)
+- Hybrid retrieval: BM25 + vector, results fused
+- Cross-encoder reranking, `retrieval_candidates` → `retrieval_top_k`
+- A `min_relevance_score` threshold; below it → `insufficient_evidence` without calling
+  the model
+- A prompt carrying the `DOCUMENT_AUTHORITY` hierarchy and a ban on leaving the context
+- The `sources` frame sent **before** the first token
+- Answers in Polish even for English rulebooks, with the original term in parentheses —
+  phase and component names are printed in English on the components (decision Z1)
 
-**Odbiór:** rozmowa „naucz mnie tej gry” prowadzi przez kolejne moduły bez zalewania
-wiedzą, a przejście w tryb `arbitrate` w środku sesji daje krótką odpowiedź z cytatem.
+**Acceptance:** a question about a rule from an ingested rulebook yields an answer with
+the correct page number; **a Polish question against an English rulebook hits the right
+passage**; a question about a game that was never ingested yields a refusal, not an
+invented rule; a question about game A never returns passages from game B.
 
 ---
 
-## Etap 5 — Głos
+## Stage 4 — Teaching mode
 
-**Cel:** rozmowa bez klawiatury.
+**Goal:** the assistant teaches rather than merely answering.
+
+- Separate prompts for `teach` and `arbitrate`
+- Teaching style drawn from tutorial transcripts, supplied as an example in the system
+  prompt, **marked as not being a source of rules**
+- Session state keyed by `sessionId`: the model remembers where in the lesson you are
+- Lesson structure: goal → theme → mechanics → turn → sample move, with a comprehension
+  check after each module
+
+**Acceptance:** a "teach me this game" conversation walks through the modules without
+dumping everything at once, and switching to `arbitrate` mid-session produces a short
+answer with a citation.
+
+---
+
+## Stage 5 — Voice
+
+**Goal:** a conversation without a keyboard.
 
 - `uv sync --extra speech`
-- Push-to-talk w przeglądarce (`MediaRecorder`), transkrypcja przez `mlx-whisper`
-- Ramka `transcript` pokazuje, co usłyszał, zanim odpowie
-- Piper z głosem polskim, audio strumieniowane **zdanie po zdaniu** — nie po
-  wygenerowaniu całej odpowiedzi
-- **Lokalny HTTPS jest wymagany** (`mkcert`), bo asystent ma działać z tabletu w
-  sieci domowej, a `getUserMedia` nie działa po HTTP poza `localhost` (ustalenie Z4)
-- Next.js nasłuchuje na `0.0.0.0`, silnik Pythona nadal tylko na `127.0.0.1`; do
-  proxy dochodzi prosta kontrola dostępu
+- Push-to-talk in the browser (`MediaRecorder`), transcription via `mlx-whisper`
+- The `transcript` frame shows what it heard before it answers
+- Piper with a Polish voice, audio streamed **sentence by sentence** — not after the
+  whole answer is generated
+- **A local HTTPS setup is required** (`mkcert`), because the assistant is meant to work
+  from a tablet on the home network, and `getUserMedia` does not work over HTTP outside
+  `localhost` (decision Z4)
+- Next.js listens on `0.0.0.0`, the Python engine still only on `127.0.0.1`; a simple
+  access check is added to the proxy
 
-**Odbiór:** pytanie zadane głosem daje odpowiedź mówioną; pierwszy dźwięk pojawia się
-zanim model dokończy generowanie; **mikrofon działa na tablecie**, nie tylko na Macu.
-
----
-
-## Etap 6 — Ewaluacja
-
-**Cel:** możliwość stwierdzenia, czy zmiana poprawiła jakość. Najważniejszy etap dla
-wiarygodności całości.
-
-- `eval/<gameId>.yaml`: 30–50 pytań z poprawną odpowiedzią i numerem strony
-- Osobna grupa pytań **spoza** instrukcji, na które poprawna odpowiedź to odmowa
-- Polskie pytania do **angielskich** instrukcji — najtrudniejszy przypadek dla
-  wyszukiwania, więc musi być mierzony osobno (ustalenie Z1)
-- Pytania celowo dwuznaczne między dwiema wczytanymi grami, wyłapujące mieszanie
-  zasad
-- `uv run python -m rag_engine.eval` raportuje trafność wyszukiwania, zgodność
-  odpowiedzi i odsetek poprawnych odmów
-- Wynik zapisywany historycznie, żeby regresja była widoczna
-
-**Odbiór:** zmiana promptu lub rozmiaru fragmentu daje liczbę, o którą jakość wzrosła
-albo spadła.
+**Acceptance:** a spoken question produces a spoken answer; the first sound arrives
+before the model finishes generating; **the microphone works on the tablet**, not only on
+the Mac.
 
 ---
 
-## Etap 7 — Obrazy i dopracowanie
+## Stage 6 — Evaluation
 
-**Cel:** „połóż karty tutaj” z pokazaniem miejsca.
+**Goal:** being able to tell whether a change improved quality. The most important stage
+for the credibility of the whole thing.
 
-- Kadrowanie figur ze stron zamiast całych renderów
-- Opcjonalny model wizyjny opisuje wycięte schematy przy wczytywaniu
-- Ramka `figure` wysyłana przez backend na podstawie **faktycznie pobranych** źródeł
-- Podgląd cytatu po kliknięciu w źródło
+- `eval/<gameId>.yaml`: 30–50 questions with the correct answer and page number
+- A separate group of questions **outside** the rulebook, where the correct answer is a
+  refusal
+- Polish questions against **English** rulebooks — the hardest case for retrieval, so it
+  must be measured separately (decision Z1)
+- Questions deliberately ambiguous between two ingested games, catching rule mixing
+- `uv run python -m rag_engine.eval` reports retrieval accuracy, answer agreement and the
+  share of correct refusals
+- The result is recorded historically, so a regression is visible
 
-**Odbiór:** pytanie o przygotowanie gry pokazuje właściwy schemat, a licznik
-`rejectedFigureCount` pozostaje zerowy przy poprawnym działaniu.
+**Acceptance:** changing a prompt or a chunk size produces a number by which quality rose
+or fell.
 
 ---
 
-## Kolejność, jeśli chcesz efekt najszybciej
+## Stage 7 — Images and polish
 
-Etapy 1 → 2 → 3 dają **działającego arbitra zasad na tekście** i to jest naturalny
-punkt zatrzymania. Etap 6 warto wykonać zaraz po 3 — zanim zaczniesz stroić prompty,
-bo inaczej stroisz na wyczucie. Głos (5) i obrazy (7) są dopracowaniem doświadczenia,
-nie warunkiem użyteczności.
+**Goal:** "put the cards here" with the place actually shown.
+
+- Cropping figures out of pages instead of whole renders
+- An optional vision model describes the cropped diagrams during ingestion
+- The `figure` frame sent by the backend based on the **actually retrieved** sources
+- A citation preview when a source is clicked
+
+**Acceptance:** a question about setting up the game shows the right diagram, and the
+`rejectedFigureCount` counter stays at zero in normal operation.
+
+---
+
+## The order, if you want results fastest
+
+Stages 1 → 2 → 3 give you **a working rules arbiter over text**, and that is a natural
+stopping point. Stage 6 is worth doing right after 3 — before you start tuning prompts,
+because otherwise you are tuning by feel. Voice (5) and images (7) polish the experience;
+they are not a condition of usefulness.

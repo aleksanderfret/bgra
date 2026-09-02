@@ -20,6 +20,7 @@ assistant from stating rules that are not in the documents.
 ```bash
 pnpm dev        # web + engine
 pnpm verify     # typecheck, test, build, lint — must pass before finishing work
+pnpm preflight  # lint, typecheck, test — without a production build
 ```
 
 Python scripts run through `uv run`. Never emit `source .venv/bin/activate` into a
@@ -43,10 +44,18 @@ Breaking any of these produces an assistant that sounds right and is wrong.
 6. **The contract has two sides.** Changing `packages/api-contract/src/types.ts`
    requires the matching change in `services/rag-engine/rag_engine/contract.py`;
    `tests/test_contract_parity.py` enforces it.
+7. **No user-facing string is hardcoded.** Every word the user reads comes from
+   `apps/web/src/i18n/locales/<locale>/common.json`, in both `pl` and `en`. The engine
+   sends codes (`NoticeEvent.code`, `ErrorEvent.code`), never prose for the screen;
+   `ErrorEvent.message` is an English technical detail for the log.
 
 ## Conventions
 
-- Code and comments in English; user-facing strings and `docs/` in Polish.
+- Everything written is in English: code, comments, `docs/`, and the `en` locale.
+  Polish exists only as translation values in `i18n/locales/pl/`.
+- Adding a key to one locale means adding it to the other. `i18n/locales.test.ts`
+  fails on a key, or an interpolated value, present in one language and not the
+  other; `i18n/i18next.d.ts` types every `t()` call against the English file.
 - Comment only what the code cannot show: a constraint, a non-obvious reason. Not
   what the next line does.
 - Every non-trivial behaviour gets a test. The pure logic — the SSE decoder and the

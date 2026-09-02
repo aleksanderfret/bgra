@@ -96,7 +96,9 @@ PROFILES: dict[str, ModelProfile] = {
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="BGA_",
-        env_file=".env",
+        # Always this file, not whatever directory you happened to start from.
+        env_file=SERVICE_ROOT / ".env",
+        env_file_encoding="utf-8",
         extra="ignore",
     )
 

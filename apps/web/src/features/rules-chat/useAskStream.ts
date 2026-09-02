@@ -52,11 +52,13 @@ export function useAskStream(): UseAskStream {
         signal: controller.signal,
       });
 
+      // `message` is a diagnostic, never the sentence on screen: `code` picks
+      // the wording and the user's language decides the rest.
       if (!response.ok || response.body === null) {
         apply({
           type: 'error',
-          code: `http_${response.status}`,
-          message: `Silnik odpowiedział błędem ${response.status}.`,
+          code: 'http_error',
+          message: `Engine responded with HTTP ${response.status}.`,
         });
         return;
       }
@@ -78,7 +80,7 @@ export function useAskStream(): UseAskStream {
         apply({
           type: 'error',
           code: 'stream_truncated',
-          message: 'Strumień odpowiedzi urwał się przed zakończeniem.',
+          message: 'The event stream ended without a `done` frame.',
         });
       }
     } catch (error) {
@@ -88,10 +90,7 @@ export function useAskStream(): UseAskStream {
       apply({
         type: 'error',
         code: 'engine_unreachable',
-        message:
-          error instanceof Error
-            ? error.message
-            : 'Nie udało się połączyć z lokalnym silnikiem RAG.',
+        message: error instanceof Error ? error.message : 'fetch failed for an unknown reason',
       });
     }
   }, []);

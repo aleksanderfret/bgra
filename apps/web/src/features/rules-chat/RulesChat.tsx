@@ -12,18 +12,17 @@ import {
   Textarea,
 } from '@mantine/core';
 import { useEffect, useState } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 import { AnswerPanel } from './AnswerPanel';
 import { useAskStream } from './useAskStream';
 
-const MODE_OPTIONS: { value: AnswerMode; label: string }[] = [
-  { value: 'teach', label: 'Naucz mnie gry' },
-  { value: 'arbitrate', label: 'Rozstrzygnij zasadę' },
-];
+const MODES: readonly AnswerMode[] = ['teach', 'arbitrate'];
 
 const isAnswerMode = (value: string): value is AnswerMode =>
-  MODE_OPTIONS.some((option) => option.value === value);
+  (MODES as readonly string[]).includes(value);
 
 export function RulesChat() {
+  const { t } = useTranslation();
   const [games, setGames] = useState<GameSummary[] | null>(null);
   const [engineOffline, setEngineOffline] = useState(false);
   const [gameId, setGameId] = useState<string | null>(null);
@@ -63,16 +62,18 @@ export function RulesChat() {
   return (
     <Stack gap="lg">
       {engineOffline && (
-        <Alert color="orange" title="Silnik RAG nie odpowiada" role="alert">
-          Uruchom go poleceniem <Text component="code">pnpm dev</Text> w katalogu repozytorium.
-          Interfejs działa, ale bez silnika nie ma skąd wziąć zasad.
+        <Alert color="orange" title={t('rulesChat.engineOffline.title')} role="alert">
+          <Trans
+            i18nKey="rulesChat.engineOffline.body"
+            components={{ command: <Text component="code" /> }}
+          />
         </Alert>
       )}
 
       <Select
-        label="Gra"
-        description="Wyszukiwanie jest zawsze zawężone do jednej gry"
-        placeholder={games === null ? 'Wczytuję…' : 'Wybierz grę'}
+        label={t('rulesChat.game.label')}
+        description={t('rulesChat.game.description')}
+        placeholder={games === null ? t('rulesChat.game.loading') : t('rulesChat.game.placeholder')}
         data={(games ?? []).map((game) => ({ value: game.gameId, label: game.title }))}
         value={gameId}
         onChange={setGameId}
@@ -87,12 +88,12 @@ export function RulesChat() {
             setMode(value);
           }
         }}
-        data={MODE_OPTIONS}
+        data={MODES.map((value) => ({ value, label: t(`rulesChat.mode.${value}`) }))}
       />
 
       <Textarea
-        label="Pytanie"
-        placeholder="Czy mogę zagrać kartę akcji, jeśli nie mam już kafelków?"
+        label={t('rulesChat.question.label')}
+        placeholder={t('rulesChat.question.placeholder')}
         value={question}
         onChange={(event) => setQuestion(event.currentTarget.value)}
         autosize
@@ -107,11 +108,11 @@ export function RulesChat() {
           disabled={!canAsk}
           loading={state.isStreaming}
         >
-          Zapytaj
+          {t('rulesChat.submit')}
         </Button>
-        {state.isStreaming && (
+        {state.isStreaming && state.stage !== 'idle' && (
           <Text size="sm" c="dimmed">
-            {state.stage}
+            {t(`stage.${state.stage}`)}
           </Text>
         )}
       </Group>

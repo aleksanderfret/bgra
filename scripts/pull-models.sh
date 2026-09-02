@@ -8,7 +8,7 @@
 #
 # Usage:
 #   ./scripts/pull-models.sh
-#   BGA_MODEL_PROFILE=full-64gb ./scripts/pull-models.sh
+#   Reads BGA_MODEL_PROFILE from services/rag-engine/.env (or the environment).
 
 set -euo pipefail
 
@@ -35,7 +35,10 @@ print(value if value else '')
 ")
 }
 
-PROFILE_NAME="${BGA_MODEL_PROFILE:-starter-32gb}"
+PROFILE_NAME="$(cd "$SERVICE_DIR" && uv run --quiet python -c "
+from rag_engine.settings import get_settings
+print(get_settings().model_profile)
+")"
 echo "Profile: $PROFILE_NAME"
 echo
 

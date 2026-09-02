@@ -1,189 +1,215 @@
-# BGA — lokalny asystent zasad gier planszowych
+# BGA — a local board game rules assistant
 
-Prywatny, działający w całości offline asystent, który **uczy zasad gier planszowych** i
-**rozstrzyga wątpliwości przy stole** — na podstawie instrukcji, FAQ i errat, które sam
-wrzucisz na dysk. Docelowo rozmawiasz z nim głosowo, a on pokazuje na ekranie właściwy
-fragment instrukcji.
+A private, fully offline assistant that **teaches board game rules** and
+**settles disputes at the table** — based on the rulebooks, FAQs and errata you put on
+your own disk. The end goal is that you talk to it, and it shows you the right part of
+the rulebook on screen.
 
-Żadne pytanie ani dokument nie opuszcza Twojego komputera.
+No question and no document ever leaves your computer.
 
 ---
 
-## Do czego to służy
+## What it is for
 
-Dwa scenariusze, celowo różne:
+Two deliberately different scenarios:
 
-| Tryb | Kiedy | Zachowanie |
+| Mode | When | Behaviour |
 | --- | --- | --- |
-| **Naucz mnie gry** | Rozpakowałeś nową grę | Prowadzi lekcję: cel gry → klimat → mechaniki → tura → przykładowy ruch, małymi porcjami, z pytaniami sprawdzającymi |
-| **Rozstrzygnij zasadę** | Spór w trakcie rozgrywki | Krótka, precyzyjna odpowiedź z podaniem strony instrukcji |
+| **Teach me the game** | You just unboxed something new | Runs a lesson: goal → theme → mechanics → turn structure → a sample move, in small portions, with comprehension checks |
+| **Settle a rule** | An argument mid-game | A short, exact answer with the rulebook page |
 
-## Jak to działa
+## How it works
 
-Model **nie uczy się zasad na pamięć**. Zamiast tego przy każdym pytaniu przeszukuje
-Twoją lokalną bazę dokumentów i odpowiada wyłącznie na podstawie znalezionych
-fragmentów. To wzorzec **RAG** (Retrieval-Augmented Generation).
+The model **does not memorise the rules**. Instead, for every question it searches your
+local document store and answers only from the passages it found. This is the **RAG**
+pattern (Retrieval-Augmented Generation).
 
 ```
                       ┌─────────────────────────────────────┐
-  mikrofon ──────────►│ 1. Rozpoznanie mowy (Whisper)       │
+  microphone ────────►│ 1. Speech recognition (Whisper)     │
                       └──────────────┬──────────────────────┘
                                      ▼
                       ┌─────────────────────────────────────┐
-                      │ 2. Wyszukiwanie w bazie dokumentów  │
-                      │    • zawężone do JEDNEJ gry         │
-                      │    • hybrydowe: słowa + znaczenie   │
-                      │    • przesiew przez reranker        │
+                      │ 2. Search the document store        │
+                      │    • scoped to ONE game             │
+                      │    • hybrid: keywords + meaning     │
+                      │    • filtered through a reranker    │
                       └──────────────┬──────────────────────┘
                                      ▼
                       ┌─────────────────────────────────────┐
-                      │ 3. Generowanie odpowiedzi (LLM)     │
-                      │    tylko z dostarczonych fragmentów │
+                      │ 3. Answer generation (LLM)          │
+                      │    only from the supplied passages  │
                       └──────┬───────────────────┬──────────┘
                              ▼                   ▼
               ┌──────────────────────┐  ┌──────────────────────┐
-              │ 4. Synteza mowy      │  │ 5. Obraz z instrukcji│
-              │    (Piper, po polsku)│  │    + numer strony    │
+              │ 4. Speech synthesis  │  │ 5. Rulebook image    │
+              │    (Piper, Polish)   │  │    + page number     │
               └──────────────────────┘  └──────────────────────┘
 ```
 
-### Dwa filary: fakty i styl
+### Two pillars: facts and style
 
-To rozdzielenie jest fundamentem całego projektu:
+This separation is the foundation of the whole project:
 
-- **Fakty** pochodzą z bazy dokumentów (instrukcja, FAQ, errata). Model nie ma prawa
-  wyjść poza to, co znalazł. Jeśli nie znalazł — mówi, że nie wie.
-- **Styl nauczania** pochodzi z promptu systemowego i transkrypcji dobrych tutoriali
-  z YouTube. Transkrypcje uczą modelu *jak* tłumaczyć (kolejność, analogie, prosty
-  język), a **nigdy** nie służą jako źródło zasad.
+- **Facts** come from the document store (rulebook, FAQ, errata). The model is not
+  allowed to go beyond what it found. If it found nothing — it says it does not know.
+- **Teaching style** comes from the system prompt and from transcripts of good YouTube
+  tutorials. Transcripts teach the model *how* to explain (ordering, analogies, plain
+  language), and are **never** used as a source of rules.
 
-Dzięki temu asystent mówi przystępnie jak youtuber, ale podaje zasady zgodne z
-instrukcją.
+The result is an assistant that speaks as accessibly as a youtuber, but states rules
+that match the rulebook.
 
-### Czego asystent celowo nie robi
+### What the assistant deliberately does not do
 
-Odpowiedź „w tych dokumentach nie ma tej zasady” jest **poprawnym wynikiem**, nie
-awarią. Dla arbitra zasad zmyślona reguła jest znacznie gorsza niż przyznanie się do
-niewiedzy — dlatego brak pokrycia w źródłach jest osobnym, widocznym stanem w
-interfejsie.
+The answer "these documents do not contain that rule" is a **correct outcome**, not a
+failure. For a rules arbiter, an invented rule is far worse than admitting ignorance —
+which is why a lack of coverage in the sources is its own, visible state in the
+interface.
 
 ---
 
-## Wymagania sprzętowe
+## Hardware requirements
 
-Wszystko liczy się w **pamięci zunifikowanej** (Unified Memory) i przepustowości
-pamięci — na Apple Silicon to one decydują o szybkości, nie liczba rdzeni.
+Everything comes down to **unified memory** and memory bandwidth — on Apple Silicon
+these decide the speed, not the core count.
 
-| Profil | Sprzęt | Model główny | Dysk | Realne odczucie |
+| Profile | Hardware | Main model | Disk | What it feels like |
 | --- | --- | --- | --- | --- |
-| `starter-32gb` | M1/M2 Pro, 32 GB | Qwen3 14B (Q4) | ~12 GB | Sprawnie; buduj na tym pipeline |
-| `full-64gb` | M4/M5 Pro/Max, 64 GB | Qwen3 30B-A3B (MoE) | ~48 GB | Docelowa jakość i płynna rozmowa |
+| `starter-32gb` | M1/M2 Pro, 32 GB | Qwen3 14B (Q4) | ~12 GB | Brisk; build the pipeline on this |
+| `full-64gb` | M4/M5 Pro/Max, 64 GB | Qwen3 30B-A3B (MoE) | ~48 GB | Target quality and fluent conversation |
 
-Profil `full-64gb` używa modelu **mixture-of-experts**: ma 30 mld parametrów, ale na
-każdy token aktywuje tylko ~3 mld. Odpowiada więc z szybkością małego modelu,
-rozumując jak duży — to najlepszy kompromis dla rozmowy głosowej, w której liczy się
-czas do pierwszego dźwięku.
+The `full-64gb` profile uses a **mixture-of-experts** model: it has 30 billion
+parameters but activates only ~3 billion per token. So it responds at the speed of a
+small model while reasoning like a large one — the best compromise for a spoken
+conversation, where time to first sound is what matters.
 
-Profil zmieniasz **jedną zmienną środowiskową**, bez dotykania kodu:
+You change the profile in **one env file**, without touching the code:
 
 ```bash
-export BGA_MODEL_PROFILE=full-64gb
+cp services/rag-engine/.env.example services/rag-engine/.env
 ```
 
-Definicje profili: [`services/rag-engine/rag_engine/settings.py`](services/rag-engine/rag_engine/settings.py).
+Then set `BGA_MODEL_PROFILE=full-64gb` (or leave `starter-32gb`). The file is gitignored.
+`./scripts/pull-models.sh` and the engine both read it; a shell export of the same name
+overrides it for one command if you need that.
 
-### Ile miejsca na dysku
+Profile definitions: [`services/rag-engine/rag_engine/settings.py`](services/rag-engine/rag_engine/settings.py).
 
-| Element | Rozmiar |
+### How much disk space
+
+| Item | Size |
 | --- | --- |
-| Model LLM (14B / 30B, Q4) | 9–20 GB |
-| Model wizyjny (opcjonalny) | ~6 GB |
-| Embeddingi + reranker | ~3 GB |
-| Rozpoznawanie mowy (Whisper turbo) | ~1,6 GB |
-| Głos polski (Piper) | ~60 MB |
-| Jedna gra: instrukcja + obrazy + indeks | 20–80 MB |
+| LLM (14B / 30B, Q4) | 9–20 GB |
+| Vision model (optional) | ~6 GB |
+| Embeddings + reranker | ~3 GB |
+| Speech recognition (Whisper turbo) | ~1.6 GB |
+| Polish voice (Piper) | ~60 MB |
+| One game: rulebook + images + index | 20–80 MB |
 
-Modele nigdy nie trafiają do repozytorium — są pobierane lokalnie.
+Models never end up in the repository — they are downloaded locally.
 
 ---
 
-## Uruchomienie
+## Getting started
 
-### Wymagane narzędzia
+### Required tools
 
 ```bash
 node --version   # ≥ 22
-corepack enable  # udostępnia pnpm z package.json
-brew install uv  # menedżer środowiska Python (sam zainstaluje Python 3.13)
+corepack enable  # exposes pnpm from package.json
+brew install uv  # Python environment manager (installs Python 3.13 itself)
 ```
 
-Silniki AI dochodzą na późniejszych etapach — **harness działa bez nich**:
+The AI engines arrive in later stages — **the harness runs without them**:
 
 ```bash
-brew install ollama          # etap 3: model językowy i embeddingi
-./scripts/pull-models.sh     # pobiera modele z aktywnego profilu
+brew install ollama          # stage 3: language model and embeddings
+./scripts/pull-models.sh     # downloads the models of the active profile
 ```
 
-### Instalacja i start
+### Install and run
 
 ```bash
 pnpm install
 pnpm dev
 ```
 
-To uruchamia równolegle **oba** procesy:
+This starts **both** processes in parallel:
 
-- interfejs: <http://localhost:3000>
-- silnik + dokumentacja API: <http://localhost:8000/docs>
+- interface: <http://localhost:3000>
+- engine + API documentation: <http://localhost:8000/docs>
 
-Przeglądarka rozmawia wyłącznie z Next.js, który przekazuje żądania do Pythona pod
-`/api/engine/*`. Jeden origin, zero konfiguracji CORS, a port silnika nie jest
-wystawiony na sieć.
+The browser talks only to Next.js, which forwards requests to Python under
+`/api/engine/*`. One origin, zero CORS configuration, and the engine port is not
+exposed to the network.
 
-### Komendy
+### Commands
 
-| Komenda | Działanie |
+| Command | Effect |
 | --- | --- |
-| `pnpm dev` | Interfejs + silnik równolegle |
-| `pnpm verify` | Typy, testy, lint i build w całym repo |
-| `pnpm test` | Testy wszystkich pakietów |
+| `pnpm dev` | Interface + engine in parallel |
+| `pnpm verify` | Types, tests, lint and build across the repo |
+| `pnpm preflight` | Lint, types and tests — without a production build |
+| `pnpm test` | Tests for every package |
 | `pnpm typecheck` | TypeScript 7 + mypy (strict) |
-| `pnpm check:fix` | Formatowanie i naprawialne reguły Biome |
+| `pnpm check:fix` | Formatting and auto-fixable Biome rules |
+| `pnpm format` | Biome + Ruff formatters, in place |
+
+Git hooks (Husky): **pre-commit** lints and formats only the staged files
+(Biome for TypeScript/JSON, Ruff for Python). **pre-push** runs `pnpm verify` —
+types, tests, lint and a production build for the whole repo. Disable for one
+command with `HUSKY=0` if you have to.
+
+Python lint and format are **Ruff** (replaces Flake8, isort and Black). Types are
+**mypy --strict**. Both already run as `rag-engine#lint` and `rag-engine#typecheck`;
+the hooks pick them up through Turborepo. There is nothing extra to install for
+that stack.
 
 ---
 
-## Struktura repozytorium
+## Repository layout
 
-Polyglot monorepo (pnpm workspaces + Turborepo): TypeScript tam, gdzie liczy się
-interfejs, Python tam, gdzie jest dojrzały ekosystem AI.
+A polyglot monorepo (pnpm workspaces + Turborepo): TypeScript where the interface
+matters, Python where the AI ecosystem is mature.
 
 ```
 bga/
 ├── apps/web/                 Next.js 16 · React 19 · Mantine 9 · TypeScript 7
-│   ├── app/                  routing, layout, proxy do silnika
-│   └── features/rules-chat/  logika odpowiedzi i strumieniowania
-├── packages/api-contract/    wspólny kontrakt TS + referencyjny dekoder SSE
+│   └── src/
+│       ├── app/[locale]/     routing, layout, engine proxy
+│       ├── features/         answer and streaming logic
+│       └── i18n/             i18next setup and pl/en resources
+├── packages/api-contract/    shared TS contract + reference SSE decoder
 ├── services/rag-engine/      FastAPI · Python 3.13 · uv
-│   ├── rag_engine/           API, konfiguracja, profile modeli
-│   └── storage/              Twoje dokumenty i indeks (poza gitem)
-└── docs/                     architektura i plan wykonawczy
+│   ├── rag_engine/           API, configuration, model profiles
+│   └── storage/              your documents and index (outside git)
+└── docs/                     architecture and execution plan
 ```
 
-## Co już działa, a co nie
+## Interface language
 
-**Działa dziś:** monorepo, interfejs, pełna ścieżka strumieniowania odpowiedzi
-(przeglądarka → Next.js → FastAPI), kontrakt API pilnowany testem parzystości,
-46 testów, lint i typy w trybie strict.
+The UI ships in Polish and English. Nothing user-facing is hardcoded: every string
+lives in [`apps/web/src/i18n/locales/`](apps/web/src/i18n/locales), and the active language is
+the first path segment (`/pl`, `/en`). Visiting `/` negotiates a language from the
+`Accept-Language` header and redirects, so the URL always names the language it is
+showing.
 
-**Jeszcze nie:** wczytywanie PDF-ów, wyszukiwanie, podłączony model, głos. Do tego
-czasu `/ask` zwraca poprawnie ukształtowaną odpowiedź ze stanem
-`insufficient_evidence` — czyli dokładnie to, co powinien zwracać przy pustej bazie.
+## What works today, and what does not
 
-Kolejność prac i kryteria odbioru każdego etapu: [`docs/ROADMAP.md`](docs/ROADMAP.md).
-Uzasadnienie decyzji i audyt architektury: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+**Works today:** the monorepo, the interface, the full answer-streaming path
+(browser → Next.js → FastAPI), an API contract guarded by a parity test, Polish and
+English translations, strict lint and types.
 
-## Materiały źródłowe
+**Not yet:** PDF ingestion, retrieval, a connected model, voice. Until then `/ask`
+returns a correctly shaped response with the `insufficient_evidence` state — which is
+exactly what it should return against an empty store.
 
-Instrukcje pobierasz sam, z legalnych źródeł (strony wydawców udostępniają PDF-y do
-pobrania) i trzymasz lokalnie, na własny użytek. Repozytorium ich nie zawiera i nie
-zawiera automatu do masowego pobierania z serwisów, których regulamin tego zabrania.
+The order of work and the acceptance criteria for each stage: [`docs/ROADMAP.md`](docs/ROADMAP.md).
+The reasoning behind the decisions and the architecture audit: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+
+## Source material
+
+You download the rulebooks yourself, from legal sources (publisher sites offer PDFs for
+download) and keep them locally, for your own use. The repository does not contain them
+and contains no bulk downloader for services whose terms forbid it.

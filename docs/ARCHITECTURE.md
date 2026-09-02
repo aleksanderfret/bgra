@@ -1,298 +1,313 @@
-# Architektura i audyt planu
+# Architecture and plan audit
 
-Dokument ma dwie części: **audyt** pierwotnego planu (co się nie nadawało i dlaczego)
-oraz **architekturę docelową** wraz z uzasadnieniem decyzji.
-
----
-
-## 1. Werdykt
-
-Zrąb planu jest dobry i został utrzymany: RAG zamiast dotrenowywania modelu,
-rozdzielenie faktów od stylu nauczania, polyglot monorepo z Next.js na froncie i
-Pythonem w warstwie AI, wszystko lokalnie na Apple Silicon. To trafne decyzje i nie
-było powodu ich zmieniać.
-
-Plan **nie nadawał się** natomiast do bezpośredniego przekazania agentowi. Zawierał
-błędy, które zatrzymałyby wykonanie, oraz — co poważniejsze — luki, które dałyby
-aplikację działającą, ale **udzielającą błędnych odpowiedzi o zasadach**. To drugie
-jest groźniejsze, bo nie objawia się awarią.
+This document has two parts: an **audit** of the original plan (what did not hold up and
+why) and the **target architecture** together with the reasoning behind the decisions.
 
 ---
 
-## 2. Audyt: błędy blokujące
+## 1. Verdict
 
-Te rzeczy wywaliłyby się przy pierwszym uruchomieniu.
+The backbone of the plan is sound and has been kept: RAG instead of fine-tuning a model,
+separating facts from teaching style, a polyglot monorepo with Next.js on the front and
+Python in the AI layer, everything local on Apple Silicon. These are the right calls and
+there was no reason to change them.
 
-| # | Problem w planie | Skutek | Rozwiązanie |
+The plan was **not fit**, however, to be handed to an agent as-is. It contained errors
+that would have stopped execution, and — more seriously — gaps that would have produced
+an application that runs but **gives wrong answers about the rules**. The second kind is
+the more dangerous, because it does not announce itself as a failure.
+
+---
+
+## 2. Audit: blocking errors
+
+These would have blown up on the first run.
+
+| # | Problem in the plan | Consequence | Resolution |
 | --- | --- | --- | --- |
-| 1 | `turbo.json` z kluczem `pipeline` | Turborepo 2.x odrzuca konfigurację; `pipeline` zniknął w wersji 2 | Klucz `tasks` |
-| 2 | `"dev": "source .venv/bin/activate && uvicorn ..."` | `source` nie istnieje w `sh`, którym npm uruchamia skrypty | `uv run uvicorn ...` — bez aktywacji, bez `bash -c` |
-| 3 | `YouTubeTranscriptApi.get_transcript(...)` | Metoda statyczna usunięta w `youtube-transcript-api` 1.x | Instancja + `.fetch()` (etap 2) |
-| 4 | `response.status_status` w pobieraniu PDF | `AttributeError` | Kod napisany od nowa (etap 2) |
-| 5 | `create-next-app --eslint` przy jednoczesnym wyborze Biome | Dwa konkurujące lintery; do tego brak `--no-tailwind` | `--biome --no-tailwind`, jeden lint w całym repo |
-| 6 | `nomic-embed-text` jako model embeddingów | Model anglocentryczny. Polskie pytanie do angielskiej instrukcji **nie trafi** we właściwy fragment — cicha utrata trafności | `bge-m3`, wielojęzyczny, przeszukiwanie międzyjęzykowe |
-| 7 | `whisper-cpp-py`, `kokoro-onnx` w `requirements.txt` | Pakiety niepewne w utrzymaniu; ryzyko przy instalacji | `mlx-whisper` (Apple MLX, natywne Metal) i `piper-tts` |
-| 8 | `allow_origins=["*"]` razem z `allow_credentials=True` | Przeglądarka odrzuca tę kombinację ze specyfikacji | Brak CORS w ogóle — patrz decyzja D2 |
-| 9 | Front wołał `http://localhost:8000` wprost, choć struktura przewidywała proxy | Niespójność: proxy istniało tylko na schemacie | Całość przez `/api/engine/*` |
-| 10 | „BGG udostępnia API, z którego można wyciągnąć sekcję plików (Files/Rules)” | Nieprawda. XMLAPI2 nie udostępnia sekcji plików; automat do jej pobierania łamałby regulamin | Instrukcje pobierasz ręcznie z legalnych źródeł; repo dostarcza wczytywanie, nie masowe ściąganie |
+| 1 | `turbo.json` with a `pipeline` key | Turborepo 2.x rejects the config; `pipeline` was removed in version 2 | The `tasks` key |
+| 2 | `"dev": "source .venv/bin/activate && uvicorn ..."` | `source` does not exist in `sh`, which npm uses to run scripts | `uv run uvicorn ...` — no activation, no `bash -c` |
+| 3 | `YouTubeTranscriptApi.get_transcript(...)` | Static method removed in `youtube-transcript-api` 1.x | Instance + `.fetch()` (stage 2) |
+| 4 | `response.status_status` in the PDF download | `AttributeError` | Code rewritten from scratch (stage 2) |
+| 5 | `create-next-app --eslint` while also choosing Biome | Two competing linters; on top of that no `--no-tailwind` | `--biome --no-tailwind`, one linter across the repo |
+| 6 | `nomic-embed-text` as the embedding model | An anglocentric model. A Polish question against an English rulebook **will not hit** the right passage — a silent loss of relevance | `bge-m3`, multilingual, cross-lingual search |
+| 7 | `whisper-cpp-py`, `kokoro-onnx` in `requirements.txt` | Packages with uncertain maintenance; risky to install | `mlx-whisper` (Apple MLX, native Metal) and `piper-tts` |
+| 8 | `allow_origins=["*"]` together with `allow_credentials=True` | The browser rejects that combination per the spec | No CORS at all — see decision D2 |
+| 9 | The frontend called `http://localhost:8000` directly, even though the structure assumed a proxy | Inconsistency: the proxy existed only on the diagram | Everything through `/api/engine/*` |
+| 10 | "BGG offers an API you can pull the files section (Files/Rules) from" | Untrue. XMLAPI2 does not expose the files section, and an automated downloader for it would breach the terms of service | You download rulebooks manually from legal sources; the repo provides ingestion, not bulk downloading |
 
-Plan sam wyłapał wcześniej trzy rzeczy trafnie: zepsuty parser SSE, brak polskiego
-fonemizera w Kokoro-TTS oraz brak awaryjnej ścieżki dla napisów z YouTube. Te
-poprawki utrzymałem.
-
----
-
-## 3. Audyt: luki architektoniczne
-
-Tu nie chodzi o błędy składniowe, a o rzeczy, których brak daje **działającą
-aplikację, która myli zasady**.
-
-### 3.1. Brak zawężenia wyszukiwania do gry — luka nr 1
-
-W planie wszystkie dokumenty trafiały do jednej bazy wektorowej bez obowiązkowego
-filtra. Pytanie „ile kart dociągam w fazie walki?” przy dwudziestu wczytanych grach
-wyciągnie fragmenty z kilku różnych instrukcji, a model połączy je w jedną
-odpowiedź, która brzmi wiarygodnie i jest nieprawdziwa.
-
-**Rozwiązanie:** `gameId` jest wymaganym polem żądania (`AskRequest`), walidowanym po
-stronie serwera, a filtr metadanych stosuje się **przed** wyszukiwaniem, nie po.
-Kontrakt wymusza to na poziomie typów, a test `test_ask_rejects_a_question_without_a_game`
-tego pilnuje.
-
-### 3.2. Brak hierarchii wiarygodności dokumentów
-
-Errata istnieje właśnie dlatego, że instrukcja się myli. Plan traktował instrukcję,
-FAQ i erratę jako równorzędny tekst, więc przy sprzeczności wygrywał ten fragment,
-który akurat miał wyższy wynik podobieństwa.
-
-**Rozwiązanie:** każdy fragment ma `documentKind`, a stała `DOCUMENT_AUTHORITY`
-ustala porządek: `video_transcript < player_aid < rulebook < faq < errata`. Przy
-konflikcie prompt każe modelowi trzymać się dokumentu o wyższej wiarygodności i
-powiedzieć wprost, że errata zmieniła zasadę. Kolejność jest identyczna po obu
-stronach — pilnuje tego `test_document_authority_order_matches`.
-
-Transkrypcje z YouTube mają **najniższą** wiarygodność celowo: dostarczają stylu, a
-nie zasad. Youtuber się myli albo gra ze starą erratą.
-
-### 3.3. Znacznik `[SHOW_IMAGE: ścieżka]` w treści odpowiedzi
-
-To był najpoważniejszy błąd projektowy. Plan kazał modelowi wypisywać ścieżkę do
-pliku wewnątrz generowanego tekstu. Model językowy **wymyśla ścieżki** — to dokładnie
-ten rodzaj danych, w którym halucynuje najchętniej. Front wyświetlałby wtedy losowy
-obrazek albo pustą ramkę, a znacznik potrafi też zostać rozerwany między dwa tokeny
-strumienia.
-
-**Rozwiązanie:** obrazy są kontrolowane przez backend, nie przez model.
-
-1. Backend wysyła ramkę `sources` **przed** pierwszym tokenem — to zamknięta lista
-   dowodów wraz z ich identyfikatorami i adresami obrazów.
-2. Model może wskazać figurę tylko przez jej identyfikator, w osobnej ramce `figure`.
-3. Front wyświetla obraz **wyłącznie** wtedy, gdy identyfikator występuje w otrzymanej
-   liście `sources` i ma przypisany obraz. Wymyślone odwołanie jest odrzucane i
-   zliczane w `rejectedFigureCount`.
-
-Wymyślona ścieżka nie jest więc „obsługiwana” — jest **niemożliwa do wyświetlenia**.
-Gwarancję opisują testy w `apps/web/features/rules-chat/answer-state.test.ts`.
-
-### 3.4. Brak reranku i wyszukiwania hybrydowego
-
-Plan miał jeden krok: podobieństwo wektorowe, `top_k` fragmentów, koniec. Dla pytań o
-zasady to za mało z dwóch powodów:
-
-- **Instrukcje są pełne nazw własnych** („Faza Odrodzenia”, „kafelek Zaopatrzenia”).
-  Wyszukiwanie znaczeniowe gubi dokładne dopasowania; potrzebny jest też klasyczny
-  BM25. LanceDB obsługuje jedno i drugie, więc wyniki łączymy.
-- **Podobieństwo ≠ trafność.** Cross-encoder (`bge-reranker-v2-m3`) przelicza pary
-  pytanie–fragment i przestawia kolejność. To pojedynczo największy zysk jakości w
-  RAG-u nad dokumentami technicznymi.
-
-Stąd trzy etapy: pobierz ~40 kandydatów hybrydowo → przesiej rerankerem → zostaw 6.
-Wartości są w konfiguracji (`retrieval_candidates`, `retrieval_top_k`).
-
-### 3.5. Brak progu istotności i stanu „nie wiem”
-
-Plan mówił modelowi „odpowiadaj tylko na podstawie fragmentów”, ale nic nie
-sprawdzało, czy fragmenty w ogóle są sensowne. Wyszukiwanie **zawsze** coś zwróci,
-choćby najlepszy wynik był kompletnie nie na temat — a model dostawszy nieadekwatny
-kontekst i tak sformułuje odpowiedź.
-
-**Rozwiązanie:** `min_relevance_score` odcina słabe trafienia, a `Groundedness`
-(`grounded` / `partial` / `insufficient_evidence`) jest częścią kontraktu i osobnym
-komunikatem w interfejsie. Brak pokrycia to wynik, nie błąd.
-
-### 3.6. Brak zbioru ewaluacyjnego — największy brak w całym planie
-
-W planie nie było **żadnego** sposobu stwierdzenia, czy asystent odpowiada poprawnie.
-Przy takim systemie każda zmiana promptu, rozmiaru fragmentu czy modelu jest
-zgadywaniem: poprawiasz jedno pytanie, psujesz trzy inne i nigdy się o tym nie
-dowiadujesz.
-
-**Rozwiązanie:** etap 6 to zbiór 30–50 pytań na grę z ręcznie wpisaną poprawną
-odpowiedzią i numerem strony. Mierzymy trzy rzeczy:
-
-- **trafność wyszukiwania** — czy właściwa strona znalazła się w wynikach,
-- **zgodność odpowiedzi** — czy odpowiedź nie sprzeczna ze wzorcem,
-- **poprawne „nie wiem”** — pytania spoza instrukcji, na które asystent **musi** odmówić.
-
-Ta trzecia grupa jest najważniejsza i najczęściej pomijana.
-
-### 3.7. Ekstrakcja obrazów z PDF
-
-Plan poprawił naiwne `page.get_images()` filtrem rozmiaru, co jest dobrym początkiem,
-ale nadal wyciąga elementy tła i pomija schematy złożone z wektorów (a takie są
-niemal wszystkie diagramy przygotowania gry).
-
-**Rozwiązanie warstwowe:** podstawą jest **render całej strony** do PNG w 150 DPI —
-zawsze poprawny i zawsze wystarczający do pokazania „patrz tutaj”, bo mamy numer
-strony. Kadrowanie pojedynczych figur to ulepszenie na później, nie fundament.
-
-### 3.8. Ciężkie parsery PDF
-
-`Marker` i `Unstructured` ciągną PyTorch i kilka GB modeli, po to, by radzić sobie ze
-skanami. Instrukcje wydawców to prawie zawsze PDF-y z warstwą tekstową.
-
-**Rozwiązanie:** domyślnie `pymupdf4llm` (lekki, zwraca Markdown z nagłówkami, bez
-żadnego modelu). Ciężki parser z OCR włączamy tylko dla konkretnego skanu.
-
-### 3.9. Warstwa głosowa
-
-Plan wysyłał całe nagranie po zakończeniu wypowiedzi i czekał na całą odpowiedź.
-Przy stole to zbyt wolne, a przy gwarze — zawodne.
-
-**Rozwiązanie:** *push-to-talk* jako domyślny tryb (odporny na hałas, przewidywalny),
-strumieniowanie TTS zdanie po zdaniu zamiast czekania na pełną odpowiedź, oraz
-widoczna transkrypcja pytania, żeby przesłyszenie było natychmiast widać.
-
-### 3.10. Mikrofon przy dostępie z tabletu
-
-Jeśli asystent ma być używany z tabletu w sieci lokalnej, `getUserMedia` **nie
-zadziała** po zwykłym HTTP — przeglądarka wymaga bezpiecznego kontekstu. Plan tego
-nie uwzględniał. Rozwiązanie (lokalny certyfikat albo tunel) należy do etapu 5 i
-zależy od odpowiedzi na pytanie otwarte O3.
+The plan itself had already caught three things correctly: a broken SSE parser, the
+missing Polish phonemiser in Kokoro-TTS, and the lack of a fallback path for YouTube
+subtitles. Those fixes were kept.
 
 ---
 
-## 4. Architektura docelowa
+## 3. Audit: architectural gaps
+
+These are not syntax errors but things whose absence yields a **working application that
+gets the rules wrong**.
+
+### 3.1. No per-game scoping of retrieval — gap no. 1
+
+In the plan all documents went into one vector store with no mandatory filter. The
+question "how many cards do I draw in the combat phase?" with twenty games indexed will
+pull passages from several different rulebooks, and the model will merge them into a
+single answer that sounds credible and is false.
+
+**Resolution:** `gameId` is a required request field (`AskRequest`), validated
+server-side, and the metadata filter is applied **before** retrieval, not after. The
+contract enforces this at the type level, and the test
+`test_ask_rejects_a_question_without_a_game` guards it.
+
+### 3.2. No document authority hierarchy
+
+Errata exist precisely because rulebooks get things wrong. The plan treated the rulebook,
+the FAQ and the errata as equivalent text, so on a contradiction the winner was whichever
+passage happened to score higher on similarity.
+
+**Resolution:** every chunk carries a `documentKind`, and the constant
+`DOCUMENT_AUTHORITY` fixes the order: `video_transcript < player_aid < rulebook < faq <
+errata`. On a conflict the prompt tells the model to follow the higher-authority document
+and to say outright that an errata changed the rule. The order is identical on both sides
+— `test_document_authority_order_matches` guards that.
+
+YouTube transcripts have the **lowest** authority on purpose: they supply style, not
+rules. A youtuber may be wrong, or playing with an old errata.
+
+### 3.3. A `[SHOW_IMAGE: path]` marker inside the answer text
+
+This was the most serious design error. The plan had the model write a file path inside
+the generated text. A language model **invents paths** — that is exactly the kind of data
+it hallucinates most eagerly. The frontend would then display a random image or an empty
+frame, and the marker can also be torn apart across two stream tokens.
+
+**Resolution:** images are controlled by the backend, not by the model.
+
+1. The backend sends a `sources` frame **before** the first token — a closed list of
+   evidence with ids and image URLs.
+2. The model may point at a figure only by its id, in a separate `figure` frame.
+3. The frontend displays an image **only** when the id is present in the `sources` list
+   it received and that source carries an image. An invented reference is rejected and
+   counted in `rejectedFigureCount`.
+
+So an invented path is not "handled" — it is **impossible to display**. The guarantee is
+described by the tests in `apps/web/src/features/rules-chat/answer-state.test.ts`.
+
+### 3.4. No reranking and no hybrid retrieval
+
+The plan had a single step: vector similarity, `top_k` passages, done. For rules
+questions that is not enough, for two reasons:
+
+- **Rulebooks are full of proper nouns** ("Rebirth Phase", "Supply tile"). Semantic
+  search loses exact matches; classic BM25 is needed too. LanceDB supports both, so we
+  fuse the results.
+- **Similarity ≠ relevance.** A cross-encoder (`bge-reranker-v2-m3`) rescores
+  question–passage pairs and reorders them. This is the single largest quality gain in
+  RAG over technical documents.
+
+Hence three stages: fetch ~40 candidates hybridly → filter through the reranker → keep 6.
+The values live in configuration (`retrieval_candidates`, `retrieval_top_k`).
+
+### 3.5. No relevance threshold and no "I don't know" state
+
+The plan told the model "answer only from the passages", but nothing checked whether the
+passages made any sense at all. Retrieval **always** returns something, even if the best
+hit is completely off topic — and a model handed inadequate context will still formulate
+an answer.
+
+**Resolution:** `min_relevance_score` cuts off weak hits, and `Groundedness`
+(`grounded` / `partial` / `insufficient_evidence`) is part of the contract and a separate
+message in the interface. A lack of coverage is a result, not an error.
+
+### 3.6. No evaluation set — the largest omission in the whole plan
+
+The plan had **no** way of establishing whether the assistant answers correctly. In a
+system like this, every change to the prompt, the chunk size or the model is guesswork:
+you fix one question, break three others, and never find out.
+
+**Resolution:** stage 6 is a set of 30–50 questions per game with a hand-written correct
+answer and a page number. We measure three things:
+
+- **retrieval accuracy** — did the right page make it into the results,
+- **answer agreement** — is the answer consistent with the reference,
+- **correct refusals** — questions outside the rulebook, which the assistant **must**
+  decline.
+
+That third group is the most important and the most commonly skipped.
+
+### 3.7. Extracting images from PDFs
+
+The plan improved on a naive `page.get_images()` with a size filter, which is a good
+start, but it still pulls background elements and misses diagrams made of vectors (and
+almost every setup diagram is one).
+
+**A layered resolution:** the baseline is **rendering the whole page** to PNG at 150 DPI
+— always correct and always sufficient for "look here", because we have the page number.
+Cropping individual figures is a later improvement, not a foundation.
+
+### 3.8. Heavy PDF parsers
+
+`Marker` and `Unstructured` drag in PyTorch and several GB of models, in order to cope
+with scans. Publisher rulebooks are almost always PDFs with a text layer.
+
+**Resolution:** `pymupdf4llm` by default (lightweight, returns Markdown with headings, no
+model at all). The heavy OCR parser is enabled only for a specific scan.
+
+### 3.9. The voice layer
+
+The plan sent the whole recording once the utterance ended and waited for the whole
+answer. At the table that is too slow, and in a noisy room — unreliable.
+
+**Resolution:** *push-to-talk* as the default mode (noise-resistant, predictable),
+TTS streamed sentence by sentence instead of waiting for the full answer, and a visible
+transcript of the question so a mishearing is immediately apparent.
+
+### 3.10. The microphone when accessed from a tablet
+
+If the assistant is to be used from a tablet on the local network, `getUserMedia` **will
+not work** over plain HTTP — the browser requires a secure context. The plan did not
+account for this. The resolution (a local certificate or a tunnel) belongs to stage 5 and
+depends on the answer to open question O3.
+
+---
+
+## 4. Target architecture
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
 │  apps/web — Next.js 16, React 19, Mantine 9, TypeScript 7        │
 │                                                                  │
 │  push-to-talk ──► POST /api/engine/ask ──► SSE                   │
-│  odpowiedź ◄── reduktor stanu ◄── dekoder ramek                  │
+│  answer ◄── state reducer ◄── frame decoder                      │
 │                     │                                            │
-│                     └─► obraz TYLKO z listy `sources`            │
+│                     └─► image ONLY from the `sources` list       │
 └───────────────────────────────┬──────────────────────────────────┘
-                                │ jeden origin, bez CORS
+                                │ one origin, no CORS
 ┌───────────────────────────────▼──────────────────────────────────┐
 │  services/rag-engine — FastAPI, Python 3.13                      │
 │                                                                  │
-│  Whisper (mlx) ──► tekst pytania                                 │
+│  Whisper (mlx) ──► question text                                 │
 │         │                                                        │
 │         ▼                                                        │
-│  wyszukiwanie:  filtr gameId ──► BM25 + wektory ──► reranker     │
+│  retrieval:  gameId filter ──► BM25 + vectors ──► reranker       │
 │         │                              │                         │
 │         │                              ▼                         │
-│         │                    próg istotności ──► „nie wiem”      │
+│         │                relevance threshold ──► "I don't know"  │
 │         ▼                                                        │
-│  LLM (Ollama) z promptem: tylko kontekst + hierarchia dokumentów │
+│  LLM (Ollama) prompted with: context only + document hierarchy   │
 │         │                                                        │
 │         ▼                                                        │
-│  Piper TTS (głos polski) ──► strumień audio zdanie po zdaniu     │
+│  Piper TTS (Polish voice) ──► audio streamed sentence by sentence│
 └───────────────────────────────┬──────────────────────────────────┘
                                 │
 ┌───────────────────────────────▼──────────────────────────────────┐
-│  Wczytywanie (uruchamiane ręcznie, nie przy starcie)             │
-│  PDF ──► pymupdf4llm ──► Markdown + render stron                 │
-│  YouTube ──► napisy, awaryjnie yt-dlp + Whisper                  │
-│  ──► podział po nagłówkach ──► LanceDB (wektory + BM25)          │
+│  Ingestion (run manually, not at startup)                        │
+│  PDF ──► pymupdf4llm ──► Markdown + page renders                 │
+│  YouTube ──► subtitles, fallback yt-dlp + Whisper                │
+│  ──► split on headings ──► LanceDB (vectors + BM25)              │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 5. Dziennik decyzji
+## 5. Decision log
 
-**D1 — Kontrakt API jako osobny pakiet.**
-`packages/api-contract` zawiera typy TypeScript i referencyjny dekoder SSE; Python
-odzwierciedla je w `contract.py`. Test parzystości czyta plik `.ts` i porównuje oba
-zbiory zdarzeń. Bez tego dodanie zdarzenia po jednej stronie objawia się jako
-strumień, który przeglądarka po cichu ignoruje.
+**D1 — The API contract as a separate package.**
+`packages/api-contract` holds the TypeScript types and a reference SSE decoder; Python
+mirrors them in `contract.py`. The parity test reads the `.ts` file and compares both
+event sets. Without it, adding an event on one side shows up as a stream the browser
+quietly ignores.
 
-**D2 — Wszystko przez proxy Next.js, zero CORS.**
-Przeglądarka nie zna adresu silnika. Zyskujemy: brak konfiguracji CORS, jeden origin
-dla obrazów i audio, port Pythona nadal tylko na `127.0.0.1`, i jedno miejsce na
-kontrolę dostępu, gdy dojdzie tablet w sieci lokalnej.
+**D2 — Everything through the Next.js proxy, zero CORS.**
+The browser does not know the engine's address. What we gain: no CORS configuration, one
+origin for images and audio, the Python port still bound to `127.0.0.1` only, and one
+place for access control once a tablet on the local network arrives.
 
-**D3 — Profile modeli w konfiguracji, nie w kodzie.**
-Budujesz na 32 GB, docelowo masz 64 GB. Profil to nazwany zestaw modeli
-(`starter-32gb`, `full-64gb`) wybierany zmienną `BGA_MODEL_PROFILE`. Przenosiny na
-nowy komputer to zmiana jednej linii.
+**D3 — Model profiles in configuration, not in code.**
+You build on 32 GB and will end up with 64 GB. A profile is a named set of models
+(`starter-32gb`, `full-64gb`) selected with the `BGA_MODEL_PROFILE` variable. Moving to a
+new machine is a one-line change.
 
-**D4 — Model MoE jako główny na docelowym sprzęcie.**
-Dla rozmowy głosowej liczy się czas do pierwszego dźwięku, nie wynik w benchmarku.
-Qwen3 30B-A3B aktywuje ~3 mld parametrów na token, więc odpowiada szybko przy
-jakości bliskiej modelowi 30B. Model 70B zmieściłby się w 64 GB, ale nie zostawia
-zapasu na cache kontekstu, Whisper i TTS jednocześnie — dlatego zamiast tego jest
-`llm_arbiter`: mocniejszy model uruchamiany wyłącznie do rozstrzygania sporów, gdzie
-kilka sekund dłużej nie przeszkadza.
+**D4 — An MoE model as the main one on the target hardware.**
+For spoken conversation what counts is time to first sound, not a benchmark score.
+Qwen3 30B-A3B activates ~3 billion parameters per token, so it answers fast at a quality
+close to a 30B model. A 70B model would fit in 64 GB but leaves no headroom for the
+context cache, Whisper and TTS at the same time — so instead there is `llm_arbiter`: a
+stronger model invoked purely to settle disputes, where a few extra seconds do not
+matter.
 
-**D5 — Ciężkie zależności w opcjonalnych grupach.**
-`uv sync` dla harnessu trwa sekundy. `ingest`, `retrieval` i `speech` doinstalowujesz
-wchodząc w dany etap. Na dysku 1 TB to wygoda; na obecnym, z 74 GB wolnego —
-konieczność.
+**D5 — Heavy dependencies in optional groups.**
+`uv sync` for the harness takes seconds. You install `ingest`, `retrieval` and `speech`
+as you enter each stage. On a 1 TB disk that is a convenience; on the current one, with
+74 GB free — a necessity.
 
-**D6 — Biome zamiast ESLint (a nie tylko dla szybkości).**
-TypeScript 7.0 nie udostępnia jeszcze programmatic API (ma dojść w 7.1), co
-**blokuje** `typescript-eslint`. Biome nie używa tego API, więc wybór Biome jest tym,
-co czyni stack TS 7 spójnym dziś. Next.js 16.3 uruchamia typowanie przez lokalne
-`tsc` CLI — sprawdzenie typów całej aplikacji zajmuje ~300 ms.
+**D6 — Biome instead of ESLint (and not just for speed).**
+TypeScript 7.0 does not yet expose a programmatic API (due in 7.1), which **blocks**
+`typescript-eslint`. Biome does not use that API, so choosing Biome is what makes a TS 7
+stack coherent today. Next.js 16.3 runs type checking through the local `tsc` CLI —
+checking the whole application takes ~300 ms.
 
-**D7 — Zaślepka `/ask` mówi „nie wiem”.**
-Domyślnym zachowaniem pustego systemu jest `insufficient_evidence`. To nie atrapa dla
-atrapy: front da się w całości zbudować i przetestować, zanim na dysku znajdzie się
-pierwszy model, a najważniejsza ścieżka — uczciwa odmowa — jest sprawdzana od
-pierwszego dnia.
+**D7 — The `/ask` stub says "I don't know".**
+The default behaviour of an empty system is `insufficient_evidence`. This is not a stub
+for its own sake: the frontend can be built and tested in full before the first model is
+on disk, and the most important path — an honest refusal — is exercised from day one.
+The stub does not stream prose; it emits a `notice` frame carrying a code, and the
+frontend renders the translated text (see D8).
+
+**D8 — User-facing text lives in the frontend, never in the engine or the model.**
+Every string the user reads comes from `apps/web/src/i18n/locales/<locale>/common.json`. The
+engine reports machine-readable codes — `NoticeEvent.code`, `ErrorEvent.code` — and the
+frontend maps them to translated copy; `ErrorEvent.message` stays an English technical
+detail for the log, not for the screen. This is the same discipline as D1 applied to
+words: text that crosses the process boundary would otherwise pin the interface to one
+language and put UI copy in Python. The active language is a URL segment (`/pl`, `/en`),
+so `<html lang>` and the page metadata are correct on the server render.
 
 ---
 
-## 6. Ustalenia zakresu
+## 6. Scope decisions
 
-Poniższe decyzje są podjęte i wiążą kolejne etapy.
+The decisions below are settled and bind the following stages.
 
-**Z1 — Instrukcje mieszane: polskie i angielskie, pytania zawsze po polsku.**
-Wyszukiwanie międzyjęzykowe przestaje być opcją. Konsekwencje:
+**Z1 — Mixed rulebooks: Polish and English, questions always in Polish.**
+Cross-lingual search stops being optional. Consequences:
 
-- `bge-m3` do embeddingów i `bge-reranker-v2-m3` do reranku są **wymagane** — oba są
-  wielojęzyczne i przeszukują między językami. Model anglocentryczny jest tu
-  wykluczony, bo polskie pytanie nie trafiłoby w angielski fragment.
-- Prompt musi nakazywać odpowiedź po polsku **z zachowaniem oryginalnego terminu w
-  nawiasie**, gdy źródło jest angielskie. To nie kosmetyka: nazwy faz i elementów są
-  wydrukowane po angielsku na kartach i planszy, więc „faza zaopatrzenia
-  (Supply Phase)” jest użyteczna przy stole, a samo tłumaczenie — nie.
-- Zbiór ewaluacyjny (etap 6) musi zawierać polskie pytania do angielskich instrukcji,
-  bo to najtrudniejszy przypadek dla wyszukiwania.
+- `bge-m3` for embeddings and `bge-reranker-v2-m3` for reranking are **required** — both
+  are multilingual and search across languages. An anglocentric model is ruled out here,
+  because a Polish question would not hit an English passage.
+- The prompt must require an answer in Polish **keeping the original term in
+  parentheses** when the source is English. This is not cosmetic: phase and component
+  names are printed in English on the cards and the board, so "faza zaopatrzenia
+  (Supply Phase)" is useful at the table, and a bare translation is not.
+- The evaluation set (stage 6) must contain Polish questions against English rulebooks,
+  because that is the hardest case for retrieval.
 
-**Z2 — Tekst jest trybem podstawowym, głos wchodzi na etapie 5.**
-Arbiter zasad na tekście jest użyteczny sam z siebie i dowozi się szybciej.
+**Z2 — Text is the primary mode, voice arrives in stage 5.**
+A rules arbiter over text is useful on its own and ships sooner.
 
-**Z3 — Obrazy: na start render całej strony wraz z numerem.**
-Zawsze poprawny i wystarczający do „patrz tutaj”. Kadrowanie pojedynczych schematów
-zostaje w etapie 7 jako ulepszenie.
+**Z3 — Images: start with a full page render including the number.**
+Always correct and sufficient for "look here". Cropping individual diagrams stays in
+stage 7 as an improvement.
 
-**Z4 — Dostęp z tabletu w sieci domowej jest w zakresie.**
-To ma trzy skutki, których pierwotny plan nie uwzględniał:
+**Z4 — Access from a tablet on the home network is in scope.**
+This has three consequences the original plan did not account for:
 
-- `getUserMedia` **nie działa** po zwykłym HTTP poza `localhost`, więc etap 5 wymaga
-  lokalnego certyfikatu (`mkcert`) albo tunelu. Bez tego mikrofon na tablecie
-  pozostanie niedostępny — i nie jest to problem do obejścia po stronie kodu.
-- Next.js musi nasłuchiwać na `0.0.0.0`, ale silnik Pythona **nadal tylko** na
-  `127.0.0.1`. Decyzja D2 (wszystko przez proxy) właśnie się opłaca: jest jedno
-  miejsce, przez które wchodzi ruch z sieci.
-- Skoro aplikacja staje się dostępna z sieci lokalnej, dochodzi prosta kontrola
-  dostępu w proxy — dziś jej nie ma i nie jest potrzebna.
+- `getUserMedia` **does not work** over plain HTTP outside `localhost`, so stage 5
+  requires a local certificate (`mkcert`) or a tunnel. Without it the microphone on a
+  tablet stays unavailable — and that is not a problem to work around in code.
+- Next.js must listen on `0.0.0.0`, but the Python engine **still only** on
+  `127.0.0.1`. Decision D2 (everything through the proxy) pays off exactly here: there is
+  a single place through which network traffic enters.
+- Once the application is reachable from the local network, a simple access check in the
+  proxy is added — it does not exist today and is not needed yet.
 
-**Z5 — Start na dwóch–trzech grach, w tym jednej prostej i jednej złożonej.**
-Wiele gier w bazie od początku pozwala wcześnie wykryć mieszanie zasad między grami
-(audyt 3.1) — przy jednej grze ten błąd jest niewidoczny aż do momentu, gdy staje się
-kosztowny w naprawie.
+**Z5 — Start with two or three games, including one simple and one complex.**
+Having several games indexed from the beginning surfaces cross-game rule mixing (audit
+3.1) early — with a single game that bug is invisible until it becomes expensive to fix.
+
+**Z6 — The interface ships in Polish and English; Polish is the default.**
+Polish is the language of the table (Z1), so it stays the default and the fallback. The
+English UI costs almost nothing once no string is hardcoded, and it makes the second
+locale a permanent test that the discipline in D8 is actually held: a hardcoded string
+shows up immediately as untranslated text on `/en`. The answers themselves remain a
+separate matter — those are governed by Z1 and the prompt, not by the interface locale.

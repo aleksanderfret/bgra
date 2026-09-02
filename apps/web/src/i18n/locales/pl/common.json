@@ -1,0 +1,79 @@
+{
+  "metadata": {
+    "title": "BGA — asystent zasad gier planszowych",
+    "description": "Lokalny asystent głosowy, który uczy zasad gier planszowych na podstawie Twoich instrukcji."
+  },
+  "home": {
+    "title": "Asystent zasad gier planszowych",
+    "subtitle": "Odpowiedzi pochodzą wyłącznie z instrukcji, FAQ i errat wczytanych na tym komputerze."
+  },
+  "language": {
+    "label": "Język interfejsu",
+    "pl": "Polski",
+    "en": "English"
+  },
+  "rulesChat": {
+    "engineOffline": {
+      "title": "Silnik RAG nie odpowiada",
+      "body": "Uruchom go poleceniem <command>pnpm dev</command> w katalogu repozytorium. Interfejs działa, ale bez silnika nie ma skąd wziąć zasad."
+    },
+    "game": {
+      "label": "Gra",
+      "description": "Wyszukiwanie jest zawsze zawężone do jednej gry",
+      "loading": "Wczytuję…",
+      "placeholder": "Wybierz grę"
+    },
+    "mode": {
+      "teach": "Naucz mnie gry",
+      "arbitrate": "Rozstrzygnij zasadę"
+    },
+    "question": {
+      "label": "Pytanie",
+      "placeholder": "Czy mogę zagrać kartę akcji, jeśli nie mam już kafelków?"
+    },
+    "submit": "Zapytaj"
+  },
+  "stage": {
+    "transcribing": "Rozpoznaję pytanie…",
+    "retrieving": "Przeszukuję dokumenty…",
+    "reranking": "Porządkuję fragmenty…",
+    "generating": "Formułuję odpowiedź…",
+    "speaking": "Mówię…"
+  },
+  "answer": {
+    "transcript": "Usłyszałem: „{{transcript}}”",
+    "insufficientEvidence": {
+      "title": "Brak podstawy w dokumentach",
+      "body": "Ta odpowiedź nie ma pokrycia w wczytanych materiałach. Dodaj erratę lub FAQ do tej gry, zamiast traktować powyższy tekst jako regułę."
+    },
+    "figures": {
+      "title": "Wskazówka wizualna",
+      "alt": "{{document}}, strona {{page}}",
+      "unknownPage": "—"
+    },
+    "sources": {
+      "title": "Źródła",
+      "page": ", s. {{page}}"
+    },
+    "error": {
+      "title": "Błąd silnika",
+      "unknown": "Silnik zgłosił błąd, dla którego nie ma tu jeszcze opisu.",
+      "engine_unreachable": "Nie udało się połączyć z lokalnym silnikiem RAG.",
+      "stream_truncated": "Strumień odpowiedzi urwał się przed zakończeniem.",
+      "http_error": "Silnik odpowiedział błędem.",
+      "malformed_frame": "Silnik przysłał ramkę, która nie jest poprawnym JSON-em.",
+      "unknown_event": "Silnik przysłał ramkę niezgodną z kontraktem zdarzeń."
+    }
+  },
+  "documentKind": {
+    "rulebook": "instrukcja",
+    "faq": "FAQ",
+    "errata": "errata",
+    "player_aid": "pomoc gracza",
+    "video_transcript": "transkrypcja wideo"
+  },
+  "notice": {
+    "unknown": "Silnik zgłosił stan, dla którego nie ma tu jeszcze opisu.",
+    "engine_not_indexed": "Nie mam jeszcze wczytanych dokumentów do gry „{{gameId}}”, więc nie odpowiem na to pytanie w sposób oparty na zasadach.\n\nSilnik działa i strumieniowanie jest sprawne — brakuje kroku wyszukiwania (etap 3 planu). Aktywny profil modeli: {{profile}}."
+  }
+}

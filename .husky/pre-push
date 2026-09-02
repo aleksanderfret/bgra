@@ -1,0 +1,3 @@
+# Same checks as CI, including a production build.
+# `pnpm verify` is lint + types + tests + build for every package.
+pnpm verify

@@ -1,0 +1,79 @@
+{
+  "metadata": {
+    "title": "BGA — board game rules assistant",
+    "description": "A local voice assistant that teaches board game rules from your own rulebooks."
+  },
+  "home": {
+    "title": "Board game rules assistant",
+    "subtitle": "Answers come only from the rulebooks, FAQs and errata indexed on this computer."
+  },
+  "language": {
+    "label": "Interface language",
+    "pl": "Polski",
+    "en": "English"
+  },
+  "rulesChat": {
+    "engineOffline": {
+      "title": "The RAG engine is not responding",
+      "body": "Start it with <command>pnpm dev</command> in the repository directory. The interface works, but without the engine there is nowhere to get the rules from."
+    },
+    "game": {
+      "label": "Game",
+      "description": "Retrieval is always scoped to a single game",
+      "loading": "Loading…",
+      "placeholder": "Choose a game"
+    },
+    "mode": {
+      "teach": "Teach me the game",
+      "arbitrate": "Settle a rule"
+    },
+    "question": {
+      "label": "Question",
+      "placeholder": "Can I play an action card if I have no tiles left?"
+    },
+    "submit": "Ask"
+  },
+  "stage": {
+    "transcribing": "Transcribing the question…",
+    "retrieving": "Searching the documents…",
+    "reranking": "Ranking the passages…",
+    "generating": "Writing the answer…",
+    "speaking": "Speaking…"
+  },
+  "answer": {
+    "transcript": "I heard: “{{transcript}}”",
+    "insufficientEvidence": {
+      "title": "No basis in the documents",
+      "body": "This answer is not covered by the indexed material. Add an errata or a FAQ for this game rather than treating the text above as a rule."
+    },
+    "figures": {
+      "title": "Visual hint",
+      "alt": "{{document}}, page {{page}}",
+      "unknownPage": "—"
+    },
+    "sources": {
+      "title": "Sources",
+      "page": ", p. {{page}}"
+    },
+    "error": {
+      "title": "Engine error",
+      "unknown": "The engine reported an error that has no description here yet.",
+      "engine_unreachable": "Could not reach the local RAG engine.",
+      "stream_truncated": "The answer stream stopped before it finished.",
+      "http_error": "The engine responded with an error.",
+      "malformed_frame": "The engine sent a frame that is not valid JSON.",
+      "unknown_event": "The engine sent a frame that does not match the event contract."
+    }
+  },
+  "documentKind": {
+    "rulebook": "rulebook",
+    "faq": "FAQ",
+    "errata": "errata",
+    "player_aid": "player aid",
+    "video_transcript": "video transcript"
+  },
+  "notice": {
+    "unknown": "The engine reported a state that has no description here yet.",
+    "engine_not_indexed": "No documents are indexed for “{{gameId}}” yet, so there is nothing to base a rules answer on.\n\nThe engine is running and streaming works — what is missing is the retrieval step (stage 3 of the plan). Active model profile: {{profile}}."
+  }
+}

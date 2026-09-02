@@ -91,7 +91,7 @@ def test_corrupt_registry_is_reported_not_hidden(client: TestClient, storage: Pa
     assert "unreadable" in response.json()["detail"]
 
 
-def test_ask_streams_sources_before_any_token(client: TestClient) -> None:
+def test_ask_streams_sources_before_the_answer(client: TestClient) -> None:
     with client.stream(
         "POST",
         "/ask",
@@ -105,7 +105,7 @@ def test_ask_streams_sources_before_any_token(client: TestClient) -> None:
 
     # The frontend may only display evidence it was given, so the sources
     # frame has to arrive before the answer starts.
-    assert kinds.index("sources") < kinds.index("token")
+    assert kinds.index("sources") < kinds.index("notice")
     assert kinds[-1] == "done"
 
 
@@ -119,6 +119,25 @@ def test_ask_admits_it_has_no_evidence_yet(client: TestClient) -> None:
 
     done = events[-1]
     assert done["groundedness"] == "insufficient_evidence"
+
+
+def test_ask_reports_the_empty_index_as_a_code_not_as_prose(client: TestClient) -> None:
+    # Wording belongs to the frontend, which has both languages; the engine
+    # only names the situation and supplies the values to fill in.
+    with client.stream(
+        "POST",
+        "/ask",
+        json={"gameId": "azul", "question": "Kto zaczyna?", "mode": "teach"},
+    ) as response:
+        events = _frames("".join(response.iter_text()))
+
+    notice = next(event for event in events if event["type"] == "notice")
+    params = notice["params"]
+
+    assert notice["code"] == "engine_not_indexed"
+    assert isinstance(params, dict)
+    assert params["gameId"] == "azul"
+    assert params["profile"]
 
 
 def test_ask_rejects_a_question_without_a_game(client: TestClient) -> None:

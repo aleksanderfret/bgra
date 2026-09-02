@@ -93,6 +93,19 @@ class AudioEvent(WireModel):
     data_base64: str
 
 
+class NoticeEvent(WireModel):
+    """A state of the engine that the user has to be told about.
+
+    The engine sends a code and the values to fill into it; the frontend owns
+    the sentence. Putting the prose here instead would pin the interface to one
+    language and scatter UI copy across two runtimes.
+    """
+
+    type: Literal["notice"] = "notice"
+    code: str
+    params: dict[str, str] = Field(default_factory=dict)
+
+
 class DoneEvent(WireModel):
     type: Literal["done"] = "done"
     answer_id: str
@@ -102,6 +115,7 @@ class DoneEvent(WireModel):
 class ErrorEvent(WireModel):
     type: Literal["error"] = "error"
     code: str
+    #: English technical detail for the log. The screen shows `code` translated.
     message: str
 
 
@@ -112,6 +126,7 @@ AssistantEvent = Annotated[
     | TokenEvent
     | FigureEvent
     | AudioEvent
+    | NoticeEvent
     | DoneEvent
     | ErrorEvent,
     Field(discriminator="type"),

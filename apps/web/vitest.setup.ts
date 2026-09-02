@@ -42,3 +42,12 @@ class ResizeObserverStub {
 }
 
 window.ResizeObserver = ResizeObserverStub;
+
+/**
+ * jsdom implements no Font Loading API either, and the autosizing textarea
+ * subscribes to `loadingdone` so it can re-measure once a webfont swaps in.
+ */
+Object.defineProperty(document, 'fonts', {
+  writable: true,
+  value: { addEventListener: vi.fn(), removeEventListener: vi.fn() },
+});

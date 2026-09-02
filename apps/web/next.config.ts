@@ -13,6 +13,10 @@ const nextConfig: NextConfig = {
   // is no build step to sequence before `next dev`.
   transpilePackages: ['@bga/api-contract'],
 
+  // This repo keeps one AGENTS.md, at the root. A generated copy under apps/web
+  // would be a second set of instructions, drifting from the first.
+  agentRules: false,
+
   experimental: {
     // Mantine re-exports its whole surface from one entry point; without this
     // the dev server pulls in every component on first compile.

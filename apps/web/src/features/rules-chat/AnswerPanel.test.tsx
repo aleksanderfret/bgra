@@ -1,5 +1,7 @@
 import type { AssistantEvent, RetrievedSource } from '@bga/api-contract';
 import { describe, expect, it } from 'vitest';
+import en from '@/i18n/locales/en/common.json';
+import pl from '@/i18n/locales/pl/common.json';
 import { render, screen } from '@/test-utils';
 import { AnswerPanel } from './AnswerPanel';
 import {
@@ -35,7 +37,7 @@ describe('AnswerPanel', () => {
   it('warns when the answer has no basis in the indexed documents', () => {
     render(<AnswerPanel state={stateWith({ groundedness: 'insufficient_evidence' })} />);
 
-    expect(screen.getByRole('alert')).toHaveTextContent('Brak podstawy w dokumentach');
+    expect(screen.getByRole('alert')).toHaveTextContent(pl.answer.insufficientEvidence.title);
   });
 
   it('shows the transcript so a mishearing is visible', () => {
@@ -75,12 +77,67 @@ describe('AnswerPanel', () => {
       <AnswerPanel
         state={stateWith({
           text: 'to nie powinno się pokazać',
-          error: { code: 'engine_unreachable', message: 'Silnik nie odpowiada.' },
+          error: { code: 'engine_unreachable', message: 'ECONNREFUSED 127.0.0.1:8000' },
         })}
       />,
     );
 
-    expect(screen.getByRole('alert')).toHaveTextContent('Silnik nie odpowiada.');
+    expect(screen.getByRole('alert')).toHaveTextContent(pl.answer.error.engine_unreachable);
     expect(screen.queryByText('to nie powinno się pokazać')).not.toBeInTheDocument();
+  });
+
+  it('keeps the technical detail visible next to the translated error', () => {
+    render(
+      <AnswerPanel
+        state={stateWith({
+          error: { code: 'http_error', message: 'Engine responded with HTTP 503.' },
+        })}
+      />,
+    );
+
+    expect(screen.getByText('Engine responded with HTTP 503.')).toBeInTheDocument();
+  });
+
+  it('falls back to a generic sentence for a code it has no wording for', () => {
+    // The engine can ship a new code before the frontend learns the word for
+    // it; showing the bare code to somebody mid-game is not an option.
+    render(
+      <AnswerPanel
+        state={stateWith({ error: { code: 'kaboom', message: 'upstream exploded' } })}
+      />,
+    );
+
+    expect(screen.getByRole('alert')).toHaveTextContent(pl.answer.error.unknown);
+    expect(screen.queryByText('kaboom')).not.toBeInTheDocument();
+  });
+
+  it('phrases an engine notice from its code and values', () => {
+    render(
+      <AnswerPanel
+        state={stateWith({
+          notice: { code: 'engine_not_indexed', params: { gameId: 'azul', profile: 'full-64gb' } },
+        })}
+      />,
+    );
+
+    expect(screen.getByText(/azul/)).toBeInTheDocument();
+    expect(screen.getByText(/full-64gb/)).toBeInTheDocument();
+  });
+
+  it('renders every string in the requested language', () => {
+    // The real assertion is that nothing here is hardcoded: the same state in
+    // another locale has to come out in that locale's words.
+    render(<AnswerPanel state={stateWith({ groundedness: 'insufficient_evidence' })} />, 'en');
+
+    expect(screen.getByRole('alert')).toHaveTextContent(en.answer.insufficientEvidence.title);
+    expect(screen.queryByText(pl.answer.insufficientEvidence.title)).not.toBeInTheDocument();
+  });
+
+  it('labels a source with the translated document kind', () => {
+    const state = stateWith({ sources: [figureSource] });
+
+    render(<AnswerPanel state={state} />, 'en');
+
+    expect(screen.getByText(`${en.documentKind.rulebook}, p. 4`)).toBeInTheDocument();
   });
 });

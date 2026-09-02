@@ -12,6 +12,9 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    env:
+      # Hooks are for local machines. CI runs the same checks as named steps.
+      HUSKY: 0
     steps:
       - uses: actions/checkout@v4
 
