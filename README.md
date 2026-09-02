@@ -184,6 +184,7 @@ bga/
 ├── services/rag-engine/      FastAPI · Python 3.14 · uv
 │   ├── rag_engine/           API, configuration, model profiles
 │   └── storage/              your documents and index (outside git)
+├── .cursor/                  committed agent harness (skills, rules, commands)
 └── docs/                     architecture and execution plan
 ```
 

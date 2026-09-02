@@ -44,3 +44,5 @@ models/
 .vscode/*
 !.vscode/settings.json
 !.vscode/extensions.json
+# `.cursor/` (skills, rules, commands) is the committed agent harness.
+# Local Cursor state lives in ~/.cursor, not in this repository.

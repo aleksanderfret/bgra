@@ -4,6 +4,9 @@ Context for coding agents. Read `docs/ARCHITECTURE.md` before changing anything 
 the retrieval or streaming path — several constraints there exist to prevent the
 assistant from stating rules that are not in the documents.
 
+Project skills, Cursor rules and slash commands live in [`.cursor/`](.cursor/).
+Keep them in git. Personal Cursor config stays in `~/.cursor/`.
+
 ## Stack
 
 | Area | Choice | Note |
