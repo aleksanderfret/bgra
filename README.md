@@ -118,7 +118,7 @@ Models never end up in the repository — they are downloaded locally.
 ```bash
 node --version   # ≥ 22
 corepack enable  # exposes pnpm from package.json
-brew install uv  # Python environment manager (installs Python 3.13 itself)
+brew install uv  # Python environment manager (installs Python 3.14 itself)
 ```
 
 The AI engines arrive in later stages — **the harness runs without them**:
@@ -181,7 +181,7 @@ bga/
 │       ├── features/         answer and streaming logic
 │       └── i18n/             i18next setup and pl/en resources
 ├── packages/api-contract/    shared TS contract + reference SSE decoder
-├── services/rag-engine/      FastAPI · Python 3.13 · uv
+├── services/rag-engine/      FastAPI · Python 3.14 · uv
 │   ├── rag_engine/           API, configuration, model profiles
 │   └── storage/              your documents and index (outside git)
 └── docs/                     architecture and execution plan

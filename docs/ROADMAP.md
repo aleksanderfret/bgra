@@ -14,7 +14,7 @@ The monorepo, the interface, the streaming flow and the API contract.
 
 - pnpm workspaces + Turborepo, one `pnpm dev` command runs both processes
 - Next.js 16.3 · React 19 · Mantine 9 · TypeScript 7 · Vitest 4 · Biome 2.5
-- FastAPI · Python 3.13 · uv, with `mypy --strict` and `ruff`
+- FastAPI · Python 3.14 · uv, with `mypy --strict` and `ruff`
 - A shared contract with a reference SSE decoder and a parity test
 - Interface in Polish and English (i18next), no user-facing string hardcoded
 - Tests including the guarantee that invented image references are rejected

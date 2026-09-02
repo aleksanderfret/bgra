@@ -50,6 +50,8 @@ class ModelProfile(BaseModel):
 
     #: Piper voice name. Polish needs a Polish-trained voice; English-only
     #: engines mispronounce it badly regardless of audio quality.
+    #: `pl_PL-bass-high` is a male teaching voice; other pl_PL options are
+    #: gosia, darkman, mc_speech (medium) and mls_6892 (low).
     tts_voice: str
 
     #: Upper bound on prompt size. Larger contexts cost KV-cache memory and,
@@ -71,7 +73,7 @@ PROFILES: dict[str, ModelProfile] = {
         reranker="BAAI/bge-reranker-v2-m3",
         vision=None,
         stt="mlx-community/whisper-large-v3-turbo",
-        tts_voice="pl_PL-gosia-medium",
+        tts_voice="pl_PL-bass-high",
         context_tokens=8192,
         approx_disk_gb=12.0,
     ),
@@ -86,7 +88,7 @@ PROFILES: dict[str, ModelProfile] = {
         reranker="BAAI/bge-reranker-v2-m3",
         vision="qwen2.5vl:7b",
         stt="mlx-community/whisper-large-v3-turbo",
-        tts_voice="pl_PL-gosia-medium",
+        tts_voice="pl_PL-bass-high",
         context_tokens=32768,
         approx_disk_gb=48.0,
     ),

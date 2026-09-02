@@ -12,7 +12,7 @@ assistant from stating rules that are not in the documents.
 | Types | TypeScript 7 | No programmatic compiler API until 7.1, so `typescript-eslint` cannot be used. |
 | Lint | Biome 2.5 | Single config at the repo root. Do not add ESLint. |
 | Tests | Vitest 4 | `globals: false`, so import `describe`/`it`/`expect` explicitly. |
-| Backend | FastAPI, Python 3.13, uv | `mypy --strict` and `ruff` both gate CI. |
+| Backend | FastAPI, Python 3.14, uv | `mypy --strict` and `ruff` both gate CI. |
 | Tasks | Turborepo + pnpm workspaces | Turbo 2 uses `tasks`, not `pipeline`. |
 
 ## Commands

@@ -184,7 +184,7 @@ depends on the answer to open question O3.
 └───────────────────────────────┬──────────────────────────────────┘
                                 │ one origin, no CORS
 ┌───────────────────────────────▼──────────────────────────────────┐
-│  services/rag-engine — FastAPI, Python 3.13                      │
+│  services/rag-engine — FastAPI, Python 3.14                      │
 │                                                                  │
 │  Whisper (mlx) ──► question text                                 │
 │         │                                                        │

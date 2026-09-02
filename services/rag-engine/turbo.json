@@ -7,6 +7,17 @@
       // so there is nothing for Turbo to cache or restore.
       "outputs": [],
       "cache": false
+    },
+    // Console scripts inside .venv bake in an absolute path. typecheck/test/lint
+    // must wait for `uv sync` so a missing or relocated venv is recreated first.
+    "typecheck": {
+      "dependsOn": ["build"]
+    },
+    "test": {
+      "dependsOn": ["build"]
+    },
+    "lint": {
+      "dependsOn": ["build"]
     }
   }
 }

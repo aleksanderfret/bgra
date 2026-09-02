@@ -1,3 +1,4 @@
 # Lint and format only the files in this commit. Fixes are re-staged.
 # Types, tests and the production build run on pre-push (`pnpm verify`).
-pnpm exec lint-staged
+. "$(dirname "$0")/load-node.sh"
+corepack pnpm exec lint-staged
