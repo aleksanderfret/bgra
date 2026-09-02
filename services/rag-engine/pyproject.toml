@@ -1,0 +1,70 @@
+[project]
+name = "rag-engine"
+version = "0.1.0"
+description = "Local RAG engine answering board game rules questions from your own documents"
+requires-python = ">=3.13,<3.15"
+
+# Kept deliberately small. Everything that pulls in model weights or native
+# ML wheels lives in an optional group below, so the harness installs in
+# seconds and each stage of the roadmap is opted into explicitly.
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    "httpx>=0.28",
+]
+
+[project.optional-dependencies]
+# Stage 2 — turn rulebooks and video transcripts into indexed chunks.
+ingest = [
+    "pymupdf4llm>=1.28",
+    "youtube-transcript-api>=1.2",
+    "yt-dlp>=2026.8.19",
+]
+# Stage 3 — hybrid retrieval over the local vector store.
+retrieval = [
+    "lancedb>=0.38",
+    "sentence-transformers>=6.0",
+]
+# Stage 5 — speech in and speech out, Apple Silicon only.
+speech = [
+    "mlx-whisper>=0.4",
+    "piper-tts>=1.7",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "mypy>=1.13",
+    "ruff>=0.8",
+]
+
+[tool.uv]
+# This is an application, not a distributable library.
+package = false
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF", "ANN"]
+ignore = ["ANN401"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["ANN201", "ANN001"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+warn_unreachable = true
+files = ["rag_engine", "tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+# The project is not installed as a package, so the service root has to be on
+# the import path for `import rag_engine` to resolve.
+pythonpath = ["."]

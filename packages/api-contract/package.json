@@ -1,0 +1,20 @@
+{
+  "name": "@bga/api-contract",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared wire contract between the Next.js frontend and the Python rag-engine",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "biome check"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2",
+    "vitest": "4.1.11"
+  }
+}

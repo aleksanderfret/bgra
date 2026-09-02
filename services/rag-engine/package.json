@@ -1,0 +1,13 @@
+{
+  "name": "rag-engine",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Turborepo wrapper around the Python engine; every script delegates to uv",
+  "scripts": {
+    "dev": "uv run uvicorn rag_engine.main:app --reload --port 8000",
+    "build": "uv sync",
+    "test": "uv run pytest -q",
+    "typecheck": "uv run mypy",
+    "lint": "uv run ruff check . && uv run ruff format --check ."
+  }
+}

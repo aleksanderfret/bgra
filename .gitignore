@@ -1,0 +1,43 @@
+# --- Node / TypeScript ---
+node_modules/
+.next/
+out/
+build/
+dist/
+coverage/
+*.tsbuildinfo
+next-env.d.ts
+.turbo/
+
+# --- Python ---
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# --- Environment ---
+.env
+.env.*
+!.env.example
+
+# --- Local knowledge base and generated artifacts ---
+# Rulebooks are copyrighted material: they stay on your disk, never in git.
+services/rag-engine/storage/
+!services/rag-engine/storage/.gitkeep
+
+# --- Model weights (tens of GB, always fetched locally) ---
+models/
+*.gguf
+*.bin
+*.onnx
+
+# --- Editor / OS ---
+.DS_Store
+*.pem
+*.log
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json

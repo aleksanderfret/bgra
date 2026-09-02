@@ -1,0 +1,17 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+  - "services/*"
+
+# Keep the dependency graph honest: a package must declare what it imports.
+linkWorkspacePackages: true
+saveWorkspaceProtocol: rolling
+
+# Native postinstall scripts are opt-in in pnpm 10+. Only allow what we need.
+allowBuilds:
+  sharp: false
+  unrs-resolver: false
+
+minimumReleaseAgeExclude:
+  - '@testing-library/user-event@14.6.7'
+  - '@types/node@26.4.1'

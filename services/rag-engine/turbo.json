@@ -1,0 +1,12 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      // `uv sync` materialises .venv, which is machine-specific and gitignored,
+      // so there is nothing for Turbo to cache or restore.
+      "outputs": [],
+      "cache": false
+    }
+  }
+}
