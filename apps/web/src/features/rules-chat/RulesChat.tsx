@@ -82,6 +82,7 @@ export function RulesChat() {
       />
 
       <SegmentedControl
+        aria-label={t('rulesChat.mode.label')}
         value={mode}
         onChange={(value) => {
           if (isAnswerMode(value)) {

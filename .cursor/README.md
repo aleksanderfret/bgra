@@ -9,6 +9,8 @@ here.
 | `skills/` | Project skills (`SKILL.md` per skill). Shared with anyone who clones the repo. |
 | `skills/premortem/` | Pre-mortem before implementation: tigers, paper tigers, elephants. |
 | `skills/frontend-code/` | How to write `apps/web` (no nested JSX ternaries, no `any`, i18n, Mantine). |
+| `skills/translations/` | No hardcoded UI copy; every string lives in `en`/`pl` catalogues. |
+| `skills/ui-testing/` | Testing Library: query UI as a user (roles, labels, text). |
 | `rules/` | Cursor rules (`.mdc`). Persistent guidance, always-on or glob-scoped. |
 | `commands/` | Slash commands for repeatable agent workflows. |
 

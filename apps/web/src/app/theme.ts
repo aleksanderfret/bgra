@@ -1,4 +1,8 @@
-import { createTheme } from '@mantine/core';
+import { createTheme, type MantineColorScheme } from '@mantine/core';
+
+// ColorSchemeScript and MantineProvider must share this value. A mismatch is
+// the usual cause of a flash of the wrong scheme on a Next.js refresh.
+export const DEFAULT_COLOR_SCHEME: MantineColorScheme = 'auto';
 
 export const theme = createTheme({
   primaryColor: 'indigo',

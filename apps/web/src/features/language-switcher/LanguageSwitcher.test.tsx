@@ -11,6 +11,19 @@ vi.mock('next/navigation', () => ({
 }));
 
 describe('LanguageSwitcher', () => {
+  it('names the radiogroup with the visible translated label', () => {
+    render(<LanguageSwitcher />, 'en');
+
+    expect(screen.getByRole('radiogroup', { name: en.language.label })).toBeInTheDocument();
+  });
+
+  it('marks each language name with its own lang so AT pronounce it correctly', () => {
+    render(<LanguageSwitcher />, 'en');
+
+    expect(screen.getByText(en.language.pl)).toHaveAttribute('lang', 'pl');
+    expect(screen.getByText(en.language.en)).toHaveAttribute('lang', 'en');
+  });
+
   it('navigates to the same page under the other locale', async () => {
     render(<LanguageSwitcher />, 'en');
 
@@ -25,5 +38,14 @@ describe('LanguageSwitcher', () => {
     render(<LanguageSwitcher />, 'en');
 
     expect(screen.getByRole('radio', { name: en.language.en })).toBeChecked();
+  });
+
+  it('moves between options with the arrow keys', async () => {
+    render(<LanguageSwitcher />, 'en');
+
+    await userEvent.click(screen.getByRole('radio', { name: en.language.en }));
+    await userEvent.keyboard('{ArrowLeft}');
+
+    expect(replace).toHaveBeenCalledWith('/pl/games/azul');
   });
 });

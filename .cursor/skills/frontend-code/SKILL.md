@@ -47,10 +47,9 @@ type (`as GameSummary[]` only at a trusted JSON boundary after a check).
   object in the function signature.
 - **Mantine** for UI. No Tailwind, no extra CSS-in-JS library. Style with
   component props and Mantine CSS variables.
-- **No user-facing string in code.** Every word on screen comes from
-  `apps/web/src/i18n/locales/<locale>/common.json`, both `pl` and `en`. Add a
-  key to both files in the same change. Engine `code`s stay codes; the UI
-  translates them.
+- **Copy:** no hardcoded user-facing text. Follow
+  `.cursor/skills/translations/SKILL.md`. Every string on screen comes from
+  both locale files; the engine sends codes, not prose.
 - **Locale lives in the URL.** Do not call `i18n.changeLanguage` to switch
   language; navigate with `withLocale` (see `LanguageSwitcher`).
 - **Do not lie to the type checker.** No non-null assertions (`!`) on values
@@ -66,6 +65,8 @@ type (`as GameSummary[]` only at a trusted JSON boundary after a check).
   to the Python port.
 - Render tests with `src/test-utils/render.tsx` (Mantine + i18n). Pass
   `locale` when the assertion is language-specific.
+- UI tests follow `.cursor/skills/ui-testing/SKILL.md`: query and click the
+  way a user would (`getByRole`, labels, text). No `querySelector`, no test ids.
 - Import `describe`, `it`, `expect` from `vitest`. `globals` are off.
 - Put branching UI logic in a pure module (`answer-state.ts`) and unit-test
   that; keep the component thin.
@@ -76,4 +77,5 @@ type (`as GameSummary[]` only at a trusted JSON boundary after a check).
 - [ ] No `any`
 - [ ] New copy exists in both locale files
 - [ ] Happy path is not buried in nested `if`/`else`
+- [ ] UI tests query by role / label / text (see `ui-testing`)
 - [ ] `pnpm --filter web test` (or `pnpm verify`) covers the new branch

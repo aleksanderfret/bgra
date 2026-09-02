@@ -1,7 +1,7 @@
 import { MantineProvider } from '@mantine/core';
 import { render as testingLibraryRender } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { theme } from '@/app/theme';
+import { DEFAULT_COLOR_SCHEME, theme } from '@/app/theme';
 import { I18nProvider } from '@/i18n/I18nProvider';
 import { DEFAULT_LOCALE, type Locale } from '@/i18n/settings';
 
@@ -18,7 +18,7 @@ export function render(ui: ReactNode, locale: Locale = DEFAULT_LOCALE) {
   return testingLibraryRender(ui, {
     wrapper: ({ children }: { children: ReactNode }) => (
       <I18nProvider locale={locale}>
-        <MantineProvider theme={theme} env="test">
+        <MantineProvider theme={theme} defaultColorScheme={DEFAULT_COLOR_SCHEME} env="test">
           {children}
         </MantineProvider>
       </I18nProvider>

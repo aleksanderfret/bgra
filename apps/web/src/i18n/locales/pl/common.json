@@ -7,10 +7,20 @@
     "title": "Asystent zasad gier planszowych",
     "subtitle": "Odpowiedzi pochodzą wyłącznie z instrukcji, FAQ i errat wczytanych na tym komputerze."
   },
+  "preferences": {
+    "label": "Ustawienia wyświetlania"
+  },
   "language": {
     "label": "Język interfejsu",
     "pl": "Polski",
     "en": "English"
+  },
+  "colorScheme": {
+    "label": "Motyw",
+    "light": "Jasny",
+    "dark": "Ciemny",
+    "auto": "System",
+    "changed": "Motyw ustawiony na {{scheme}}"
   },
   "rulesChat": {
     "engineOffline": {
@@ -24,6 +34,7 @@
       "placeholder": "Wybierz grę"
     },
     "mode": {
+      "label": "Tryb odpowiedzi",
       "teach": "Naucz mnie gry",
       "arbitrate": "Rozstrzygnij zasadę"
     },

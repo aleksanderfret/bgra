@@ -1,0 +1,13 @@
+---
+description: UI tests query the page the way a user does (Testing Library).
+globs: apps/web/**/*.test.tsx
+alwaysApply: false
+---
+
+# UI tests
+
+Follow `.cursor/skills/ui-testing/SKILL.md`.
+
+Find elements with `getByRole` / `getByLabelText` / `getByText`. Interact with
+`userEvent`. Do not use `querySelector`, `getByTestId`, or `.focus()` to drive
+the test.

@@ -56,7 +56,10 @@ describe('AnswerPanel', () => {
 
     render(<AnswerPanel state={state} />);
 
-    expect(screen.getByAltText('Azul — instrukcja, strona 4')).toBeInTheDocument();
+    const figureName = pl.answer.figures.alt
+      .replace('{{document}}', figureSource.documentTitle)
+      .replace('{{page}}', String(figureSource.page));
+    expect(screen.getByRole('img', { name: figureName })).toBeInTheDocument();
   });
 
   it('renders no image when the model cited a figure that was never retrieved', () => {
@@ -120,8 +123,12 @@ describe('AnswerPanel', () => {
       />,
     );
 
-    expect(screen.getByText(/azul/)).toBeInTheDocument();
-    expect(screen.getByText(/full-64gb/)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        (content, element) =>
+          element?.tagName === 'P' && content.includes('azul') && content.includes('full-64gb'),
+      ),
+    ).toBeInTheDocument();
   });
 
   it('renders every string in the requested language', () => {

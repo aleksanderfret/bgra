@@ -10,6 +10,7 @@ Follow `.cursor/skills/frontend-code/SKILL.md` when editing these files.
 
 - Nested ternaries in JSX are forbidden. Use early returns, `{cond && <X />}`, or a small component.
 - `any` is forbidden (`as any` included). Narrow with a type guard or a precise type.
-- No user-facing string in source. Add keys to both `en` and `pl` locale files.
+- No hardcoded user-facing text. Follow `.cursor/skills/translations/SKILL.md`.
 - Mantine only. No Tailwind.
 - `'use client'` only when the file needs state, effects, or browser events.
+- UI tests follow `.cursor/skills/ui-testing/SKILL.md` (roles, labels, text; no selectors).

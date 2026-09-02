@@ -1,0 +1,15 @@
+---
+description: No hardcoded user-facing text — every word on screen comes from en/pl catalogues.
+alwaysApply: true
+---
+
+# Translations
+
+Follow `.cursor/skills/translations/SKILL.md`.
+
+There must be no hardcoded user-facing text. Everything the user reads is
+defined in `apps/web/src/i18n/locales/en/common.json` and
+`apps/web/src/i18n/locales/pl/common.json`, in the same change.
+
+The engine sends `code`s (`NoticeEvent`, `ErrorEvent`), never a sentence for
+the screen. `ErrorEvent.message` is an English log detail only.

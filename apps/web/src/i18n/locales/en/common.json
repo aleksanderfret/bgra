@@ -7,10 +7,20 @@
     "title": "Board game rules assistant",
     "subtitle": "Answers come only from the rulebooks, FAQs and errata indexed on this computer."
   },
+  "preferences": {
+    "label": "Display preferences"
+  },
   "language": {
     "label": "Interface language",
     "pl": "Polski",
     "en": "English"
+  },
+  "colorScheme": {
+    "label": "Color scheme",
+    "light": "Light",
+    "dark": "Dark",
+    "auto": "System",
+    "changed": "Color scheme set to {{scheme}}"
   },
   "rulesChat": {
     "engineOffline": {
@@ -24,6 +34,7 @@
       "placeholder": "Choose a game"
     },
     "mode": {
+      "label": "Answer mode",
       "teach": "Teach me the game",
       "arbitrate": "Settle a rule"
     },
