@@ -256,17 +256,43 @@ pierwszego dnia.
 
 ---
 
-## 6. Pytania otwarte
+## 6. Ustalenia zakresu
 
-Odpowiedzi zmieniają zakres kolejnych etapów.
+Poniższe decyzje są podjęte i wiążą kolejne etapy.
 
-- **O1 — Języki instrukcji.** Same polskie, czy też angielskie? Jeśli mieszane,
-  wyszukiwanie międzyjęzykowe (`bge-m3`) jest obowiązkowe, a nie opcjonalne.
-- **O2 — Obrazy z instrukcji w wersji pierwszej, czy później?** Sam tekst z numerami
-  stron da się dowieźć znacznie szybciej.
-- **O3 — Dostęp z tabletu przy stole?** Jeśli tak, potrzebny lokalny HTTPS, bo bez
-  niego przeglądarka nie da dostępu do mikrofonu.
-- **O4 — Ile gier na start?** Trzy pozwalają wcześnie wykryć mieszanie zasad między
-  grami; jedna upraszcza wszystko.
-- **O5 — Głos zawsze, czy tekst jako tryb podstawowy?** Wpływa na to, czy warstwa
-  mowy wchodzi na etapie 5, czy wcześniej.
+**Z1 — Instrukcje mieszane: polskie i angielskie, pytania zawsze po polsku.**
+Wyszukiwanie międzyjęzykowe przestaje być opcją. Konsekwencje:
+
+- `bge-m3` do embeddingów i `bge-reranker-v2-m3` do reranku są **wymagane** — oba są
+  wielojęzyczne i przeszukują między językami. Model anglocentryczny jest tu
+  wykluczony, bo polskie pytanie nie trafiłoby w angielski fragment.
+- Prompt musi nakazywać odpowiedź po polsku **z zachowaniem oryginalnego terminu w
+  nawiasie**, gdy źródło jest angielskie. To nie kosmetyka: nazwy faz i elementów są
+  wydrukowane po angielsku na kartach i planszy, więc „faza zaopatrzenia
+  (Supply Phase)” jest użyteczna przy stole, a samo tłumaczenie — nie.
+- Zbiór ewaluacyjny (etap 6) musi zawierać polskie pytania do angielskich instrukcji,
+  bo to najtrudniejszy przypadek dla wyszukiwania.
+
+**Z2 — Tekst jest trybem podstawowym, głos wchodzi na etapie 5.**
+Arbiter zasad na tekście jest użyteczny sam z siebie i dowozi się szybciej.
+
+**Z3 — Obrazy: na start render całej strony wraz z numerem.**
+Zawsze poprawny i wystarczający do „patrz tutaj”. Kadrowanie pojedynczych schematów
+zostaje w etapie 7 jako ulepszenie.
+
+**Z4 — Dostęp z tabletu w sieci domowej jest w zakresie.**
+To ma trzy skutki, których pierwotny plan nie uwzględniał:
+
+- `getUserMedia` **nie działa** po zwykłym HTTP poza `localhost`, więc etap 5 wymaga
+  lokalnego certyfikatu (`mkcert`) albo tunelu. Bez tego mikrofon na tablecie
+  pozostanie niedostępny — i nie jest to problem do obejścia po stronie kodu.
+- Next.js musi nasłuchiwać na `0.0.0.0`, ale silnik Pythona **nadal tylko** na
+  `127.0.0.1`. Decyzja D2 (wszystko przez proxy) właśnie się opłaca: jest jedno
+  miejsce, przez które wchodzi ruch z sieci.
+- Skoro aplikacja staje się dostępna z sieci lokalnej, dochodzi prosta kontrola
+  dostępu w proxy — dziś jej nie ma i nie jest potrzebna.
+
+**Z5 — Start na dwóch–trzech grach, w tym jednej prostej i jednej złożonej.**
+Wiele gier w bazie od początku pozwala wcześnie wykryć mieszanie zasad między grami
+(audyt 3.1) — przy jednej grze ten błąd jest niewidoczny aż do momentu, gdy staje się
+kosztowny w naprawie.

@@ -52,8 +52,9 @@ tokenie; `/health` zgłasza `degraded` z nazwą brakującego modelu, gdy któreg
 - Rejestr gier w `storage/games.json` zgodny z `GameSummary`
 - CLI: `uv run python -m rag_engine.ingest add --game azul --kind rulebook plik.pdf`
 
-**Odbiór:** po wczytaniu jednej gry `/games` zwraca ją z niezerowym `chunkCount`, a
-`storage/assets/<gameId>/` zawiera renderowane strony.
+**Odbiór:** po wczytaniu dwóch–trzech gier (jedna prosta, jedna złożona — ustalenie
+Z5) `/games` zwraca je z niezerowym `chunkCount`, a `storage/assets/<gameId>/`
+zawiera renderowane strony.
 
 ---
 
@@ -69,10 +70,14 @@ tokenie; `/health` zgłasza `degraded` z nazwą brakującego modelu, gdy któreg
 - Próg `min_relevance_score`; poniżej → `insufficient_evidence` bez wołania modelu
 - Prompt z hierarchią `DOCUMENT_AUTHORITY` i zakazem wychodzenia poza kontekst
 - Ramka `sources` wysyłana **przed** pierwszym tokenem
+- Odpowiedź po polsku także dla angielskich instrukcji, z oryginalnym terminem w
+  nawiasie — nazwy faz i elementów są wydrukowane po angielsku na komponentach
+  (ustalenie Z1)
 
 **Odbiór:** pytanie o zasadę z wczytanej instrukcji daje odpowiedź z poprawnym
-numerem strony; pytanie o grę niewczytaną daje odmowę, nie zmyśloną regułę; pytanie o
-grę A nigdy nie zwraca fragmentów gry B.
+numerem strony; **polskie pytanie o angielską instrukcję trafia we właściwy
+fragment**; pytanie o grę niewczytaną daje odmowę, nie zmyśloną regułę; pytanie o grę
+A nigdy nie zwraca fragmentów gry B.
 
 ---
 
@@ -101,11 +106,13 @@ wiedzą, a przejście w tryb `arbitrate` w środku sesji daje krótką odpowied�
 - Ramka `transcript` pokazuje, co usłyszał, zanim odpowie
 - Piper z głosem polskim, audio strumieniowane **zdanie po zdaniu** — nie po
   wygenerowaniu całej odpowiedzi
-- Jeśli asystent ma działać z tabletu: lokalny HTTPS, bez niego przeglądarka nie
-  udostępni mikrofonu (pytanie otwarte O3)
+- **Lokalny HTTPS jest wymagany** (`mkcert`), bo asystent ma działać z tabletu w
+  sieci domowej, a `getUserMedia` nie działa po HTTP poza `localhost` (ustalenie Z4)
+- Next.js nasłuchuje na `0.0.0.0`, silnik Pythona nadal tylko na `127.0.0.1`; do
+  proxy dochodzi prosta kontrola dostępu
 
 **Odbiór:** pytanie zadane głosem daje odpowiedź mówioną; pierwszy dźwięk pojawia się
-zanim model dokończy generowanie.
+zanim model dokończy generowanie; **mikrofon działa na tablecie**, nie tylko na Macu.
 
 ---
 
@@ -116,6 +123,10 @@ wiarygodności całości.
 
 - `eval/<gameId>.yaml`: 30–50 pytań z poprawną odpowiedzią i numerem strony
 - Osobna grupa pytań **spoza** instrukcji, na które poprawna odpowiedź to odmowa
+- Polskie pytania do **angielskich** instrukcji — najtrudniejszy przypadek dla
+  wyszukiwania, więc musi być mierzony osobno (ustalenie Z1)
+- Pytania celowo dwuznaczne między dwiema wczytanymi grami, wyłapujące mieszanie
+  zasad
 - `uv run python -m rag_engine.eval` raportuje trafność wyszukiwania, zgodność
   odpowiedzi i odsetek poprawnych odmów
 - Wynik zapisywany historycznie, żeby regresja była widoczna
