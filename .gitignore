@@ -24,7 +24,9 @@ __pycache__/
 
 # --- Local knowledge base and generated artifacts ---
 # Rulebooks are copyrighted material: they stay on your disk, never in git.
-services/rag-engine/storage/
+# Ignore the contents, keep the directory: git will not descend into an
+# ignored directory, so the pattern has to target its entries.
+services/rag-engine/storage/*
 !services/rag-engine/storage/.gitkeep
 
 # --- Model weights (tens of GB, always fetched locally) ---
