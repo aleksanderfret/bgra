@@ -1,0 +1,33 @@
+---
+description: Commit messages follow Conventional Commits with a required monorepo scope.
+alwaysApply: true
+---
+
+# Conventional commits
+
+When the user asks for a commit, the message must pass `commitlint`
+(`@commitlint/config-conventional` plus a required scope).
+
+```
+type(scope): subject
+
+Why this change exists. Not a restatement of the subject.
+```
+
+- `type` is one of `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`.
+- `scope` is required and must be one of `web`, `rag-engine`, `api-contract`, `cursor`, `repo`, `docs`, `ci`.
+- Subject is English, imperative, lowercase, no trailing period. Header max 100 characters.
+- Body is optional but preferred: the why, not the what.
+- Do not use `git commit` flags that skip hooks.
+
+Interactive helper for humans: `git commit`, `git commit --amend`,
+rebase reword/squash, and `pnpm commit` in a **terminal** (type → scope
+→ subject). Git's editor and sequence editor are no-ops here — Cursor
+must not open COMMIT_EDITMSG. Source Control has no TTY, so it will not
+show the menu.
+
+`git commit -m` opens the wizard when the given message would fail
+commitlint. A message that already passes (agents, scripts) skips it.
+
+Ctrl+C in the wizard restores the message Git already prepared (amend /
+rebase keep it; a new commit is aborted).

@@ -1,0 +1,3 @@
+# Conventional Commits: type(scope): subject, scope from commitlint.config.mjs.
+. "$(dirname "$0")/load-node.sh"
+corepack pnpm exec commitlint --edit "$1"

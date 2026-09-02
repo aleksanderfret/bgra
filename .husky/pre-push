@@ -1,4 +1,16 @@
 # Same checks as CI, including a production build.
 # `pnpm verify` is lint + types + tests + build for every package.
 . "$(dirname "$0")/load-node.sh"
+
+# Turbo TUI enables terminal mouse tracking. After a hook that is not a
+# full-screen session, leftover CSI reports print as `35;32;8M` on mouse move.
+# Stream UI matches CI and never turns that mode on.
+export TURBO_UI=stream
+
+restore_terminal() {
+  # Belt and braces if a cached TUI binary still emitted the enable sequence.
+  printf '\033[?1000l\033[?1002l\033[?1003l\033[?1006l' >/dev/tty 2>/dev/null || true
+}
+trap restore_terminal EXIT
+
 corepack pnpm verify

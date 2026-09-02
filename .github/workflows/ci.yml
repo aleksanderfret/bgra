@@ -17,6 +17,8 @@ jobs:
       HUSKY: 0
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -42,6 +44,13 @@ jobs:
       - name: Install Python dependencies
         run: uv sync
         working-directory: services/rag-engine
+
+      - name: Lint commit messages
+        if: github.event_name == 'pull_request'
+        run: pnpm exec commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }} --verbose
+
+      - name: Test commitlint rules
+        run: node --test commitlint.config.test.mjs
 
       - name: Lint and format
         run: pnpm check

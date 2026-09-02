@@ -1,0 +1,46 @@
+# Every commit message in a real terminal goes through cz-git, including
+# amend, squash, merge, and rebase reword. A valid `git commit -m` (agents)
+# must not hang. Cursor's commit tab (TERM=dumb) cannot render Inquirer.
+#
+# Husky runs this file with `sh -e`. Ctrl+C must not leak to husky/git
+# (that is exit 130). The wizard is the tty foreground group; on cancel
+# we restore Git's prepared message and exit 0 so amend/rebase keep it.
+. "$(dirname "$0")/load-node.sh"
+
+if [ "${2-}" = "message" ] && corepack pnpm exec commitlint --edit "$1"; then
+  exit 0
+fi
+
+if [ -z "${TERM-}" ] || [ "$TERM" = "dumb" ]; then
+  exit 0
+fi
+
+exec < /dev/tty || exit 0
+
+msg_file="$1"
+backup=$(mktemp)
+cp "$msg_file" "$backup"
+
+root=$(git rev-parse --show-toplevel)
+cz="$root/node_modules/.bin/cz"
+runner="$root/scripts/run-cz-hook.py"
+
+trap '' INT
+status=0
+if command -v python3 >/dev/null 2>&1; then
+  python3 "$runner" "$cz" || status=$?
+else
+  status=1
+fi
+# 130 is Ctrl+C. Any other failure is the runner; fall back so the wizard still shows.
+if [ "$status" -ne 0 ] && [ "$status" -ne 130 ]; then
+  status=0
+  "$cz" --hook || status=$?
+fi
+trap - INT
+
+if [ "$status" -ne 0 ]; then
+  cp "$backup" "$msg_file"
+fi
+rm -f "$backup"
+exit 0

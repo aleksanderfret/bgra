@@ -1,0 +1,11 @@
+{
+  "git.terminalGitEditor": false,
+  "terminal.integrated.env.osx": {
+    "GIT_EDITOR": "${workspaceFolder}/scripts/git-commit-editor.sh",
+    "GIT_SEQUENCE_EDITOR": "${workspaceFolder}/scripts/git-commit-editor.sh"
+  },
+  "terminal.integrated.env.linux": {
+    "GIT_EDITOR": "${workspaceFolder}/scripts/git-commit-editor.sh",
+    "GIT_SEQUENCE_EDITOR": "${workspaceFolder}/scripts/git-commit-editor.sh"
+  }
+}

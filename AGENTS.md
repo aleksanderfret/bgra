@@ -22,9 +22,15 @@ Keep them in git. Personal Cursor config stays in `~/.cursor/`.
 
 ```bash
 pnpm dev        # web + engine
+pnpm commit     # interactive Conventional Commit (commitizen + cz-git)
 pnpm verify     # typecheck, test, build, lint — must pass before finishing work
 pnpm preflight  # lint, typecheck, test — without a production build
 ```
+
+Commit messages are `type(scope): subject` with a required scope from
+`commitlint.config.mjs`. In a terminal, `git commit`, `git commit --amend`, rebase reword/squash,
+and `pnpm commit` open the cz-git wizard. Git's editor is a no-op in this
+repo. Husky `commit-msg` then runs commitlint. Do not skip hooks.
 
 Python scripts run through `uv run`. Never emit `source .venv/bin/activate` into a
 package.json script: npm runs scripts with `sh`, which has no `source`.
