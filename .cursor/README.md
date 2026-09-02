@@ -7,6 +7,8 @@ here.
 | Path | Role |
 | --- | --- |
 | `skills/` | Project skills (`SKILL.md` per skill). Shared with anyone who clones the repo. |
+| `skills/premortem/` | Pre-mortem before implementation: tigers, paper tigers, elephants. |
+| `skills/frontend-code/` | How to write `apps/web` (no nested JSX ternaries, no `any`, i18n, Mantine). |
 | `rules/` | Cursor rules (`.mdc`). Persistent guidance, always-on or glob-scoped. |
 | `commands/` | Slash commands for repeatable agent workflows. |
 

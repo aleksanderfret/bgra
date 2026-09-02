@@ -36,7 +36,8 @@
       },
       "style": {
         "useConst": "error",
-        "noNonNullAssertion": "warn"
+        "noNonNullAssertion": "warn",
+        "noNestedTernary": "error"
       },
       "suspicious": {
         "noExplicitAny": "error"
