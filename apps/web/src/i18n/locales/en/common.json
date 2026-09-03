@@ -42,7 +42,9 @@
       "label": "Question",
       "placeholder": "Can I play an action card if I have no tiles left?"
     },
-    "submit": "Ask"
+    "submit": "Ask",
+    "cancel": "Cancel",
+    "formLabel": "Ask a rules question"
   },
   "stage": {
     "transcribing": "Transcribing the question…",
@@ -52,6 +54,7 @@
     "speaking": "Speaking…"
   },
   "answer": {
+    "regionLabel": "Model answer",
     "transcript": "I heard: “{{transcript}}”",
     "insufficientEvidence": {
       "title": "No basis in the documents",

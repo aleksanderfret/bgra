@@ -13,6 +13,7 @@ from rag_engine.contract import (
     AssistantEvent,
     DocumentKind,
     Groundedness,
+    HealthReport,
     PipelineStage,
     RetrievedSource,
 )
@@ -26,9 +27,12 @@ def _source() -> str:
 
 
 def _declaration(source: str, anchor: str) -> str:
-    """A top-level declaration in `types.ts` always ends at a blank line."""
+    """A top-level declaration in `types.ts` ends at a blank line or EOF."""
     start = source.index(anchor)
-    end = source.index("\n\n", start)
+    try:
+        end = source.index("\n\n", start)
+    except ValueError:
+        end = len(source)
     return source[start:end]
 
 
@@ -107,5 +111,12 @@ def test_retrieved_source_fields_match() -> None:
 def test_ask_request_fields_match() -> None:
     ts_fields = _interface_fields(_source(), "AskRequest")
     python_fields = {to_camel(name) for name in AskRequest.model_fields}
+
+    assert ts_fields == python_fields
+
+
+def test_health_report_fields_match() -> None:
+    ts_fields = _interface_fields(_source(), "HealthReport")
+    python_fields = {to_camel(name) for name in HealthReport.model_fields}
 
     assert ts_fields == python_fields

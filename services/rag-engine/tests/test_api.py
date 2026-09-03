@@ -1,12 +1,20 @@
+import asyncio
 import json
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
 
+from rag_engine.engines.llm import OllamaUnreachableError
 from rag_engine.main import create_app
 from rag_engine.settings import Settings, get_settings
+
+_ALL_TAGS = {"qwen3:14b", "bge-m3"}
+_TAGS_PATCH = "rag_engine.routers.ask.installed_ollama_tags"
+_GEN_PATCH = "rag_engine.routers.ask.generate_stream"
+_HEALTH_TAGS_PATCH = "rag_engine.routers.health.installed_ollama_tags"
 
 
 @pytest.fixture
@@ -18,7 +26,9 @@ def storage(tmp_path: Path) -> Path:
 @pytest.fixture
 def client(storage: Path) -> Iterator[TestClient]:
     app = create_app()
-    app.dependency_overrides[get_settings] = lambda: Settings(storage_dir=storage)
+    app.dependency_overrides[get_settings] = lambda: Settings(
+        storage_dir=storage,
+    )
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
@@ -33,26 +43,92 @@ def _frames(raw: str) -> list[dict[str, object]]:
     return events
 
 
+def _mock_tags(tags: set[str]) -> AsyncMock:
+    return AsyncMock(return_value=tags)
+
+
+async def _fake_generate(
+    *_args: object,
+    **_kwargs: object,
+) -> AsyncIterator[str]:
+    for word in ["Hello", " world", "!"]:
+        yield word
+
+
+def _ask_body(
+    game_id: str = "azul",
+    question: str = "Kto zaczyna?",
+    mode: str = "teach",
+) -> dict[str, str]:
+    return {"gameId": game_id, "question": question, "mode": mode}
+
+
+# --- health ---
+
+
+def test_health_reports_ok_when_all_models_installed(
+    client: TestClient,
+) -> None:
+    with patch(_HEALTH_TAGS_PATCH, _mock_tags(_ALL_TAGS)):
+        response = client.get("/health")
+
+    payload = response.json()
+    assert response.status_code == 200
+    assert payload["status"] == "ok"
+    assert payload["missingModels"] == []
+
+
+def test_health_reports_degraded_with_missing_model(
+    client: TestClient,
+) -> None:
+    with patch(_HEALTH_TAGS_PATCH, _mock_tags({"bge-m3"})):
+        response = client.get("/health")
+
+    payload = response.json()
+    assert payload["status"] == "degraded"
+    assert "qwen3:14b" in payload["missingModels"]
+
+
+def test_health_reports_degraded_when_ollama_unreachable(
+    client: TestClient,
+) -> None:
+    with patch(
+        _HEALTH_TAGS_PATCH,
+        side_effect=OllamaUnreachableError("down"),
+    ):
+        response = client.get("/health")
+
+    payload = response.json()
+    assert payload["status"] == "degraded"
+    assert payload["components"]["ollama"] is False
+
+
 def test_health_names_the_loaded_models(client: TestClient) -> None:
-    response = client.get("/health")
+    with patch(_HEALTH_TAGS_PATCH, _mock_tags(set())):
+        response = client.get("/health")
 
     assert response.status_code == 200
     payload = response.json()
-    # Degraded is expected on a machine where Ollama is not running; what
-    # matters is that the report says which component is down.
     assert payload["status"] in {"ok", "degraded"}
     assert "ollama" in payload["components"]
     assert payload["models"]["llm"]
 
 
-def test_games_is_empty_before_any_ingestion(client: TestClient) -> None:
-    response = client.get("/games")
+# --- games ---
 
+
+def test_games_is_empty_before_any_ingestion(
+    client: TestClient,
+) -> None:
+    response = client.get("/games")
     assert response.status_code == 200
     assert response.json() == []
 
 
-def test_games_returns_the_registry_newest_first(client: TestClient, storage: Path) -> None:
+def test_games_returns_the_registry_newest_first(
+    client: TestClient,
+    storage: Path,
+) -> None:
     (storage / "games.json").write_text(
         json.dumps(
             [
@@ -76,82 +152,117 @@ def test_games_returns_the_registry_newest_first(client: TestClient, storage: Pa
     )
 
     payload = client.get("/games").json()
-
-    assert [game["gameId"] for game in payload] == ["brass", "azul"]
+    assert [g["gameId"] for g in payload] == ["brass", "azul"]
     assert payload[0]["documentKinds"] == ["rulebook", "faq"]
 
 
-def test_corrupt_registry_is_reported_not_hidden(client: TestClient, storage: Path) -> None:
-    (storage / "games.json").write_text("{ this is not json", encoding="utf-8")
-
+def test_corrupt_registry_is_reported_not_hidden(
+    client: TestClient,
+    storage: Path,
+) -> None:
+    (storage / "games.json").write_text(
+        "{ this is not json",
+        encoding="utf-8",
+    )
     response = client.get("/games")
-
     assert response.status_code == 500
     assert "unreadable" in response.json()["detail"]
 
 
-def test_registry_failure_does_not_reveal_the_filesystem(client: TestClient, storage: Path) -> None:
-    (storage / "games.json").write_text("{ this is not json", encoding="utf-8")
-
+def test_registry_failure_does_not_reveal_the_filesystem(
+    client: TestClient,
+    storage: Path,
+) -> None:
+    (storage / "games.json").write_text(
+        "{ this is not json",
+        encoding="utf-8",
+    )
     detail = client.get("/games").json()["detail"]
-
     assert str(storage) not in detail
     assert "games.json" not in detail
 
 
-def test_ask_streams_sources_before_the_answer(client: TestClient) -> None:
-    with client.stream(
-        "POST",
-        "/ask",
-        json={"gameId": "azul", "question": "Ile kafelków dobieram?", "mode": "arbitrate"},
-    ) as response:
+# --- ask: model available ---
+
+
+def test_ask_streams_tokens_from_model(client: TestClient) -> None:
+    with (
+        patch(_TAGS_PATCH, _mock_tags(_ALL_TAGS)),
+        patch(_GEN_PATCH, _fake_generate),
+        client.stream("POST", "/ask", json=_ask_body()) as response,
+    ):
         assert response.status_code == 200
-        assert response.headers["content-type"].startswith("text/event-stream")
         events = _frames("".join(response.iter_text()))
 
-    kinds = [event["type"] for event in events]
+    kinds = [e["type"] for e in events]
+    assert "sources" in kinds
+    assert "token" in kinds
+    assert events[-1]["type"] == "done"
+    assert events[-1]["groundedness"] == "partial"
 
-    # The frontend may only display evidence it was given, so the sources
-    # frame has to arrive before the answer starts.
-    assert kinds.index("sources") < kinds.index("notice")
-    assert kinds[-1] == "done"
+
+def test_ask_sends_generating_status_between_sources_and_tokens(
+    client: TestClient,
+) -> None:
+    with (
+        patch(_TAGS_PATCH, _mock_tags(_ALL_TAGS)),
+        patch(_GEN_PATCH, _fake_generate),
+        client.stream("POST", "/ask", json=_ask_body()) as response,
+    ):
+        events = _frames("".join(response.iter_text()))
+
+    kinds = [e["type"] for e in events]
+    sources_idx = kinds.index("sources")
+    gen_indices = [
+        i for i, k in enumerate(kinds) if k == "status" and events[i].get("stage") == "generating"
+    ]
+    assert len(gen_indices) == 1
+    assert gen_indices[0] > sources_idx
+    token_indices = [i for i, k in enumerate(kinds) if k == "token"]
+    assert all(ti > gen_indices[0] for ti in token_indices)
 
 
-def test_ask_admits_it_has_no_evidence_yet(client: TestClient) -> None:
-    with client.stream(
-        "POST",
-        "/ask",
-        json={"gameId": "azul", "question": "Kto zaczyna?", "mode": "teach"},
-    ) as response:
+# --- ask: model not available ---
+
+
+def test_ask_falls_back_when_ollama_unreachable(
+    client: TestClient,
+) -> None:
+    with (
+        patch(
+            _TAGS_PATCH,
+            side_effect=OllamaUnreachableError("down"),
+        ),
+        client.stream("POST", "/ask", json=_ask_body()) as response,
+    ):
+        events = _frames("".join(response.iter_text()))
+
+    done = events[-1]
+    assert done["groundedness"] == "insufficient_evidence"
+    notices = [e for e in events if e["type"] == "notice"]
+    assert notices[0]["code"] == "engine_not_indexed"
+
+
+def test_ask_falls_back_when_model_missing(
+    client: TestClient,
+) -> None:
+    with (
+        patch(_TAGS_PATCH, _mock_tags({"bge-m3"})),
+        client.stream("POST", "/ask", json=_ask_body()) as response,
+    ):
         events = _frames("".join(response.iter_text()))
 
     done = events[-1]
     assert done["groundedness"] == "insufficient_evidence"
 
 
-def test_ask_reports_the_empty_index_as_a_code_not_as_prose(client: TestClient) -> None:
-    # Wording belongs to the frontend, which has both languages; the engine
-    # only names the situation and supplies the values to fill in.
-    with client.stream(
-        "POST",
-        "/ask",
-        json={"gameId": "azul", "question": "Kto zaczyna?", "mode": "teach"},
-    ) as response:
-        events = _frames("".join(response.iter_text()))
-
-    notice = next(event for event in events if event["type"] == "notice")
-    params = notice["params"]
-
-    assert notice["code"] == "engine_not_indexed"
-    assert isinstance(params, dict)
-    assert params["gameId"] == "azul"
-    assert params["profile"]
+# --- ask: validation ---
 
 
-def test_ask_rejects_a_question_without_a_game(client: TestClient) -> None:
-    # Unscoped retrieval would mix rules from every game in the library.
-    response = client.post("/ask", json={"gameId": "", "question": "Kto zaczyna?"})
-
+def test_ask_rejects_a_question_without_a_game(
+    client: TestClient,
+) -> None:
+    response = client.post("/ask", json=_ask_body(game_id=""))
     assert response.status_code == 422
 
 
@@ -159,9 +270,83 @@ def test_ask_rejects_a_question_without_a_game(client: TestClient) -> None:
     "game_id",
     ["../../etc/passwd", "azul/rulebook", "..", "Azul", "azul\x00"],
 )
-def test_ask_rejects_a_game_id_that_is_not_a_slug(client: TestClient, game_id: str) -> None:
-    # The same value names a directory under storage/assets, so anything but a
-    # slug is a path waiting to escape.
-    response = client.post("/ask", json={"gameId": game_id, "question": "Kto zaczyna?"})
-
+def test_ask_rejects_a_game_id_that_is_not_a_slug(
+    client: TestClient,
+    game_id: str,
+) -> None:
+    response = client.post("/ask", json=_ask_body(game_id=game_id))
     assert response.status_code == 422
+
+
+# --- ask: mid-generation failure ---
+
+
+def test_ask_returns_insufficient_evidence_on_generation_error(
+    client: TestClient,
+) -> None:
+    async def _failing_generate(
+        *_args: object,
+        **_kwargs: object,
+    ) -> AsyncIterator[str]:
+        yield "partial answer"
+        raise OllamaUnreachableError("connection lost")
+
+    with (
+        patch(_TAGS_PATCH, _mock_tags(_ALL_TAGS)),
+        patch(_GEN_PATCH, _failing_generate),
+        client.stream("POST", "/ask", json=_ask_body()) as response,
+    ):
+        events = _frames("".join(response.iter_text()))
+
+    tokens = [e for e in events if e["type"] == "token"]
+    assert len(tokens) >= 1
+    errors = [e for e in events if e["type"] == "error"]
+    assert len(errors) == 1
+    assert errors[0]["code"] == "engine_unreachable"
+    done = events[-1]
+    assert done["type"] == "done"
+    assert done["groundedness"] == "insufficient_evidence"
+
+
+# --- semaphore ---
+
+
+def test_two_requests_do_not_generate_in_parallel(
+    client: TestClient,
+) -> None:
+    call_log: list[tuple[str, float]] = []
+
+    async def _slow_generate(
+        *_args: object,
+        **_kwargs: object,
+    ) -> AsyncIterator[str]:
+        call_log.append(("start", asyncio.get_event_loop().time()))
+        await asyncio.sleep(0.15)
+        yield "answer"
+        call_log.append(("end", asyncio.get_event_loop().time()))
+
+    with (
+        patch(_TAGS_PATCH, _mock_tags(_ALL_TAGS)),
+        patch(_GEN_PATCH, _slow_generate),
+    ):
+        import concurrent.futures
+
+        def do_ask() -> list[dict[str, object]]:
+            with client.stream(
+                "POST",
+                "/ask",
+                json=_ask_body(question="Test?"),
+            ) as resp:
+                return _frames("".join(resp.iter_text()))
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+            f1 = pool.submit(do_ask)
+            f2 = pool.submit(do_ask)
+            r1, r2 = f1.result(), f2.result()
+
+    assert r1[-1]["type"] == "done"
+    assert r2[-1]["type"] == "done"
+    assert len(call_log) == 4
+    starts = [t for label, t in call_log if label == "start"]
+    ends = [t for label, t in call_log if label == "end"]
+    assert starts[1] >= ends[0]

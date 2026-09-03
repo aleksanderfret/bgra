@@ -134,3 +134,4 @@ class HealthReport(WireModel):
     status: Literal["ok", "degraded"]
     components: dict[str, bool]
     models: dict[str, str]
+    missing_models: list[str] = Field(default_factory=list)

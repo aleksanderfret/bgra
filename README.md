@@ -250,6 +250,9 @@ Every user-facing label, button, and message is defined in language translation 
 
 - Complete local monorepo setup (TypeScript frontend + Python search engine).
 - Live streaming connection from the Python engine to the web interface.
+- **Local model answers** — the engine connects to Ollama and streams a real answer token by token. The model answers from general knowledge for now; it does not read your rulebooks yet (that is the next step).
+- **Honest health check** — `/health` tells you exactly which models are installed and which are missing, instead of just saying "Ollama is running".
+- **One question at a time** — the engine makes sure only one answer is being generated at any moment, so your computer is not overloaded. A second question waits in line. If you cancel a question, the slot opens immediately.
 - Complete English and Polish translations.
 - Automated desktop packaging (macOS arm64 DMG and ZIP).
 - Automated GitHub Release pipeline with changelog generation.

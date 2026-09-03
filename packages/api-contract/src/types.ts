@@ -90,4 +90,5 @@ export interface HealthReport {
   status: 'ok' | 'degraded';
   components: Record<string, boolean>;
   models: Record<string, string>;
+  missingModels: string[];
 }

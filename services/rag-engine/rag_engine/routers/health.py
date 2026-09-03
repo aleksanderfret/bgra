@@ -1,23 +1,15 @@
 from typing import Annotated
 
-import httpx
 from fastapi import APIRouter, Depends
 
 from ..contract import HealthReport
+from ..engines.llm import OllamaUnreachableError, installed_ollama_tags
+from ..pull_models import ollama_fields
 from ..settings import Settings, get_settings
 
 router = APIRouter(tags=["system"])
 
-PROBE_TIMEOUT_SECONDS = 1.0  # /health must not be the slowest thing on the page.
-
-
-async def _ollama_reachable(base_url: str) -> bool:
-    try:
-        async with httpx.AsyncClient(timeout=PROBE_TIMEOUT_SECONDS) as client:
-            response = await client.get(f"{base_url}/api/tags")
-        return response.status_code == httpx.codes.OK
-    except httpx.HTTPError:
-        return False
+PROBE_TIMEOUT_SECONDS = 1.0
 
 
 @router.get("/health")
@@ -25,11 +17,23 @@ async def read_health(
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> HealthReport:
     profile = settings.profile
+
+    ollama_up = True
+    missing: list[str] = []
+    try:
+        tags = await installed_ollama_tags(settings.ollama_url, timeout=PROBE_TIMEOUT_SECONDS)
+        required = ollama_fields(profile)
+        for _role, tag in required:
+            if tag not in tags:
+                missing.append(tag)
+    except OllamaUnreachableError:
+        ollama_up = False
+
     components = {
-        "ollama": await _ollama_reachable(settings.ollama_url),
+        "ollama": ollama_up,
         "storage": settings.storage_dir.is_dir(),
     }
-    models = {
+    models: dict[str, str] = {
         "profile": settings.model_profile,
         "llm": profile.llm,
         "embedding": profile.embedding,
@@ -37,8 +41,16 @@ async def read_health(
         "stt": profile.stt,
         "tts": profile.tts_voice,
     }
+    if profile.llm_arbiter:
+        models["llm_arbiter"] = profile.llm_arbiter
+    if profile.vision:
+        models["vision"] = profile.vision
+
+    degraded = not all(components.values()) or len(missing) > 0
+
     return HealthReport(
-        status="ok" if all(components.values()) else "degraded",
+        status="degraded" if degraded else "ok",
         components=components,
         models=models,
+        missing_models=missing,
     )

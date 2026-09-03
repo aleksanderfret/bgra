@@ -1,6 +1,6 @@
 'use client';
 
-import { Alert, Badge, Group, Image, Paper, Stack, Text, Title } from '@mantine/core';
+import { Alert, Badge, Box, Image, Paper, Stack, Text, Title } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import { type AnswerState, selectVisibleFigures } from './answer-state';
 
@@ -46,19 +46,19 @@ export function AnswerPanel({ state }: AnswerPanelProps) {
           <Text style={{ whiteSpace: 'pre-wrap' }}>
             {t(`notice.${state.notice.code}`, {
               ...state.notice.params,
-              // Codes are an open set: the engine can send one this build has
-              // no wording for, and the raw code must not reach the screen.
               defaultValue: t('notice.unknown'),
             })}
           </Text>
         </Paper>
       )}
 
-      {state.text.length > 0 && (
-        <Paper withBorder p="md" radius="md">
-          <Text style={{ whiteSpace: 'pre-wrap' }}>{state.text}</Text>
-        </Paper>
-      )}
+      <Box role="log" aria-live="polite" aria-label={t('answer.regionLabel')}>
+        {state.text.length > 0 && (
+          <Paper withBorder p="md" radius="md">
+            <Text style={{ whiteSpace: 'pre-wrap' }}>{state.text}</Text>
+          </Paper>
+        )}
+      </Box>
 
       {figures.length > 0 && (
         <Stack gap="xs">
@@ -81,14 +81,26 @@ export function AnswerPanel({ state }: AnswerPanelProps) {
       {state.sources.length > 0 && (
         <Stack gap="xs">
           <Title order={5}>{t('answer.sources.title')}</Title>
-          <Group gap="xs">
+          <Box
+            component="ul"
+            style={{
+              listStyle: 'none',
+              padding: 0,
+              margin: 0,
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 'var(--mantine-spacing-xs)',
+            }}
+          >
             {state.sources.map((source) => (
-              <Badge key={source.id} variant="light" title={source.excerpt}>
-                {t(`documentKind.${source.documentKind}`)}
-                {source.page !== null && t('answer.sources.page', { page: source.page })}
-              </Badge>
+              <li key={source.id}>
+                <Badge variant="light" title={source.excerpt}>
+                  {t(`documentKind.${source.documentKind}`)}
+                  {source.page !== null && t('answer.sources.page', { page: source.page })}
+                </Badge>
+              </li>
             ))}
-          </Group>
+          </Box>
         </Stack>
       )}
     </Stack>
