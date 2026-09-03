@@ -63,13 +63,13 @@ export function AnswerPanel({ state }: AnswerPanelProps) {
       {figures.length > 0 && (
         <Stack gap="xs">
           <Title order={4}>{t('answer.figures.title')}</Title>
-          {figures.map((figure) => (
-            <Paper key={figure.id} withBorder p="xs" radius="md">
+          {figures.map(({ source, src }) => (
+            <Paper key={source.id} withBorder p="xs" radius="md">
               <Image
-                src={figure.imageUrl}
+                src={src}
                 alt={t('answer.figures.alt', {
-                  document: figure.documentTitle,
-                  page: figure.page ?? t('answer.figures.unknownPage'),
+                  document: source.documentTitle,
+                  page: source.page ?? t('answer.figures.unknownPage'),
                 })}
                 radius="sm"
               />

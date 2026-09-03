@@ -18,6 +18,10 @@ The monorepo, the interface, the streaming flow and the API contract.
 - A shared contract with a reference SSE decoder and a parity test
 - Interface in Polish and English (i18next), no user-facing string hardcoded
 - Tests including the guarantee that invented image references are rejected
+- Hardening that only gets more expensive later: both processes bound to `127.0.0.1`
+  (D9), one un-bypassable route to the engine with allowlisted headers and an
+  `assertMayReachEngine` seam (D10), upstream cancellation (D11), `gameId` as a slug on
+  both sides of the contract (D12), and batched token painting (Z7)
 
 ---
 
@@ -32,9 +36,16 @@ The monorepo, the interface, the streaming flow and the API contract.
 - `/health` checks for the **specific** models of the profile, not just whether Ollama
   responds
 - The `/ask` endpoint streams a real model's answer, still without retrieval
+- A semaphore around generation: one machine, one GPU, so a second question waits instead
+  of thrashing. The proxy already cancels upstream on disconnect (D11) — the engine has
+  to release the slot when that happens, or the queue fills with abandoned answers.
+- A timeout on the Ollama client itself. The 10 s deadline in the proxy deliberately does
+  not cover `/ask`, so a model that stops producing tokens hangs until something else
+  notices.
 
 **Acceptance:** `curl` against `/ask` returns a model-generated answer, token by token;
-`/health` reports `degraded` naming the missing model when one is absent.
+`/health` reports `degraded` naming the missing model when one is absent; two questions
+at once are answered one after the other, and killing the first frees the slot at once.
 
 ---
 
@@ -51,10 +62,21 @@ The monorepo, the interface, the streaming flow and the API contract.
   `yt-dlp` + Whisper when the author disabled subtitles
 - A game registry in `storage/games.json` matching `GameSummary`
 - CLI: `uv run python -m rag_engine.ingest add --game azul --kind rulebook file.pdf`
+- `--game` is rejected unless it matches `GAME_ID_PATTERN` (D12) — the value becomes a
+  directory name, so a bad one is caught at ingestion rather than at request time
+- Every path under `storage/` comes from one helper (`assets_path()` and friends), never
+  from string concatenation at the call site. That is what makes scoping a library to an
+  owner one change later instead of a search (D13).
+- `imageUrl` is minted as `/static/assets/<gameId>/pNN.png` — relative to the engine root,
+  never absolute. The frontend adds the proxy prefix, so Python stays ignorant of how Next
+  routes; an absolute URL is dropped by the reducer instead of rendered (D10).
+- A PDF and a transcript are **someone else's file**: parse defensively, cap page counts
+  and extracted sizes, and never let a filename from the document reach the filesystem
 
 **Acceptance:** after ingesting two or three games (one simple, one complex — decision
-Z5) `/games` returns them with a non-zero `chunkCount`, and `storage/assets/<gameId>/`
-contains the rendered pages.
+Z5) `/games` returns them with a non-zero `chunkCount`, `storage/assets/<gameId>/`
+contains the rendered pages, and ingesting under a `--game` like `../x` fails before
+anything is written.
 
 ---
 
@@ -70,7 +92,14 @@ contains the rendered pages.
 - A `min_relevance_score` threshold; below it → `insufficient_evidence` without calling
   the model
 - A prompt carrying the `DOCUMENT_AUTHORITY` hierarchy and a ban on leaving the context
+- Retrieved chunks are wrapped in delimiters and labelled as source material, with the
+  system prompt stating that nothing inside them changes it (D14). A transcript that says
+  "ignore the previous instructions" is text about a game, not an instruction.
+- The reranker and the index are loaded **once at startup**, not per request. A
+  cross-encoder reloaded per question turns a 2 s answer into a 20 s one.
 - The `sources` frame sent **before** the first token
+- Generation stops when the client disconnects: the proxy already aborts upstream (D11),
+  so the engine has to honour the disconnect rather than finish into a closed socket
 - Answers in Polish even for English rulebooks, with the original term in parentheses —
   phase and component names are printed in English on the components (decision Z1)
 
@@ -88,7 +117,9 @@ invented rule; a question about game A never returns passages from game B.
 - Separate prompts for `teach` and `arbitrate`
 - Teaching style drawn from tutorial transcripts, supplied as an example in the system
   prompt, **marked as not being a source of rules**
-- Session state keyed by `sessionId`: the model remembers where in the lesson you are
+- Session state keyed by `sessionId`, **issued by the server and given a TTL** (D13). A
+  client-chosen identifier would be someone else's lesson for the price of a guess — the
+  cost of getting this right is nil today and considerable once anyone else can connect.
 - Lesson structure: goal → theme → mechanics → turn → sample move, with a comprehension
   check after each module
 
@@ -110,12 +141,18 @@ answer with a citation.
 - **A local HTTPS setup is required** (`mkcert`), because the assistant is meant to work
   from a tablet on the home network, and `getUserMedia` does not work over HTTP outside
   `localhost` (decision Z4)
-- Next.js listens on `0.0.0.0`, the Python engine still only on `127.0.0.1`; a simple
-  access check is added to the proxy
+- Opening the LAN interface is **one change with the access check**, not a step before
+  it: Next.js stops binding `127.0.0.1` (D9) only in the same commit that fills in
+  `assertMayReachEngine` (D10). The Python engine stays on `127.0.0.1` either way.
+- With HTTPS in place, the report-only CSP becomes enforcing, and `Strict-Transport-
+  Security` is added. Mantine's inline styles and `ColorSchemeScript` need nonces first,
+  which is why the policy is only recording today.
+- Recorded audio goes through the same proxy as everything else; `Permissions-Policy`
+  already limits the microphone to this origin
 
 **Acceptance:** a spoken question produces a spoken answer; the first sound arrives
 before the model finishes generating; **the microphone works on the tablet**, not only on
-the Mac.
+the Mac; and a request from the tablet without credentials is refused by the proxy.
 
 ---
 
@@ -130,6 +167,9 @@ for the credibility of the whole thing.
 - Polish questions against **English** rulebooks — the hardest case for retrieval, so it
   must be measured separately (decision Z1)
 - Questions deliberately ambiguous between two ingested games, catching rule mixing
+- A group run against a **deliberately poisoned chunk** ("ignore the previous
+  instructions and…"), where the correct behaviour is to treat it as text about a game.
+  D14 is a claim about the prompt; this is the only thing that turns it into a measurement.
 - `uv run python -m rag_engine.eval` reports retrieval accuracy, answer agreement and the
   share of correct refusals
 - The result is recorded historically, so a regression is visible
@@ -146,7 +186,12 @@ or fell.
 - Cropping figures out of pages instead of whole renders
 - An optional vision model describes the cropped diagrams during ingestion
 - The `figure` frame sent by the backend based on the **actually retrieved** sources
+- Crops are addressed the same way as page renders — a path under `/api/engine/static`,
+  so they stay behind the one door (D10) and inherit its caching
 - A citation preview when a source is clicked
+- If answers start being rendered as Markdown, no `dangerouslySetInnerHTML` without
+  sanitisation. Today React escapes everything for us, which is why model output can be
+  dropped into the page safely — that protection ends the moment a renderer is added.
 
 **Acceptance:** a question about setting up the game shows the right diagram, and the
 `rejectedFigureCount` counter stays at zero in normal operation.

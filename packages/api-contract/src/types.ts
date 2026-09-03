@@ -18,6 +18,17 @@ export const DOCUMENT_AUTHORITY: readonly DocumentKind[] = [
 ] as const;
 
 /**
+ * `gameId` is both the retrieval filter and a directory name under
+ * `storage/assets`, so it stays a strict slug. `test_contract_parity.py`
+ * checks this against the Python side.
+ */
+export const GAME_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;
+
+export function isGameId(value: string): boolean {
+  return GAME_ID_PATTERN.test(value);
+}
+
+/**
  * A retrieved chunk. The UI may show a figure only if its id is in this list
  * and `imageUrl` is set.
  */
@@ -30,6 +41,10 @@ export interface RetrievedSource {
   page: number | null;
   score: number;
   excerpt: string;
+  /**
+   * A path relative to the engine root (`/static/assets/...`), never an
+   * absolute URL: the frontend prefixes it with its own proxy path (see D10).
+   */
   imageUrl: string | null;
 }
 

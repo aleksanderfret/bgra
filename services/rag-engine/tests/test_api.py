@@ -90,6 +90,15 @@ def test_corrupt_registry_is_reported_not_hidden(client: TestClient, storage: Pa
     assert "unreadable" in response.json()["detail"]
 
 
+def test_registry_failure_does_not_reveal_the_filesystem(client: TestClient, storage: Path) -> None:
+    (storage / "games.json").write_text("{ this is not json", encoding="utf-8")
+
+    detail = client.get("/games").json()["detail"]
+
+    assert str(storage) not in detail
+    assert "games.json" not in detail
+
+
 def test_ask_streams_sources_before_the_answer(client: TestClient) -> None:
     with client.stream(
         "POST",
@@ -142,5 +151,17 @@ def test_ask_reports_the_empty_index_as_a_code_not_as_prose(client: TestClient) 
 def test_ask_rejects_a_question_without_a_game(client: TestClient) -> None:
     # Unscoped retrieval would mix rules from every game in the library.
     response = client.post("/ask", json={"gameId": "", "question": "Kto zaczyna?"})
+
+    assert response.status_code == 422
+
+
+@pytest.mark.parametrize(
+    "game_id",
+    ["../../etc/passwd", "azul/rulebook", "..", "Azul", "azul\x00"],
+)
+def test_ask_rejects_a_game_id_that_is_not_a_slug(client: TestClient, game_id: str) -> None:
+    # The same value names a directory under storage/assets, so anything but a
+    # slug is a path waiting to escape.
+    response = client.post("/ask", json={"gameId": game_id, "question": "Kto zaczyna?"})
 
     assert response.status_code == 422

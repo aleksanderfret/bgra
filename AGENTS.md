@@ -53,7 +53,17 @@ Breaking any of these produces an assistant that sounds right and is wrong.
 6. **The contract has two sides.** Changing `packages/api-contract/src/types.ts`
    requires the matching change in `services/rag-engine/rag_engine/contract.py`;
    `tests/test_contract_parity.py` enforces it.
-7. **No user-facing string is hardcoded.** Every word the user reads comes from
+7. **`/api/engine/[...path]/route.ts` is the only way to the engine.** Images and audio
+ included. Do not add a `rewrites()` entry to `next.config.ts` and do not let the engine
+ hand the browser an absolute URL — both route around `assertMayReachEngine`, which is
+ where stage 5 puts the access check. Headers are allowlisted in both directions.
+8. **Both processes bind `127.0.0.1`.** `next dev`/`next start` default to `0.0.0.0`;
+ the `--hostname` flags are load-bearing. Opening the LAN interface happens in the same
+ change as the access check, never before it.
+9. **`gameId` matches `GAME_ID_PATTERN` on both sides.** It is a retrieval filter and a
+ directory name at once, so it is a slug in `contract.py` and in `types.ts`, and
+ `test_contract_parity.py` fails if the two drift.
+10. **No user-facing string is hardcoded.** Every word the user reads comes from
    `apps/web/src/i18n/locales/<locale>/common.json`, in both `pl` and `en`. The engine
    sends codes (`NoticeEvent.code`, `ErrorEvent.code`), never prose for the screen;
    `ErrorEvent.message` is an English technical detail for the log.

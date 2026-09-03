@@ -15,7 +15,7 @@ const source = (overrides: Partial<RetrievedSource> = {}): RetrievedSource => ({
   page: 4,
   score: 0.82,
   excerpt: 'Kafelki dobierasz z jednego talerzyka...',
-  imageUrl: '/api/engine/static/azul/p04.png',
+  imageUrl: '/static/assets/azul/p04.png',
   ...overrides,
 });
 
@@ -73,6 +73,23 @@ describe('reduceAssistantEvent', () => {
     const state = reduceAssistantEvent(withSources, {
       type: 'figure',
       sourceId: 'azul:video:001',
+    });
+
+    expect(state.figureIds).toEqual([]);
+    expect(state.rejectedFigureCount).toBe(1);
+  });
+
+  it('drops a figure whose image would be fetched straight from the engine', () => {
+    // An absolute URL would take the browser around the proxy, which is the
+    // only place an access check can live.
+    const withSources = reduceAssistantEvent(startAnswer(), {
+      type: 'sources',
+      sources: [source({ imageUrl: 'http://127.0.0.1:8000/static/assets/azul/p04.png' })],
+    });
+
+    const state = reduceAssistantEvent(withSources, {
+      type: 'figure',
+      sourceId: 'azul:rulebook:p04:c02',
     });
 
     expect(state.figureIds).toEqual([]);

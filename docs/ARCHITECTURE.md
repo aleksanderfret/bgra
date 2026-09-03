@@ -263,6 +263,71 @@ words: text that crosses the process boundary would otherwise pin the interface 
 language and put UI copy in Python. The active language is a URL segment (`/pl`, `/en`),
 so `<html lang>` and the page metadata are correct on the server render.
 
+**D9 — "Local" is a binding, not a hope.**
+`next dev` and `next start` default to `0.0.0.0`; left alone, the very first `pnpm dev`
+publishes an unauthenticated assistant to every device on the network. Both scripts pass
+`--hostname 127.0.0.1`, so reaching the LAN is a deliberate act (stage 5) rather than the
+default. The engine is bound the same way and is not published at all.
+
+**D10 — One chokepoint, and no way around it.**
+Everything the browser fetches from the engine — answers, page renders, audio — goes
+through `apps/web/src/app/api/engine/[...path]/route.ts`. A `rewrites()` entry in
+`next.config.ts` would be faster and would also route straight past that handler, so
+there is none, on purpose. The handler holds an empty `assertMayReachEngine` seam: the
+place stage 5 fills in, chosen now so that adding auth is one function and not an audit.
+
+Three rules follow from having a single door:
+
+- **Headers are allowlisted in both directions** (`src/lib/engine-proxy.ts`). The engine
+  cannot verify a cookie or a bearer token, so it never receives one; conversely it may
+  not set a cookie or redirect the browser.
+- **The engine never hands the browser a URL it can use as-is.** `RetrievedSource.imageUrl`
+  is relative to the engine root (`/static/assets/...`); the frontend adds the proxy
+  prefix in `engineAssetUrl`. So the engine does not need to know how Next routes, and an
+  absolute URL — which would fetch around this handler — is dropped by the answer reducer
+  rather than rendered.
+- **Path segments are validated and encoded individually**, so `..` cannot climb out of
+  the engine's routes.
+
+**D11 — A cancelled question stops costing.**
+`request.signal` is passed to the upstream `fetch`, so closing the tab or asking again
+stops generation instead of leaving the model running on the GPU for an answer nobody
+will read. The streaming route has no deadline — a long answer is normal — while `/games`
+and `/health` get 10 seconds, because a stalled one of those is a bug, not patience.
+
+**D12 — `gameId` is a slug on both sides.**
+It is simultaneously the retrieval filter (invariant 1) and a directory name under
+`storage/assets`, which makes it the one value where a validation gap becomes path
+traversal. `^[a-z0-9][a-z0-9-]{0,63}$` is enforced by Pydantic on `AskRequest` and
+`GameSummary`, exposed as `isGameId` in the contract package, and — like the event set in
+D1 — checked for drift by `test_contract_parity.py`. A pattern that is stricter on one
+side than the other is a game that indexes and then cannot be asked about.
+
+**D13 — Identity is not modelled yet, but nothing assumes its absence.**
+There is one user, so there is no user table and no login, and inventing one now would
+be guessing at requirements. What is not allowed is code that becomes wrong the moment a
+second person exists. Three commitments carry that:
+
+- `/games` means "the games visible to whoever is asking", not "every directory on the
+  disk". Today those are the same list; the endpoint is written as the former.
+- `sessionId` (stage 4) is **issued by the server**, never chosen by the client. A
+  client-chosen identifier is someone else's teaching session for the price of a guess.
+- Every path under `storage/` is built by one helper, so scoping a library to an owner
+  is a change in that helper rather than a search across the ingestion code.
+
+Whether the library ends up shared or per-owner is deliberately left open — with these
+three in place, either costs one function.
+
+**D14 — Document text is data, never instructions.**
+Rulebooks, FAQs and especially YouTube transcripts are third-party text that ends up
+inside a prompt. A transcript that says "ignore the previous instructions" is a rule the
+assistant must not follow. So retrieved chunks are wrapped in delimiters and labelled as
+source material, and the system prompt states that nothing inside them can change it.
+
+`DOCUMENT_AUTHORITY` does not help here: it ranks how much a document should be trusted
+about **the rules**, which is a relevance ordering, not a security boundary. An errata is
+the highest authority on rules and still may not issue instructions.
+
 ---
 
 ## 6. Scope decisions
@@ -295,11 +360,12 @@ This has three consequences the original plan did not account for:
 - `getUserMedia` **does not work** over plain HTTP outside `localhost`, so stage 5
   requires a local certificate (`mkcert`) or a tunnel. Without it the microphone on a
   tablet stays unavailable — and that is not a problem to work around in code.
-- Next.js must listen on `0.0.0.0`, but the Python engine **still only** on
-  `127.0.0.1`. Decision D2 (everything through the proxy) pays off exactly here: there is
-  a single place through which network traffic enters.
-- Once the application is reachable from the local network, a simple access check in the
-  proxy is added — it does not exist today and is not needed yet.
+- Next.js will then have to listen beyond the loopback interface, while the Python engine
+  stays on `127.0.0.1`. Decision D2 (everything through the proxy) pays off exactly here:
+  there is a single place through which network traffic enters.
+- Opening that interface and adding the access check are **one change, not two** (D10).
+  Until stage 5 the app is bound to `127.0.0.1` (D9), because an unauthenticated
+  assistant reachable from the whole flat is what "local-first" was supposed to prevent.
 
 **Z5 — Start with two or three games, including one simple and one complex.**
 Having several games indexed from the beginning surfaces cross-game rule mixing (audit
@@ -311,3 +377,46 @@ English UI costs almost nothing once no string is hardcoded, and it makes the se
 locale a permanent test that the discipline in D8 is actually held: a hardcoded string
 shows up immediately as untranslated text on `/en`. The answers themselves remain a
 separate matter — those are governed by Z1 and the prompt, not by the interface locale.
+
+**Z7 — Streaming is paced for the machine that is also running the model.**
+Tokens arrive faster than a screen can usefully repaint, and the same laptop is busy
+generating them. `useAskStream` coalesces token frames on a 50 ms timer; every other
+frame paints at once, because `sources` before the first word (invariant 3) and an error
+instead of an answer are correctness, not smoothness. The pending flush is cancelled when
+an answer is superseded or cancelled, so a stale batch cannot repaint a discarded answer.
+
+**Z8 — The threat model, stated so it can be checked.**
+Everything above is only coherent against a written answer to "trusted by whom".
+
+| | Trusted | Why it matters |
+| --- | --- | --- |
+| The person at the keyboard | Yes | One household, one machine — hence no login today (D13) |
+| Other devices on the home network | Not until stage 5, and then only past the guard | Which is why `127.0.0.1` is the binding, not a preference (D9) |
+| The internet | No, and it is not reachable | The engine is never published; only Next may ever be |
+| Rulebooks, FAQs, transcripts | As **data**, never as instructions | Third-party text inside a prompt (D14) |
+| The model's own output | No | It may name a source id, never a path (invariant 2) |
+
+The engine never leaves `127.0.0.1` under any of these. The only process that may ever
+be exposed is Next, and only behind `assertMayReachEngine`.
+
+---
+
+## 7. Annex: what changes on a remote server
+
+Nothing in the retrieval path. The index is data — `storage/lancedb` and
+`storage/assets` copy across and the assistant knows exactly the same rules, because
+nothing was ever trained (that is the whole point of RAG over fine-tuning). Four things
+do change, and they are the reason this is not a deployment target today.
+
+| Assumption that stops holding | Consequence |
+| --- | --- |
+| One trusted user | `assertMayReachEngine` (D10) has to become a real check, and `storage/games.json` a per-owner library rather than a global one |
+| Loopback binding (D9) | Needs TLS in front, and the engine port must stay unreachable from outside the host |
+| Apple Silicon | `mlx-whisper` is MLX-only; a Linux box needs `faster-whisper` behind the same interface, which is why the model choice lives in `settings.py` profiles (D3) |
+| A GPU per household | Concurrent generations queue on one model; the request timeout in D11 is tuned for a single user and would need a queue instead |
+| One log reader who was also the only user | Logs need a request identifier to be readable at all once answers interleave |
+| `storage/` sitting next to the code | It becomes a mounted volume with its own lifecycle, so `storage_dir` has to stay the single configured root it already is, never a path assembled at a call site |
+
+The order matters: identity comes first. Every other item is a configuration change,
+while retrofitting a notion of "whose library is this" touches the storage layout, the
+registry and the retrieval filter at once.

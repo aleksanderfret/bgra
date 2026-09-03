@@ -1,66 +1,64 @@
 import type { NextRequest } from 'next/server';
-
-/**
- * Same-origin proxy so the browser never talks to Python directly — no CORS,
- * one place for an access check once a tablet is on the LAN.
- */
+import {
+  ENGINE_TIMEOUT_MS,
+  engineTarget,
+  requestHeadersForEngine,
+  responseHeadersFromEngine,
+  routeKind,
+} from '@/lib/engine-proxy';
 
 const ENGINE_URL = process.env.RAG_ENGINE_URL ?? 'http://127.0.0.1:8000';
 
 export const dynamic = 'force-dynamic';
 
-const HOP_BY_HOP_HEADERS = new Set([
-  'connection',
-  'host',
-  'keep-alive',
-  'transfer-encoding',
-  'upgrade',
-]);
+/**
+ * The only way from the browser to the engine — answers, images and audio
+ * alike. An access check belongs here and nowhere else, so no rewrite in
+ * `next.config.ts` may route around it.
+ */
+function assertMayReachEngine(_request: NextRequest): void {}
 
-function forwardedRequestHeaders(request: NextRequest): Headers {
-  const headers = new Headers();
-  for (const [name, value] of request.headers.entries()) {
-    if (!HOP_BY_HOP_HEADERS.has(name.toLowerCase())) {
-      headers.set(name, value);
-    }
-  }
-  return headers;
+function engineError(code: string, message: string, status: number): Response {
+  return Response.json({ type: 'error', code, message }, { status });
 }
 
 async function proxy(request: NextRequest, segments: string[]): Promise<Response> {
-  const target = new URL(`/${segments.join('/')}`, ENGINE_URL);
-  target.search = request.nextUrl.search;
+  assertMayReachEngine(request);
+
+  const kind = routeKind(segments);
+  const target = engineTarget(ENGINE_URL, segments, request.nextUrl.search);
+
+  if (target === null) {
+    return engineError('bad_engine_path', 'The requested engine path is not addressable.', 400);
+  }
 
   const hasBody = request.method !== 'GET' && request.method !== 'HEAD';
+  const signal =
+    kind === 'api'
+      ? AbortSignal.any([request.signal, AbortSignal.timeout(ENGINE_TIMEOUT_MS)])
+      : request.signal;
 
   try {
     const upstream = await fetch(target, {
       method: request.method,
-      headers: forwardedRequestHeaders(request),
+      headers: requestHeadersForEngine(request.headers),
       body: hasBody ? request.body : undefined,
       // Node's fetch requires this whenever the request body is a stream.
       ...(hasBody ? { duplex: 'half' } : {}),
       cache: 'no-store',
       redirect: 'manual',
+      signal,
     } as RequestInit);
 
-    const headers = new Headers(upstream.headers);
-    headers.set('cache-control', 'no-cache, no-transform');
-    headers.set('x-accel-buffering', 'no');
-
-    return new Response(upstream.body, { status: upstream.status, headers });
+    return new Response(upstream.body, {
+      status: upstream.status,
+      headers: responseHeadersFromEngine(upstream.headers, kind),
+    });
   } catch (error) {
-    // `code` is what the UI phrases; `message` stays an English diagnostic.
-    return Response.json(
-      {
-        type: 'error',
-        code: 'engine_unreachable',
-        message: `Cannot reach the engine at ${ENGINE_URL}: ${
-          error instanceof Error ? error.message : 'unknown error'
-        }`,
-      },
-      { status: 502 },
-    );
+    // Where the engine lives is not the browser's business; the detail goes to
+    // the server log and the browser gets a code it can phrase.
+    console.error(`Engine request to ${target.pathname} failed`, error);
+    return engineError('engine_unreachable', 'The engine did not respond.', 502);
   }
 }
 

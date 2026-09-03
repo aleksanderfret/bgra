@@ -19,7 +19,7 @@ const figureSource: RetrievedSource = {
   page: 4,
   score: 0.9,
   excerpt: 'Przygotowanie gry: talerzyki układasz wokół...',
-  imageUrl: '/api/engine/static/azul/p04.png',
+  imageUrl: '/static/assets/azul/p04.png',
 };
 
 const stateWith = (overrides: Partial<AnswerState>): AnswerState => ({
@@ -59,7 +59,12 @@ describe('AnswerPanel', () => {
     const figureName = pl.answer.figures.alt
       .replace('{{document}}', figureSource.documentTitle)
       .replace('{{page}}', String(figureSource.page));
-    expect(screen.getByRole('img', { name: figureName })).toBeInTheDocument();
+    // The engine sends an engine-relative path; the proxy prefix is the app's
+    // to add, or the browser would fetch around it.
+    expect(screen.getByRole('img', { name: figureName })).toHaveAttribute(
+      'src',
+      '/api/engine/static/assets/azul/p04.png',
+    );
   });
 
   it('renders no image when the model cited a figure that was never retrieved', () => {

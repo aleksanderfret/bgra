@@ -4,6 +4,7 @@ import type {
   PipelineStage,
   RetrievedSource,
 } from '@bga/api-contract';
+import { engineAssetUrl } from '@/lib/engine-proxy';
 
 export interface AnswerState {
   stage: PipelineStage | 'idle';
@@ -36,8 +37,9 @@ export function startAnswer(): AnswerState {
 }
 
 /**
- * A figure is shown only when its id is in `sources` and that source has an
- * image. An invented path is counted in `rejectedFigureCount` and discarded.
+ * A figure is shown only when its id is in `sources`, that source has an
+ * image, and the image resolves to a path on this origin. Anything else is
+ * counted in `rejectedFigureCount` and discarded.
  */
 export function reduceAssistantEvent(state: AnswerState, event: AssistantEvent): AnswerState {
   switch (event.type) {
@@ -56,6 +58,9 @@ export function reduceAssistantEvent(state: AnswerState, event: AssistantEvent):
     case 'figure': {
       const source = state.sources.find((candidate) => candidate.id === event.sourceId);
       if (source === undefined || source.imageUrl === null) {
+        return { ...state, rejectedFigureCount: state.rejectedFigureCount + 1 };
+      }
+      if (engineAssetUrl(source.imageUrl) === null) {
         return { ...state, rejectedFigureCount: state.rejectedFigureCount + 1 };
       }
       if (state.figureIds.includes(event.sourceId)) {
@@ -87,9 +92,19 @@ export function reduceAssistantEvent(state: AnswerState, event: AssistantEvent):
   }
 }
 
-export function selectVisibleFigures(state: AnswerState): RetrievedSource[] {
+export interface VisibleFigure {
+  source: RetrievedSource;
+  /** Already behind the proxy, so the view never builds a URL of its own. */
+  src: string;
+}
+
+export function selectVisibleFigures(state: AnswerState): VisibleFigure[] {
   return state.figureIds.flatMap((id) => {
     const source = state.sources.find((candidate) => candidate.id === id);
-    return source === undefined ? [] : [source];
+    if (source === undefined || source.imageUrl === null) {
+      return [];
+    }
+    const src = engineAssetUrl(source.imageUrl);
+    return src === null ? [] : [{ source, src }];
   });
 }

@@ -1,11 +1,14 @@
 # BGA — a local board game rules assistant
 
-A private, fully offline assistant that **teaches board game rules** and
-**settles disputes at the table** — based on the rulebooks, FAQs and errata you put on
-your own disk. The end goal is that you talk to it, and it shows you the right part of
-the rulebook on screen.
+A private assistant that **teaches board game rules** and **settles disputes at the
+table** — based on the rulebooks, FAQs and errata you put on your own disk. The end goal
+is that you talk to it, and it shows you the right part of the rulebook on screen.
 
-No question and no document ever leaves your computer.
+**No question and no document ever leaves your computer.** Answering is fully offline:
+the models run locally and there is no external API in the request path. The network is
+used twice, both times outside answering — installing the models, and fetching a YouTube
+transcript if you ask for one during ingestion. The app itself listens on `127.0.0.1`
+only, so nothing on your network can reach it until you decide otherwise.
 
 ---
 

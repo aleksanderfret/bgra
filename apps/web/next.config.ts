@@ -1,6 +1,21 @@
 import { join } from 'node:path';
 import type { NextConfig } from 'next';
 
+// Mantine ships inline styles and `ColorSchemeScript` is an inline script, so
+// a blocking policy would need nonces first. Report-only records what a strict
+// policy would break; tightening it belongs with the HTTPS work in stage 5.
+const CONTENT_SECURITY_POLICY = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data:",
+  "media-src 'self'",
+  "connect-src 'self'",
+  "frame-ancestors 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+].join('; ');
+
 const nextConfig: NextConfig = {
   // Without this, Turbopack walks up past the repo looking for a lockfile and
   // picks a root outside git. Point it at the workspace root so that
@@ -23,13 +38,20 @@ const nextConfig: NextConfig = {
     optimizePackageImports: ['@mantine/core', '@mantine/hooks'],
   },
 
-  // Everything the browser needs is same-origin: figure images and audio are
-  // proxied through /api/engine/* so no CORS headers are involved anywhere.
-  async rewrites() {
+  // No rewrite to the engine lives here on purpose (decision D9): images and
+  // audio go through /api/engine/* like everything else, so the access check
+  // in that route handler cannot be bypassed.
+  async headers() {
     return [
       {
-        source: '/api/engine/static/:path*',
-        destination: `${process.env.RAG_ENGINE_URL ?? 'http://127.0.0.1:8000'}/static/:path*`,
+        source: '/:path*',
+        headers: [
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'X-Frame-Options', value: 'DENY' },
+          { key: 'Referrer-Policy', value: 'no-referrer' },
+          { key: 'Permissions-Policy', value: 'camera=(), geolocation=(), microphone=(self)' },
+          { key: 'Content-Security-Policy-Report-Only', value: CONTENT_SECURITY_POLICY },
+        ],
       },
     ];
   },

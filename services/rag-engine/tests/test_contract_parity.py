@@ -7,6 +7,7 @@ from pydantic.alias_generators import to_camel
 
 from rag_engine.contract import (
     DOCUMENT_AUTHORITY,
+    GAME_ID_PATTERN,
     AnswerMode,
     AskRequest,
     AssistantEvent,
@@ -55,6 +56,15 @@ def test_document_authority_order_matches() -> None:
     ts_order = re.findall(r"'([^']+)'", block.split("[", 1)[1])
 
     assert tuple(ts_order) == DOCUMENT_AUTHORITY
+
+
+def test_game_id_pattern_matches() -> None:
+    block = _declaration(_source(), "export const GAME_ID_PATTERN")
+    ts_pattern = block.split("=", 1)[1].strip().rstrip(";").strip("/")
+
+    # A slug accepted on one side and rejected on the other is a game that
+    # indexes and then cannot be asked about.
+    assert ts_pattern == GAME_ID_PATTERN
 
 
 def test_answer_modes_match() -> None:
