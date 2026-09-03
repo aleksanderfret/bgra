@@ -101,6 +101,21 @@ def pull_profile(
             "Install it from https://ollama.com/download and start it first."
         ) from error
 
+    try:
+        installed = ollama_tags(settings.ollama_url)
+    except urllib.error.URLError:
+        installed = set()
+    missing = [tag for _, tag in ollama_fields(profile) if tag not in installed]
+    if missing:
+        _log(
+            f"WARNING: these models were pulled but did not appear in the installed list: "
+            f"{', '.join(missing)}. The tags may have been renamed or removed from the "
+            f"Ollama registry.",
+            progress,
+        )
+    else:
+        _log(f"All {len(ollama_fields(profile))} Ollama models verified as installed.", progress)
+
     if not skip_huggingface:
         # Reranker is always needed for stage 3; pull it up-front so first ask
         # does not freeze while sentence-transformers downloads ~GB of weights.
