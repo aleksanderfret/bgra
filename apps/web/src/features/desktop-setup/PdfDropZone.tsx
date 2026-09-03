@@ -1,8 +1,8 @@
 'use client';
 
 import { isGameId } from '@bga/api-contract';
-import { Alert, Stack, Text, TextInput, Title } from '@mantine/core';
-import { type DragEvent, useState } from 'react';
+import { Alert, Button, Group, Stack, Text, TextInput, Title } from '@mantine/core';
+import { type ChangeEvent, type DragEvent, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getDesktopApi } from '@/lib/desktop-bridge';
 
@@ -29,11 +29,9 @@ export function PdfDropZone() {
   const [gameId, setGameId] = useState('');
   const [feedback, setFeedback] = useState<ImportFeedback>({ kind: 'idle' });
   const [dragging, setDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const onDrop = (event: DragEvent<HTMLDivElement>): void => {
-    event.preventDefault();
-    setDragging(false);
-
+  const handleFile = (file: File): void => {
     const api = getDesktopApi();
     if (api === null) {
       setFeedback({ kind: 'browser_only' });
@@ -45,12 +43,10 @@ export function PdfDropZone() {
       return;
     }
 
-    const file = event.dataTransfer.files.item(0);
-    if (file === null || !file.name.toLowerCase().endsWith('.pdf')) {
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
       return;
     }
 
-    // Electron exposes the absolute path; browsers do not.
     const filePath = absolutePathOf(file);
     if (filePath === null) {
       setFeedback({ kind: 'browser_only' });
@@ -65,6 +61,29 @@ export function PdfDropZone() {
       }
     });
   };
+
+  const onDrop = (event: DragEvent<HTMLDivElement>): void => {
+    event.preventDefault();
+    setDragging(false);
+
+    const file = event.dataTransfer.files.item(0);
+    if (file !== null) {
+      handleFile(file);
+    }
+  };
+
+  const onFileChange = (event: ChangeEvent<HTMLInputElement>): void => {
+    const file = event.target.files?.item(0);
+    if (file !== null && file !== undefined) {
+      handleFile(file);
+    }
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const gameIdError =
+    feedback.kind === 'invalid_game_id' ? t('pdfImport.error.invalidGameIdBody') : undefined;
 
   return (
     <Stack gap="md">
@@ -81,12 +100,16 @@ export function PdfDropZone() {
         placeholder={t('pdfImport.gameId.placeholder')}
         value={gameId}
         onChange={(event) => setGameId(event.currentTarget.value)}
+        error={gameIdError}
+        required
       />
 
       <Alert
         variant={dragging ? 'filled' : 'light'}
         color={dragging ? 'teal' : 'gray'}
         title={t('pdfImport.drop.title')}
+        role="region"
+        aria-label={t('pdfImport.drop.title')}
         onDragOver={(event) => {
           event.preventDefault();
           setDragging(true);
@@ -95,14 +118,25 @@ export function PdfDropZone() {
         onDrop={onDrop}
         styles={{ root: { minHeight: 120, cursor: 'copy' } }}
       >
-        {t('pdfImport.drop.body')}
+        <Stack gap="sm">
+          <Text>{t('pdfImport.drop.body')}</Text>
+          <Group>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf"
+              onChange={onFileChange}
+              style={{ display: 'none' }}
+              aria-hidden="true"
+              tabIndex={-1}
+            />
+            <Button variant="light" size="sm" onClick={() => fileInputRef.current?.click()}>
+              {t('pdfImport.drop.title')}
+            </Button>
+          </Group>
+        </Stack>
       </Alert>
 
-      {feedback.kind === 'invalid_game_id' && (
-        <Alert color="red" title={t('pdfImport.error.invalidGameIdTitle')}>
-          {t('pdfImport.error.invalidGameIdBody')}
-        </Alert>
-      )}
       {feedback.kind === 'ingest_not_ready' && (
         <Alert color="orange" title={t('pdfImport.error.ingestNotReadyTitle')}>
           {t('pdfImport.error.ingestNotReadyBody', { fileName: feedback.fileName })}

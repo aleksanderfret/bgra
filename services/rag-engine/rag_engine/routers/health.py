@@ -33,7 +33,7 @@ async def read_health(
         "ollama": ollama_up,
         "storage": settings.storage_dir.is_dir(),
     }
-    models = {
+    models: dict[str, str] = {
         "profile": settings.model_profile,
         "llm": profile.llm,
         "embedding": profile.embedding,
@@ -41,6 +41,10 @@ async def read_health(
         "stt": profile.stt,
         "tts": profile.tts_voice,
     }
+    if profile.llm_arbiter:
+        models["llm_arbiter"] = profile.llm_arbiter
+    if profile.vision:
+        models["vision"] = profile.vision
 
     degraded = not all(components.values()) or len(missing) > 0
 

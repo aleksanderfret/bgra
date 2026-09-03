@@ -278,6 +278,36 @@ def test_ask_rejects_a_game_id_that_is_not_a_slug(
     assert response.status_code == 422
 
 
+# --- ask: mid-generation failure ---
+
+
+def test_ask_returns_insufficient_evidence_on_generation_error(
+    client: TestClient,
+) -> None:
+    async def _failing_generate(
+        *_args: object,
+        **_kwargs: object,
+    ) -> AsyncIterator[str]:
+        yield "partial answer"
+        raise OllamaUnreachableError("connection lost")
+
+    with (
+        patch(_TAGS_PATCH, _mock_tags(_ALL_TAGS)),
+        patch(_GEN_PATCH, _failing_generate),
+        client.stream("POST", "/ask", json=_ask_body()) as response,
+    ):
+        events = _frames("".join(response.iter_text()))
+
+    tokens = [e for e in events if e["type"] == "token"]
+    assert len(tokens) >= 1
+    errors = [e for e in events if e["type"] == "error"]
+    assert len(errors) == 1
+    assert errors[0]["code"] == "engine_unreachable"
+    done = events[-1]
+    assert done["type"] == "done"
+    assert done["groundedness"] == "insufficient_evidence"
+
+
 # --- semaphore ---
 
 

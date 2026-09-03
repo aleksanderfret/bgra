@@ -18,6 +18,7 @@ from ..contract import (
     AskRequest,
     DoneEvent,
     ErrorEvent,
+    Groundedness,
     NoticeEvent,
     SourcesEvent,
     StatusEvent,
@@ -75,6 +76,7 @@ async def _stream_answer(request: AskRequest, settings: Settings) -> AsyncIterat
 
     yield encode_event(StatusEvent(stage="generating"))
 
+    generation_failed = False
     await _generation_semaphore.acquire()
     try:
         messages = [
@@ -84,6 +86,7 @@ async def _stream_answer(request: AskRequest, settings: Settings) -> AsyncIterat
         async for text in generate_stream(settings.ollama_url, model, messages):
             yield encode_event(TokenEvent(text=text))
     except GenerationTimeoutError:
+        generation_failed = True
         logger.warning("Generation timed out for model %s", model)
         yield encode_event(
             ErrorEvent(
@@ -92,6 +95,7 @@ async def _stream_answer(request: AskRequest, settings: Settings) -> AsyncIterat
             )
         )
     except ModelNotInstalledError:
+        generation_failed = True
         yield encode_event(
             ErrorEvent(
                 code="model_missing",
@@ -99,6 +103,7 @@ async def _stream_answer(request: AskRequest, settings: Settings) -> AsyncIterat
             )
         )
     except OllamaUnreachableError:
+        generation_failed = True
         yield encode_event(
             ErrorEvent(
                 code="engine_unreachable",
@@ -108,7 +113,8 @@ async def _stream_answer(request: AskRequest, settings: Settings) -> AsyncIterat
     finally:
         _generation_semaphore.release()
 
-    yield encode_event(DoneEvent(answer_id=uuid4().hex, groundedness="partial"))
+    groundedness: Groundedness = "insufficient_evidence" if generation_failed else "partial"
+    yield encode_event(DoneEvent(answer_id=uuid4().hex, groundedness=groundedness))
 
 
 @router.post("/ask")

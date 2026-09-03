@@ -77,6 +77,10 @@ async def generate_stream(
                         return
         except httpx.ConnectError as error:
             raise OllamaUnreachableError(f"Cannot reach Ollama at {ollama_url}: {error}") from error
+        except httpx.HTTPStatusError as error:
+            raise OllamaUnreachableError(
+                f"Ollama returned HTTP {error.response.status_code}: {error}"
+            ) from error
         except httpx.ReadTimeout as error:
             raise GenerationTimeoutError(
                 f"Ollama did not produce tokens within {timeout_seconds}s"

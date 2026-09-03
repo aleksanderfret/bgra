@@ -42,7 +42,9 @@
       "label": "Pytanie",
       "placeholder": "Czy mogę zagrać kartę akcji, jeśli nie mam już kafelków?"
     },
-    "submit": "Zapytaj"
+    "submit": "Zapytaj",
+    "cancel": "Anuluj",
+    "formLabel": "Zadaj pytanie o zasady"
   },
   "stage": {
     "transcribing": "Rozpoznaję pytanie…",
@@ -52,6 +54,7 @@
     "speaking": "Mówię…"
   },
   "answer": {
+    "regionLabel": "Odpowiedź modelu",
     "transcript": "Usłyszałem: „{{transcript}}”",
     "insufficientEvidence": {
       "title": "Brak podstawy w dokumentach",
