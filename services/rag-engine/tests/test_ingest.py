@@ -102,6 +102,29 @@ def test_pdf_page_limit(tmp_path: Path) -> None:
         extract_markdown(pdf)
 
 
+def test_render_page_pngs_steps_dpi_down_when_png_is_heavy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from rag_engine.ingest import pdf as pdf_mod
+
+    pdf = _make_pdf(tmp_path / "demo.pdf", ["Cover art"])
+    out = tmp_path / "pages"
+    calls: list[int] = []
+
+    def fake_page_png(_page: object, dpi: int) -> bytes:
+        calls.append(dpi)
+        if dpi > 100:
+            return b"x" * (pdf_mod.MAX_PNG_BYTES + 1)
+        return b"png-ok"
+
+    monkeypatch.setattr(pdf_mod, "_page_png_bytes", fake_page_png)
+    written = pdf_mod.render_page_pngs(pdf, out)
+
+    assert calls == [150, 120, 100]
+    assert len(written) == 1
+    assert written[0].read_bytes() == b"png-ok"
+
+
 def test_assert_pdf_limits_missing_file(tmp_path: Path) -> None:
     with pytest.raises(FileNotFoundError):
         assert_pdf_limits(tmp_path / "missing.pdf")

@@ -15,6 +15,7 @@ from rag_engine.contract import GameSummary
 from rag_engine.ingest.pdf import (
     MAX_PDF_BYTES,
     IngestExtraMissingError,
+    PageImageLimitError,
     PdfLimitError,
 )
 from rag_engine.ingest.pipeline import ingest_rulebook
@@ -105,6 +106,8 @@ async def ingest_pdf_upload(
     except InvalidGameIdError as error:
         return _error(400, "invalid_game_id", str(error))
     except PdfLimitError as error:
+        if isinstance(error, PageImageLimitError):
+            return _error(413, "page_image_too_large", str(error))
         return _error(413, "limit_exceeded", str(error))
     except ValueError as error:
         return _error(400, "invalid_file", str(error))

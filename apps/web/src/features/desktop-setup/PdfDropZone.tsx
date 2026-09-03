@@ -24,6 +24,7 @@ type ImportFeedback =
   | { kind: 'ingest_not_ready'; fileName: string }
   | { kind: 'engine_unreachable' }
   | { kind: 'limit_exceeded' }
+  | { kind: 'page_image_too_large' }
   | { kind: 'ingest_failed' }
   | { kind: 'ingest_busy' }
   | { kind: 'success'; gameId: string };
@@ -115,6 +116,10 @@ export function PdfDropZone() {
         }
         if (code === 'limit_exceeded') {
           setFeedback({ kind: 'limit_exceeded' });
+          return;
+        }
+        if (code === 'page_image_too_large') {
+          setFeedback({ kind: 'page_image_too_large' });
           return;
         }
         if (code === 'engine_unreachable') {
@@ -272,6 +277,11 @@ export function PdfDropZone() {
         {feedback.kind === 'limit_exceeded' && (
           <Alert color="red" title={t('pdfImport.error.limitExceededTitle')} role="alert">
             {t('pdfImport.error.limitExceededBody')}
+          </Alert>
+        )}
+        {feedback.kind === 'page_image_too_large' && (
+          <Alert color="red" title={t('pdfImport.error.pageImageTooLargeTitle')} role="alert">
+            {t('pdfImport.error.pageImageTooLargeBody')}
           </Alert>
         )}
         {feedback.kind === 'ingest_failed' && (

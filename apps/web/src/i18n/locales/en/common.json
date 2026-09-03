@@ -7,6 +7,15 @@
     "title": "Board game rules assistant",
     "subtitle": "Answers come only from the rulebooks, FAQs and errata indexed on this computer."
   },
+  "rulebooks": {
+    "title": "Rulebooks",
+    "subtitle": "Load your own publisher PDFs on this computer. Nothing from someone else’s library is bundled."
+  },
+  "appNav": {
+    "label": "Main views",
+    "assistant": "Assistant",
+    "rulebooks": "Rulebooks"
+  },
   "preferences": {
     "label": "Display preferences"
   },
@@ -96,7 +105,7 @@
     "loading": "Reading hardware…",
     "browserOnly": {
       "title": "Model setup needs the desktop app",
-      "body": "Checking hardware and downloading models works in the packaged desktop app. In the browser you can still import rulebook PDFs below — start the stack with pnpm dev first."
+      "body": "Checking hardware and downloading models works in the packaged desktop app. In the browser, open Rulebooks to import a PDF — start the stack with pnpm dev first."
     },
     "hardware": {
       "title": "This computer",
@@ -186,7 +195,9 @@
       "engineUnreachableTitle": "The assistant is offline",
       "engineUnreachableBody": "Start the app with pnpm dev so the web interface and the engine are both running, then try again.",
       "limitExceededTitle": "PDF is too large",
-      "limitExceededBody": "This file is over 80 MB, has more than 200 pages, or a page image is too large. Use a smaller publisher PDF.",
+      "limitExceededBody": "This file is over 80 MB or has more than 200 pages. Use a smaller publisher PDF.",
+      "pageImageTooLargeTitle": "A page image is too heavy",
+      "pageImageTooLargeBody": "One page still makes a picture larger than 5 MB even after lowering resolution. Try a lighter scan or a smaller publisher PDF.",
       "ingestFailedTitle": "Import failed",
       "ingestFailedBody": "The file could not be turned into pages. Try another PDF, or check the engine log.",
       "ingestBusyTitle": "Another import is running",

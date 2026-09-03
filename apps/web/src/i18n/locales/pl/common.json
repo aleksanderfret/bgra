@@ -7,6 +7,15 @@
     "title": "Asystent zasad gier planszowych",
     "subtitle": "Odpowiedzi pochodzą wyłącznie z instrukcji, FAQ i errat wczytanych na tym komputerze."
   },
+  "rulebooks": {
+    "title": "Instrukcje",
+    "subtitle": "Wczytujesz własne PDF-y wydawcy na tym komputerze. Nic z cudzej biblioteki nie jest dołączone."
+  },
+  "appNav": {
+    "label": "Główne widoki",
+    "assistant": "Asystent",
+    "rulebooks": "Instrukcje"
+  },
   "preferences": {
     "label": "Ustawienia wyświetlania"
   },
@@ -96,7 +105,7 @@
     "loading": "Odczytuję sprzęt…",
     "browserOnly": {
       "title": "Konfiguracja modeli wymaga aplikacji desktopowej",
-      "body": "Sprawdzanie sprzętu i pobieranie modeli działa w spakowanej aplikacji desktopowej. W przeglądarce nadal możesz wczytać instrukcję PDF poniżej — najpierw uruchom stos poleceniem pnpm dev."
+      "body": "Sprawdzanie sprzętu i pobieranie modeli działa w spakowanej aplikacji desktopowej. W przeglądarce otwórz Instrukcje, żeby wczytać PDF — najpierw uruchom stos poleceniem pnpm dev."
     },
     "hardware": {
       "title": "Ten komputer",
@@ -186,7 +195,9 @@
       "engineUnreachableTitle": "Asystent jest wyłączony",
       "engineUnreachableBody": "Uruchom aplikację przez pnpm dev, żeby interfejs i silnik działały razem, i spróbuj ponownie.",
       "limitExceededTitle": "PDF jest za duży",
-      "limitExceededBody": "Plik ma ponad 80 MB, więcej niż 200 stron albo obraz strony jest za duży. Użyj mniejszego PDF-a od wydawcy.",
+      "limitExceededBody": "Plik ma ponad 80 MB albo więcej niż 200 stron. Użyj mniejszego PDF-a od wydawcy.",
+      "pageImageTooLargeTitle": "Obraz strony jest za ciężki",
+      "pageImageTooLargeBody": "Jedna strona nadal daje obraz większy niż 5 MB nawet po obniżeniu rozdzielczości. Spróbuj lżejszego skanu albo mniejszego PDF-a od wydawcy.",
       "ingestFailedTitle": "Import nie powiódł się",
       "ingestFailedBody": "Nie udało się zamienić pliku na strony. Spróbuj innego PDF-a albo sprawdź dziennik silnika.",
       "ingestBusyTitle": "Trwa inny import",

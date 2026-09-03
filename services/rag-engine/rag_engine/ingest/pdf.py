@@ -7,11 +7,18 @@ from pathlib import Path
 
 MAX_PDF_BYTES = 80 * 1024 * 1024
 MAX_PDF_PAGES = 200
-MAX_PNG_BYTES = 2 * 1024 * 1024
+# Art-heavy publisher pages often exceed 2 MB as PNG at 150 DPI; 5 MB is still
+# a hard cap after we step DPI down.
+MAX_PNG_BYTES = 5 * 1024 * 1024
 RENDER_DPI = 150
+RENDER_DPI_FALLBACKS = (150, 120, 100, 72)
 
 
 class PdfLimitError(ValueError):
+    pass
+
+
+class PageImageLimitError(PdfLimitError):
     pass
 
 
@@ -72,6 +79,15 @@ def extract_markdown(pdf_path: Path) -> PdfExtractResult:
     return PdfExtractResult(markdown="\n".join(parts), page_count=page_count)
 
 
+def _page_png_bytes(page: object, dpi: int) -> bytes:
+    import pymupdf
+
+    zoom = dpi / 72.0
+    matrix = pymupdf.Matrix(zoom, zoom)  # type: ignore[no-untyped-call,unused-ignore]
+    pixmap = page.get_pixmap(matrix=matrix, alpha=False)  # type: ignore[attr-defined]
+    return pixmap.tobytes("png")  # type: ignore[no-any-return]
+
+
 def render_page_pngs(pdf_path: Path, output_dir: Path) -> list[Path]:
     assert_pdf_limits(pdf_path)
     try:
@@ -83,8 +99,6 @@ def render_page_pngs(pdf_path: Path, output_dir: Path) -> list[Path]:
 
     output_dir.mkdir(parents=True, exist_ok=True)
     written: list[Path] = []
-    zoom = RENDER_DPI / 72.0
-    matrix = pymupdf.Matrix(zoom, zoom)  # type: ignore[no-untyped-call,unused-ignore]
 
     with pymupdf.open(pdf_path) as document:  # type: ignore[no-untyped-call,unused-ignore]
         if document.page_count > MAX_PDF_PAGES:
@@ -93,14 +107,21 @@ def render_page_pngs(pdf_path: Path, output_dir: Path) -> list[Path]:
             )
         for index in range(document.page_count):
             page = document.load_page(index)
-            pixmap = page.get_pixmap(matrix=matrix, alpha=False)
-            target = output_dir / f"p{index + 1:02d}.png"
-            png_bytes = pixmap.tobytes("png")
-            if len(png_bytes) > MAX_PNG_BYTES:
-                raise PdfLimitError(
-                    f"Rendered page {index + 1} is {len(png_bytes)} bytes; "
-                    f"maximum allowed is {MAX_PNG_BYTES} bytes (2 MB)."
+            png_bytes: bytes | None = None
+            last_size = 0
+            for dpi in RENDER_DPI_FALLBACKS:
+                candidate = _page_png_bytes(page, dpi)
+                last_size = len(candidate)
+                if last_size <= MAX_PNG_BYTES:
+                    png_bytes = candidate
+                    break
+            if png_bytes is None:
+                raise PageImageLimitError(
+                    f"Rendered page {index + 1} is {last_size} bytes; "
+                    f"maximum allowed is {MAX_PNG_BYTES} bytes "
+                    f"even at {RENDER_DPI_FALLBACKS[-1]} DPI."
                 )
+            target = output_dir / f"p{index + 1:02d}.png"
             target.write_bytes(png_bytes)
             written.append(target)
 
