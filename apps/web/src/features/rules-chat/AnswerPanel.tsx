@@ -19,8 +19,6 @@ export function AnswerPanel({ state }: AnswerPanelProps) {
           <Text size="sm">
             {t(`answer.error.${state.error.code}`, { defaultValue: t('answer.error.unknown') })}
           </Text>
-          {/* The raw message is a diagnostic, not copy: it stays in English and
-              in a quieter register than the sentence above it. */}
           <Text size="xs" c="dimmed">
             {state.error.message}
           </Text>

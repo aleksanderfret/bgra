@@ -1,5 +1,3 @@
-"""Readiness of the local engines behind the assistant."""
-
 from typing import Annotated
 
 import httpx
@@ -10,8 +8,7 @@ from ..settings import Settings, get_settings
 
 router = APIRouter(tags=["system"])
 
-#: A health probe must never be the slowest thing on the page.
-PROBE_TIMEOUT_SECONDS = 1.0
+PROBE_TIMEOUT_SECONDS = 1.0  # /health must not be the slowest thing on the page.
 
 
 async def _ollama_reachable(base_url: str) -> bool:
@@ -27,11 +24,6 @@ async def _ollama_reachable(base_url: str) -> bool:
 async def read_health(
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> HealthReport:
-    """Reports which parts of the stack are actually up.
-
-    The frontend uses this to explain a failure precisely — "Ollama is not
-    running" is actionable, "something went wrong" is not.
-    """
     profile = settings.profile
     components = {
         "ollama": await _ollama_reachable(settings.ollama_url),

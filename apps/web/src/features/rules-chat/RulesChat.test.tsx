@@ -4,7 +4,6 @@ import pl from '@/i18n/locales/pl/common.json';
 import { render, screen, waitFor, within } from '@/test-utils';
 import { RulesChat } from './RulesChat';
 
-/** The engine being down is the default state on a fresh checkout. */
 function withEngineOffline(): void {
   vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('ECONNREFUSED'));
 }

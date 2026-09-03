@@ -8,6 +8,7 @@ here.
 | --- | --- |
 | `skills/` | Project skills (`SKILL.md` per skill). Shared with anyone who clones the repo. |
 | `skills/premortem/` | Pre-mortem before implementation: tigers, paper tigers, elephants. |
+| `skills/code-comments/` | Comments only for non-intuitive / non-standard / exceptionally complex code. |
 | `skills/frontend-code/` | How to write `apps/web` (no nested JSX ternaries, no `any`, i18n, Mantine). |
 | `skills/translations/` | No hardcoded UI copy; every string lives in `en`/`pl` catalogues. |
 | `skills/ui-testing/` | Testing Library: query UI as a user (roles, labels, text). |

@@ -1,12 +1,7 @@
 /**
- * The engine codes this build knows how to phrase.
- *
- * Codes are an open set — the engine can start sending one before the frontend
- * has been taught the word for it — so the components fall back rather than
- * putting `stream_truncated` in front of somebody mid-game. This list is the
- * other half of that arrangement: `codes.test.ts` fails if anything named here
- * is missing wording in either language, which is what keeps the fallback rare
- * instead of routine.
+ * Codes this build knows how to phrase. The engine may send a new one first;
+ * the UI falls back rather than printing `stream_truncated` mid-game.
+ * `codes.test.ts` fails if a code listed here has no wording in either locale.
  */
 
 export const ERROR_CODES = [

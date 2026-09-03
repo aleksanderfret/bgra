@@ -1,0 +1,10 @@
+---
+description: Comments only for non-intuitive, non-standard, or exceptionally complex code.
+alwaysApply: true
+---
+
+# Code comments
+
+Follow `.cursor/skills/code-comments/SKILL.md`.
+
+Add comments in code ONLY when something is non-intuitive/non-standard and/or exceptionally complex, the way humans would. Do not restate what the code already shows.

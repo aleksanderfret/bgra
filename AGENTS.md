@@ -65,8 +65,8 @@ Breaking any of these produces an assistant that sounds right and is wrong.
 - Adding a key to one locale means adding it to the other. `i18n/locales.test.ts`
   fails on a key, or an interpolated value, present in one language and not the
   other; `i18n/i18next.d.ts` types every `t()` call against the English file.
-- Comment only what the code cannot show: a constraint, a non-obvious reason. Not
-  what the next line does.
+- Comments follow `.cursor/skills/code-comments/SKILL.md`: only when something is
+  non-intuitive, non-standard, or exceptionally complex — the way a human would.
 - Every non-trivial behaviour gets a test. The pure logic — the SSE decoder and the
   answer reducer — is where correctness is cheapest to pin down.
 - Model identifiers belong in `settings.py` profiles, never inline in call sites.

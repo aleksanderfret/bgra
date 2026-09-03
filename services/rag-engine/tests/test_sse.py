@@ -39,8 +39,7 @@ def test_nested_models_are_serialized_with_aliases() -> None:
 
 
 def test_newlines_in_text_cannot_break_out_of_a_frame() -> None:
-    # A raw newline in the payload would end the frame early and desynchronise
-    # the decoder, so it has to arrive escaped.
+    # A raw newline would end the frame early and desynchronise the decoder.
     frame = encode_event(TokenEvent(text="pierwsza\n\ndruga"))
 
     assert frame.count("\n\n") == 1

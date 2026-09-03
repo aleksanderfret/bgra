@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { resources } from './resources';
 import { LOCALES } from './settings';
 
-/** Every leaf key, dot-joined, sorted — the shape of a catalogue. */
 function keysOf(value: unknown, prefix = ''): string[] {
   if (typeof value !== 'object' || value === null) {
     return [prefix];

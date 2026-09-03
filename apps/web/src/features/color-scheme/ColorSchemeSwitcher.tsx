@@ -11,13 +11,6 @@ import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { COLOR_SCHEMES, isColorScheme } from './schemes';
 
-/**
- * Persists light / dark / auto through Mantine's localStorage manager.
- *
- * The first paint is not this component's job: `ColorSchemeScript` in the
- * root layout reads the same key before hydration so a refresh does not flash
- * the default scheme.
- */
 export function ColorSchemeSwitcher() {
   const { t } = useTranslation();
   const labelId = useId();

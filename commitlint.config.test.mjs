@@ -8,9 +8,6 @@ import { fileURLToPath } from 'node:url';
 const root = dirname(fileURLToPath(import.meta.url));
 const commitlintBin = join(root, 'node_modules', '.bin', 'commitlint');
 
-/**
- * @param {string} message
- */
 function lint(message) {
   return spawnSync(commitlintBin, ['--verbose'], {
     cwd: root,

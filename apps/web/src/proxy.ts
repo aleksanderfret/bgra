@@ -4,18 +4,14 @@ import { localeFromPathname, prefixLocale } from './i18n/routing';
 import { DEFAULT_LOCALE, isLocale, LOCALES } from './i18n/settings';
 
 /**
- * Makes sure every page URL names the language it is showing.
- *
- * The locale has to be in the path rather than in a cookie so that the server
- * render already knows it: `<html lang>` and the page metadata are produced
- * before any client code runs, and a cookie would make them a guess.
+ * Locale lives in the path, not a cookie: `<html lang>` and metadata are
+ * produced before any client code runs.
  */
 
 acceptLanguage.languages([...LOCALES]);
 
 export const config = {
-  // `api` is excluded so the engine proxy under /api/engine/* is never
-  // redirected, and `.*\..*` so static files keep their own URLs.
+  // Skip `/api/engine/*` (would break the proxy) and static files.
   matcher: ['/((?!api|_next|.*\\..*).*)'],
 };
 

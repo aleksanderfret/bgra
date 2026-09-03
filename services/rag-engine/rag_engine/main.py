@@ -1,5 +1,3 @@
-"""FastAPI application for the local rules engine."""
-
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
@@ -18,14 +16,11 @@ def create_app() -> FastAPI:
         summary="Answers board game rules questions from locally indexed documents",
     )
 
-    # No CORS middleware on purpose. The browser only ever talks to Next.js,
-    # which proxies to this service at /api/engine/*, so every request is
-    # same-origin and this port stays bound to localhost.
+    # No CORS: the browser only talks to Next.js, which proxies here.
     app.include_router(health.router)
     app.include_router(games.router)
     app.include_router(ask.router)
 
-    # Page renders and figure crops extracted from rulebooks.
     app.mount(
         "/static/assets",
         StaticFiles(directory=settings.assets_dir),

@@ -1,10 +1,4 @@
-"""Guards the frontend and backend against silently drifting apart.
-
-The TypeScript file is the source of truth for the wire format. Nothing stops
-someone from adding an event on one side only, and the failure would surface
-as a stream the browser quietly ignores. These tests turn that into a red
-test instead.
-"""
+"""Parity: an event added on one side only becomes a stream the browser ignores."""
 
 import re
 from typing import get_args
@@ -31,7 +25,7 @@ def _source() -> str:
 
 
 def _declaration(source: str, anchor: str) -> str:
-    """Returns the text of a declaration, which always ends at a blank line."""
+    """A top-level declaration in `types.ts` always ends at a blank line."""
     start = source.index(anchor)
     end = source.index("\n\n", start)
     return source[start:end]
@@ -60,7 +54,6 @@ def test_document_authority_order_matches() -> None:
     block = _declaration(_source(), "export const DOCUMENT_AUTHORITY")
     ts_order = re.findall(r"'([^']+)'", block.split("[", 1)[1])
 
-    # Order is the whole point here: it decides which document wins a conflict.
     assert tuple(ts_order) == DOCUMENT_AUTHORITY
 
 

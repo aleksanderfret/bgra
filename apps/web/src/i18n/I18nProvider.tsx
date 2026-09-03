@@ -12,15 +12,9 @@ export interface I18nProviderProps {
   children: ReactNode;
 }
 
-/**
- * Hands the active locale to every client component below it.
- *
- * The instance is rebuilt when the locale changes rather than mutated through
- * `changeLanguage`: switching language is a navigation to a different URL
- * segment, so the locale arrives as a prop and rebuilding keeps the rendered
- * language and the address bar from ever disagreeing.
- */
 export function I18nProvider({ locale, children }: I18nProviderProps) {
+  // Rebuild on locale change rather than `changeLanguage`: the URL segment is
+  // the source of truth, and mutating a shared instance would desync them.
   const instance = useMemo(() => {
     const created = createInstance();
     void created.use(initReactI18next).init(i18nOptions(locale));

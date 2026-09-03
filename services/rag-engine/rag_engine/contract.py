@@ -1,11 +1,7 @@
-"""Python side of the wire contract shared with `apps/web`.
+"""Python mirror of `packages/api-contract/src/types.ts`.
 
-The TypeScript definitions in `packages/api-contract/src/types.ts` are the
-source of truth for the shapes; this module mirrors them. Fields are snake_case
-in Python and camelCase on the wire, handled by the alias generator below.
-
-`tests/test_contract_parity.py` reads the TypeScript file and fails if the two
-sides drift apart.
+Fields are snake_case here and camelCase on the wire (`alias_generator`).
+`tests/test_contract_parity.py` fails if the two sides drift.
 """
 
 from typing import Annotated, Literal
@@ -15,9 +11,7 @@ from pydantic.alias_generators import to_camel
 
 DocumentKind = Literal["rulebook", "faq", "errata", "player_aid", "video_transcript"]
 
-#: Documents ordered from lowest to highest authority. When two documents
-#: disagree, the later entry wins: an errata sheet overrides the printed rules.
-#: A video transcript never establishes a rule, it only supplies wording.
+#: Later entries win a conflict. Transcripts never establish a rule.
 DOCUMENT_AUTHORITY: tuple[DocumentKind, ...] = (
     "video_transcript",
     "player_aid",
@@ -32,17 +26,11 @@ Groundedness = Literal["grounded", "partial", "insufficient_evidence"]
 
 
 class WireModel(BaseModel):
-    """Base for anything crossing the process boundary."""
-
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 
 class RetrievedSource(WireModel):
-    """A chunk the retriever actually returned.
-
-    The frontend renders only what appears here, which is what stops a model
-    from putting an invented figure on screen.
-    """
+    """The UI may show a figure only if its id appears here and `image_url` is set."""
 
     id: str
     game_id: str
@@ -94,12 +82,7 @@ class AudioEvent(WireModel):
 
 
 class NoticeEvent(WireModel):
-    """A state of the engine that the user has to be told about.
-
-    The engine sends a code and the values to fill into it; the frontend owns
-    the sentence. Putting the prose here instead would pin the interface to one
-    language and scatter UI copy across two runtimes.
-    """
+    """Code + params only. The frontend owns the sentence (and the language)."""
 
     type: Literal["notice"] = "notice"
     code: str
@@ -115,7 +98,7 @@ class DoneEvent(WireModel):
 class ErrorEvent(WireModel):
     type: Literal["error"] = "error"
     code: str
-    #: English technical detail for the log. The screen shows `code` translated.
+    #: English log detail. The screen shows `code` translated.
     message: str
 
 

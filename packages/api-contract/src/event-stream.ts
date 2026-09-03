@@ -12,13 +12,7 @@ const KNOWN_EVENT_TYPES: ReadonlySet<string> = new Set([
   'error',
 ]);
 
-/**
- * Shallow structural check on a decoded frame.
- *
- * Deliberately not a full schema validation: the goal is to keep a malformed
- * or unknown frame from reaching the UI as if it were a real event, while
- * staying forward-compatible with fields added later on the Python side.
- */
+/** Shallow check: reject garbage, stay forward-compatible with extra fields. */
 export function isAssistantEvent(value: unknown): value is AssistantEvent {
   if (typeof value !== 'object' || value === null) {
     return false;
@@ -40,24 +34,13 @@ export function isAssistantEvent(value: unknown): value is AssistantEvent {
 }
 
 export interface AssistantEventDecoder {
-  /**
-   * Feeds one network chunk in and returns every event that became complete.
-   *
-   * Chunk boundaries are arbitrary: a single frame can arrive split across
-   * several calls, and several frames can arrive in one call. Bytes that do not
-   * yet form a whole frame are retained until the next call.
-   */
   push(chunk: string): AssistantEvent[];
-  /** True when bytes are buffered, i.e. the stream ended mid-frame. */
   hasPendingBytes(): boolean;
 }
 
 /**
- * Incremental decoder for the `text/event-stream` framing used by `/ask`.
- *
- * Handles the parts of the SSE format that a naive `split('\n')` gets wrong:
- * multi-line `data:` fields (joined with a newline, per spec), `:` keep-alive
- * comments, both LF and CRLF line endings, and frames straddling chunks.
+ * Incremental SSE decoder. A naive `split('\n')` drops keep-alives, multi-line
+ * `data:` fields, CRLF, and frames that straddle chunks.
  */
 export function createAssistantEventDecoder(): AssistantEventDecoder {
   let buffer = '';
@@ -66,20 +49,18 @@ export function createAssistantEventDecoder(): AssistantEventDecoder {
     const dataLines: string[] = [];
 
     for (const rawLine of frame.split('\n')) {
-      // A line starting with ':' is a comment. Servers send these as
-      // keep-alives to stop proxies from closing an idle stream.
+      // `:` lines are keep-alives so idle proxies do not close the stream.
       if (rawLine.length === 0 || rawLine.startsWith(':')) {
         continue;
       }
       const separatorIndex = rawLine.indexOf(':');
       const field = separatorIndex === -1 ? rawLine : rawLine.slice(0, separatorIndex);
       if (field !== 'data') {
-        // `event:`, `id:` and `retry:` carry no payload in this protocol; the
-        // discriminator lives in the JSON body instead.
+        // `event:` / `id:` / `retry:` are unused; the discriminator is in JSON.
         continue;
       }
       let value = separatorIndex === -1 ? '' : rawLine.slice(separatorIndex + 1);
-      // Exactly one leading space after the colon is part of the framing.
+      // Spec: one leading space after the colon is framing, not payload.
       if (value.startsWith(' ')) {
         value = value.slice(1);
       }
@@ -91,7 +72,7 @@ export function createAssistantEventDecoder(): AssistantEventDecoder {
     }
 
     const payload = dataLines.join('\n');
-    // Tolerated for compatibility with plain-text SSE producers.
+    // Some SSE producers send this sentinel; it is not one of our events.
     if (payload === '[DONE]') {
       return null;
     }

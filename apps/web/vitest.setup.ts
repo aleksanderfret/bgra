@@ -3,24 +3,14 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
 import { afterEach, vi } from 'vitest';
 
-/**
- * Testing Library only auto-registers its cleanup when Vitest runs with
- * `globals: true`. We import test helpers explicitly, so the teardown has to
- * be wired by hand — otherwise each render stacks on top of the previous one
- * and queries start matching elements from earlier tests.
- */
+// Testing Library auto-registers cleanup only with `globals: true`.
 afterEach(cleanup);
-
-/**
- * jsdom implements neither `matchMedia` nor `ResizeObserver`, and several
- * Mantine components call both while measuring themselves. Without these stubs
- * every render that touches a responsive component throws.
- */
 
 const { getComputedStyle } = window;
 window.getComputedStyle = (element) => getComputedStyle(element);
 window.HTMLElement.prototype.scrollIntoView = () => {};
 
+// jsdom implements neither; Mantine calls both while measuring.
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
   value: vi.fn().mockImplementation((query: string) => ({
@@ -43,10 +33,7 @@ class ResizeObserverStub {
 
 window.ResizeObserver = ResizeObserverStub;
 
-/**
- * jsdom implements no Font Loading API either, and the autosizing textarea
- * subscribes to `loadingdone` so it can re-measure once a webfont swaps in.
- */
+// jsdom has no Font Loading API; Mantine's autosize textarea listens for it.
 Object.defineProperty(document, 'fonts', {
   writable: true,
   value: { addEventListener: vi.fn(), removeEventListener: vi.fn() },

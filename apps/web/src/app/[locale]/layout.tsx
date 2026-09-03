@@ -31,8 +31,7 @@ export async function generateMetadata({ params }: LocaleParams): Promise<Metada
 export default async function RootLayout({ children, params }: LayoutProps<'/[locale]'>) {
   const { locale } = await params;
 
-  // The proxy only ever routes known locales here, but a request can reach a
-  // route handler directly; an unknown segment is a 404, not a silent fallback.
+  // The proxy only routes known locales, but a direct hit must 404, not fall back.
   if (!isLocale(locale)) {
     notFound();
   }
@@ -40,8 +39,7 @@ export default async function RootLayout({ children, params }: LayoutProps<'/[lo
   return (
     <html lang={locale} {...mantineHtmlProps}>
       <head>
-        {/* Inline script, not next/script: it must run before first paint so a
-            refresh does not flash light while localStorage says dark. */}
+        {/* Must run before first paint or a refresh flashes the wrong scheme. */}
         <ColorSchemeScript defaultColorScheme={DEFAULT_COLOR_SCHEME} />
       </head>
       <body>

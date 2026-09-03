@@ -25,7 +25,6 @@ def client(storage: Path) -> Iterator[TestClient]:
 
 
 def _frames(raw: str) -> list[dict[str, object]]:
-    """Decodes an SSE body into the events it carried."""
     events: list[dict[str, object]] = []
     for frame in raw.split("\n\n"):
         for line in frame.splitlines():

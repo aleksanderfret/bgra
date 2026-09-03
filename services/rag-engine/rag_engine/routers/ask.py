@@ -1,12 +1,7 @@
-"""The question-answering endpoint.
+"""Stub `/ask` until retrieval exists.
 
-Retrieval and generation are not implemented yet. Until they are, this streams
-a correctly-shaped response that reports `insufficient_evidence`, which is the
-honest answer while no documents are indexed — and it exercises the whole
-frontend path, so the UI can be built and tested before any model is on disk.
-
-The stub emits no prose of its own: what the user reads comes from a `notice`
-code the frontend translates, so nothing here has to pick a language.
+Streams a correctly shaped `insufficient_evidence` response so the UI can be
+built against an empty store. Emits a `notice` code, never prose.
 """
 
 import asyncio
@@ -23,8 +18,7 @@ from ..sse import SSE_HEADERS, SSE_MEDIA_TYPE, encode_event
 
 router = APIRouter(tags=["assistant"])
 
-#: Small pause between frames so streaming is visibly incremental in the UI
-#: while the real generator is still a placeholder.
+#: Pause so the stub still looks like a stream in the UI.
 _FRAME_DELAY_SECONDS = 0.02
 
 
@@ -32,9 +26,7 @@ async def _stream_answer(request: AskRequest, settings: Settings) -> AsyncIterat
     yield encode_event(StatusEvent(stage="retrieving"))
     await asyncio.sleep(_FRAME_DELAY_SECONDS)
 
-    # Real retrieval lands in stage 3. Sending an explicit empty set keeps the
-    # contract's guarantee intact: the frontend may display only what it gets
-    # here, so right now it can display no figures at all.
+    # Empty on purpose: the UI may display only what it receives here.
     yield encode_event(SourcesEvent(sources=[]))
     await asyncio.sleep(_FRAME_DELAY_SECONDS)
 

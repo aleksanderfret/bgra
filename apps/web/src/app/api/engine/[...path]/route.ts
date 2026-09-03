@@ -1,17 +1,12 @@
 import type { NextRequest } from 'next/server';
 
 /**
- * Same-origin proxy in front of the local Python engine.
- *
- * Routing every call through Next keeps one origin for the browser, which
- * removes CORS from the picture entirely and leaves a single place to add
- * request validation or an access check once the app is reachable from a
- * tablet on the local network.
+ * Same-origin proxy so the browser never talks to Python directly — no CORS,
+ * one place for an access check once a tablet is on the LAN.
  */
 
 const ENGINE_URL = process.env.RAG_ENGINE_URL ?? 'http://127.0.0.1:8000';
 
-/** Streaming responses must never be cached or collapsed into one buffer. */
 export const dynamic = 'force-dynamic';
 
 const HOP_BY_HOP_HEADERS = new Set([
@@ -51,7 +46,6 @@ async function proxy(request: NextRequest, segments: string[]): Promise<Response
 
     const headers = new Headers(upstream.headers);
     headers.set('cache-control', 'no-cache, no-transform');
-    // Tells any intermediate proxy not to buffer the event stream.
     headers.set('x-accel-buffering', 'no');
 
     return new Response(upstream.body, { status: upstream.status, headers });

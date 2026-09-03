@@ -19,14 +19,6 @@ export interface UseAskStream {
   cancel: () => void;
 }
 
-/**
- * Drives one question through the engine and folds the response stream into
- * `AnswerState`.
- *
- * State is advanced through a local variable rather than the `useState`
- * updater so that a burst of tokens arriving in a single network chunk is
- * applied in order without depending on React's batching.
- */
 export function useAskStream(): UseAskStream {
   const [state, setState] = useState<AnswerState>(initialAnswerState);
   const abortRef = useRef<AbortController | null>(null);
@@ -36,6 +28,8 @@ export function useAskStream(): UseAskStream {
     const controller = new AbortController();
     abortRef.current = controller;
 
+    // Local copy so tokens in one network chunk apply in order; `setState`
+    // updater batching would not.
     let current = startAnswer();
     setState(current);
 
@@ -52,8 +46,6 @@ export function useAskStream(): UseAskStream {
         signal: controller.signal,
       });
 
-      // `message` is a diagnostic, never the sentence on screen: `code` picks
-      // the wording and the user's language decides the rest.
       if (!response.ok || response.body === null) {
         apply({
           type: 'error',
@@ -74,8 +66,8 @@ export function useAskStream(): UseAskStream {
         chunk = await reader.read();
       }
 
-      // A stream that ends without a `done` event means the engine died
-      // mid-answer; say so instead of leaving a spinner running forever.
+      // No `done` frame means the engine died mid-answer; otherwise the
+      // spinner never stops.
       if (current.isStreaming) {
         apply({
           type: 'error',
