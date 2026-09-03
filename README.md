@@ -1,268 +1,271 @@
-# BGA — a local board game rules assistant
+# BGA — Board Game Assistant
 
-A private assistant that **teaches board game rules** and **settles disputes at the
-table** — based on the rulebooks, FAQs and errata you put on your own disk. The end goal
-is that you talk to it, and it shows you the right part of the rulebook on screen.
+A private, offline assistant that **teaches board game rules** and **settles rules questions at the table** using your own rulebooks and FAQs. The goal is simple: you ask a question out loud, and the assistant answers you while showing the relevant page from the rulebook on screen.
 
-**No question and no document ever leaves your computer.** Answering is fully offline:
-the models run locally and there is no external API in the request path. The network is
-used twice, both times outside answering — installing the models, and fetching a YouTube
-transcript if you ask for one during ingestion. The app itself listens on `127.0.0.1`
-only, so nothing on your network can reach it until you decide otherwise.
+**Everything stays on your computer.** The assistant works completely offline once set up. No questions, game notes, or personal documents are ever sent to external cloud servers or third-party APIs.
 
 ---
 
-## What it is for
+## Table of Contents
 
-Two deliberately different scenarios:
+- [What this assistant does](#what-this-assistant-does)
+- [How it works (in simple words)](#how-it-works-in-simple-words)
+- [Hardware requirements](#hardware-requirements)
+- [Releases and downloads](#releases-and-downloads)
+- [Running from source](#running-from-source)
+- [Everyday commands](#everyday-commands)
+- [Project structure](#project-structure)
+- [Languages](#languages)
+- [Current status](#current-status)
+- [Source material and privacy](#source-material-and-privacy)
 
-| Mode | When | Behaviour |
+---
+
+## What this assistant does
+
+The assistant covers two common situations:
+
+| Situation | When to use it | What it does |
 | --- | --- | --- |
-| **Teach me the game** | You just unboxed something new | Runs a lesson: goal → theme → mechanics → turn structure → a sample move, in small portions, with comprehension checks |
-| **Settle a rule** | An argument mid-game | A short, exact answer with the rulebook page |
+| **Teach me the game** | When opening a new game for the first time | Guides you step-by-step: goal of the game, theme, main actions, turn order, and a sample move, checking understanding along the way. |
+| **Settle a rule** | During a game dispute | Gives a short, definitive answer citing the exact page and paragraph from the official rulebook. |
 
-## How it works
+---
 
-The model **does not memorise the rules**. Instead, for every question it searches your
-local document store and answers only from the passages it found. This is the **RAG**
-pattern (Retrieval-Augmented Generation).
+## How it works (in simple words)
 
+Traditional AI models often guess or invent details when they are not sure. BGA avoids this by following a strict principle: **it never guesses rules from memory**.
+
+Instead, every time you ask a question, the assistant:
+1. Listens to your voice through the microphone.
+2. Searches through the actual PDF rulebooks, FAQs, and official errata on your hard drive for that specific game.
+3. Reads the matching paragraphs and answers strictly based on that text.
+4. Shows the actual page from the rulebook on screen so everyone at the table can verify it.
+
+```text
+  Microphone
+      │
+      ▼
+  1. Speech recognition (transcribes your voice locally)
+      │
+      ▼
+  2. Document search (finds relevant pages in your local rulebook)
+      │
+      ▼
+  3. Answer generation (summarises the rule using ONLY those pages)
+      │
+      ├───────────────────────────────┐
+      ▼                               ▼
+  4. Spoken answer (local voice)   5. Rulebook page on screen
 ```
-                      ┌─────────────────────────────────────┐
-  microphone ────────►│ 1. Speech recognition (Whisper)     │
-                      └──────────────┬──────────────────────┘
-                                     ▼
-                      ┌─────────────────────────────────────┐
-                      │ 2. Search the document store        │
-                      │    • scoped to ONE game             │
-                      │    • hybrid: keywords + meaning     │
-                      │    • filtered through a reranker    │
-                      └──────────────┬──────────────────────┘
-                                     ▼
-                      ┌─────────────────────────────────────┐
-                      │ 3. Answer generation (LLM)          │
-                      │    only from the supplied passages  │
-                      └──────┬───────────────────┬──────────┘
-                             ▼                   ▼
-              ┌──────────────────────┐  ┌──────────────────────┐
-              │ 4. Speech synthesis  │  │ 5. Rulebook image    │
-              │    (Piper, Polish)   │  │    + page number     │
-              └──────────────────────┘  └──────────────────────┘
-```
 
-### Two pillars: facts and style
+### Facts vs. teaching style
 
-This separation is the foundation of the whole project:
-
-- **Facts** come from the document store (rulebook, FAQ, errata). The model is not
-  allowed to go beyond what it found. If it found nothing — it says it does not know.
-- **Teaching style** comes from the system prompt and from transcripts of good YouTube
-  tutorials. Transcripts teach the model *how* to explain (ordering, analogies, plain
-  language), and are **never** used as a source of rules.
-
-The result is an assistant that speaks as accessibly as a youtuber, but states rules
-that match the rulebook.
-
-### What the assistant deliberately does not do
-
-The answer "these documents do not contain that rule" is a **correct outcome**, not a
-failure. For a rules arbiter, an invented rule is far worse than admitting ignorance —
-which is why a lack of coverage in the sources is its own, visible state in the
-interface.
+- **Facts** come exclusively from official rulebooks and errata. If the rulebook does not mention a situation, the assistant admits it does not know instead of inventing a rule.
+- **Teaching style** comes from transcripts of board game video tutorials. These tutorials teach the assistant *how* to explain concepts clearly, but they are never used as a source of official rules.
 
 ---
 
 ## Hardware requirements
 
-Everything comes down to **unified memory** and memory bandwidth — on Apple Silicon
-these decide the speed, not the core count.
+Because the assistant runs locally on your computer without external cloud servers, it relies on your computer's memory (RAM). On modern Apple Silicon Macs (M1/M2/M3/M4), memory is shared between the processor and graphics, which makes local AI run fast.
 
-| Profile | Hardware | Main model | Disk | What it feels like |
-| --- | --- | --- | --- | --- |
-| `minimal-16gb` | 16 GB unified / ~10 GB VRAM | Qwen3 8B | ~6 GB | Settles rules; weaker teaching prose |
-| `starter-32gb` | M1/M2 Pro, 32 GB | Qwen3 14B (Q4) | ~12 GB | Brisk; build the pipeline on this |
-| `full-64gb` | M4/M5 Pro/Max, 64 GB | Qwen3 30B-A3B (MoE) | ~48 GB | Target quality and fluent conversation |
+| Memory profile | Recommended computer | How it feels |
+| --- | --- | --- |
+| `minimal-16gb` | 16 GB RAM (MacBook Air / M1 / M2) | Answers rules well; explanations are simpler. |
+| `starter-32gb` | 32 GB RAM (MacBook Pro / Pro chips) | **Recommended default:** quick responses, smooth flow. |
+| `full-64gb` | 64 GB+ RAM (Max or Ultra chips) | Best quality and natural, fluent conversation. |
 
-The `full-64gb` profile uses a **mixture-of-experts** model: it has 30 billion
-parameters but activates only ~3 billion per token. So it responds at the speed of a
-small model while reasoning like a large one — the best compromise for a spoken
-conversation, where time to first sound is what matters.
+### Disk space
 
-You change the profile in **one env file**, without touching the code:
+- **AI models:** 10–25 GB (downloaded once to your machine, never committed to git).
+- **Voice synthesis (speech):** ~1.6 GB.
+- **Game rulebooks & indexes:** 20–80 MB per game.
+
+To choose your hardware profile, copy the example environment file:
 
 ```bash
 cp services/rag-engine/.env.example services/rag-engine/.env
 ```
 
-Then set `BGA_MODEL_PROFILE=full-64gb` (or leave `starter-32gb`). The file is gitignored.
-`./scripts/pull-models.sh` and the engine both read it; a shell export of the same name
-overrides it for one command if you need that.
-
-Profile definitions: [`services/rag-engine/rag_engine/settings.py`](services/rag-engine/rag_engine/settings.py).
-
-### How much disk space
-
-| Item | Size |
-| --- | --- |
-| LLM (14B / 30B, Q4) | 9–20 GB |
-| Vision model (optional) | ~6 GB |
-| Embeddings + reranker | ~3 GB |
-| Speech recognition (Whisper turbo) | ~1.6 GB |
-| Polish voice (Piper) | ~60 MB |
-| One game: rulebook + images + index | 20–80 MB |
-
-Models never end up in the repository — they are downloaded locally.
+Set `BGA_MODEL_PROFILE=starter-32gb` (or `minimal-16gb` / `full-64gb`).
 
 ---
 
-## Getting started
+## Releases and downloads
 
-### Required tools
+We provide ready-to-run desktop application packages for macOS (Apple Silicon / arm64).
+
+### Downloading the app
+
+1. Go to the [Releases](https://github.com/aleksanderfret/bgra/releases) section on GitHub.
+2. Download the latest `.dmg` or `.zip` installer (e.g. `BGA-x.y.z-arm64.dmg`).
+3. Open the downloaded file and drag **BGA** into your Applications folder.
+
+### What you need installed on your Mac
+
+The packaged application runs the user interface and local server, but expects two helper tools to be installed on your computer:
+
+1. **[Ollama](https://ollama.com/)** — runs the local AI language models.
+2. **[uv](https://docs.astral.sh/uv/)** — runs the Python rules search engine.
+
+You can install both quickly using [Homebrew](https://brew.sh/):
 
 ```bash
-node --version   # ≥ 22
-corepack enable  # exposes pnpm from package.json
-brew install uv  # Python environment manager (installs Python 3.14 itself)
+brew install ollama
+brew install uv
 ```
 
-The AI engines arrive in later stages — **the harness runs without them**:
+Before first use, start Ollama and download the models for your chosen profile:
 
 ```bash
-brew install ollama          # stage 3: language model and embeddings
-./scripts/pull-models.sh     # downloads the models of the active profile
+./scripts/pull-models.sh
 ```
 
-### Install and run
+### macOS security notice (unsigned build)
+
+Because these are early community test builds without an expensive Apple Developer certificate:
+- macOS Gatekeeper may show a warning: *"BGA cannot be opened because the developer cannot be verified"*.
+- **To open it:** Right-click (or Control-click) the **BGA** app icon in Finder, choose **Open**, and click **Open** in the confirmation dialog. You only need to do this once.
+
+### For developers: creating a new release
+
+Creating a release is a two-step process:
+
+1. **Prepare locally:**
+   ```bash
+   pnpm release:prepare        # Bumps version (patch by default) and updates CHANGELOG.md
+   # Or for bigger updates:
+   # pnpm release:prepare minor
+   # pnpm release:prepare major
+   ```
+2. **Verify and tag:**
+   ```bash
+   pnpm preflight              # Run tests, linter, and type checks
+   git add .
+   git commit -m "chore(repo): release v0.1.1"
+   git tag v0.1.1
+   git push && git push origin v0.1.1
+   ```
+
+When you push a version tag (`v*`), our automated GitHub Action (`.github/workflows/release.yml`):
+- Verifies the tag matches the repository version.
+- Compiles the Next.js web application and packages the Electron desktop app.
+- Creates a clean GitHub Release with changelog notes filtered to user-facing changes (features, fixes, performance improvements, and visual updates).
+- Cleans up older binary files to keep storage tidy, while keeping past release notes and tags intact.
+
+---
+
+## Running from source
+
+If you want to modify the code or contribute to the project, you can run everything from source.
+
+### Prerequisites
+
+```bash
+node --version   # Version 22 or newer
+corepack enable  # Enables pnpm package manager
+brew install uv  # Installs uv for Python 3.14 environment
+brew install ollama
+```
+
+### Install dependencies and start
 
 ```bash
 pnpm install
 pnpm dev
 ```
 
-This starts **both** processes in parallel:
+This starts both parts of the system at the same time:
+- **Web interface:** <http://localhost:3000>
+- **Rules engine API & documentation:** <http://localhost:8000/docs>
 
-- interface: <http://localhost:3000>
-- engine + API documentation: <http://localhost:8000/docs>
+The browser communicates with the Python search engine securely through the local interface. Nothing is accessible from your outside local network.
 
-The browser talks only to Next.js, which forwards requests to Python under
-`/api/engine/*`. One origin, zero CORS configuration, and the engine port is not
-exposed to the network.
+### Running the desktop app locally
 
-### Commands
-
-| Command | Effect |
-| --- | --- |
-| `pnpm dev` | Interface + engine in parallel |
-| `pnpm verify` | Types, tests, lint and build across the repo |
-| `pnpm preflight` | Lint, types and tests — without a production build |
-| `pnpm test` | Tests for every package |
-| `pnpm typecheck` | TypeScript 7 + mypy (strict) |
-| `pnpm check:fix` | Formatting and auto-fixable Biome rules |
-| `pnpm format` | Biome + Ruff formatters, in place |
-| `pnpm release:prepare` | Bump version + CHANGELOG (no commit); see Desktop / GitHub Release |
-| `pnpm release:package` | Web standalone + unsigned Electron DMG/zip |
-
-Git hooks (Husky): **pre-commit** lints and formats only the staged files
-(Biome for TypeScript/JSON, Ruff for Python). **pre-push** runs `pnpm verify` —
-types, tests, lint and a production build for the whole repo. Disable for one
-command with `HUSKY=0` if you have to.
-
-Python lint and format are **Ruff** (replaces Flake8, isort and Black). Types are
-**mypy --strict**. Both already run as `rag-engine#lint` and `rag-engine#typecheck`;
-the hooks pick them up through Turborepo. There is nothing extra to install for
-that stack.
-
----
-
-## Repository layout
-
-A polyglot monorepo (pnpm workspaces + Turborepo): TypeScript where the interface
-matters, Python where the AI ecosystem is mature.
-
-```
-bga/
-├── apps/web/                 Next.js 16 · React 19 · Mantine 9 · TypeScript 7
-│   └── src/
-│       ├── app/[locale]/     routing, layout, engine proxy, setup
-│       ├── features/         answer and streaming logic
-│       └── i18n/             i18next setup and pl/en resources
-├── apps/desktop/             Electron shell (one icon → Next + engine)
-├── packages/api-contract/    shared TS contract + reference SSE decoder
-├── services/rag-engine/      FastAPI · Python 3.14 · uv
-│   ├── rag_engine/           API, configuration, model profiles
-│   └── storage/              your documents and index (outside git)
-├── .cursor/                  committed agent harness (skills, rules, commands)
-└── docs/                     architecture and execution plan
-```
-
-### Desktop app (Electron)
-
-Same UI as the browser; the Electron main process starts the Python engine and a local
-Next.js server, then opens `http://127.0.0.1`. From a checkout:
+To run the desktop Electron shell against your local code:
 
 ```bash
-pnpm install
-pnpm --filter web build          # once, for the production Next server
-pnpm --filter desktop build
-pnpm --filter desktop dev        # starts engine + Next + window
+pnpm --filter web build          # Builds production web assets
+pnpm --filter desktop build      # Compiles desktop shell
+pnpm --filter desktop dev        # Launches the app window
 ```
 
-While iterating on the web UI, keep `pnpm dev` running and attach the shell:
-
-```bash
-pnpm --filter desktop dev:attach
-```
-
-Local unsigned package (builds web standalone, then Electron DMG/zip under
-`apps/desktop/release/`):
+To build an unsigned `.dmg` / `.zip` on your machine:
 
 ```bash
 pnpm release:package
 ```
 
-The packaged app still needs **uv** and **Ollama** on the machine (models are not
-bundled). Do not share packaged game indexes; each person loads their own PDFs.
+---
 
-### GitHub Release (macOS arm64)
+## Everyday commands
 
-Releases are tagged locally; CI builds the binaries.
+| Command | What it does in plain language |
+| --- | --- |
+| `pnpm dev` | Starts both the web interface and the Python engine for everyday use. |
+| `pnpm preflight` | Fast sanity check: runs linter, TypeScript types, and tests. |
+| `pnpm verify` | Full verification: checks types, tests, code style, and builds production assets. |
+| `pnpm test` | Runs all automated unit tests across the whole project. |
+| `pnpm typecheck` | Validates TypeScript and Python type safety (`mypy --strict`). |
+| `pnpm check:fix` | Automatically formats files and fixes safe code issues. |
+| `pnpm release:prepare` | Updates version numbers across all packages and prepares the changelog. |
+| `pnpm release:package` | Builds the standalone web app and packages the desktop installer locally. |
 
-1. `pnpm release:prepare` — or `pnpm release:prepare minor` / `major` — bumps every
-   product version file, regenerates `CHANGELOG.md`, and prints the next commands
-   (does **not** commit or push).
-2. `pnpm preflight` (or `pnpm verify`).
-3. Commit with `chore(repo): release vX.Y.Z`, create tag `vX.Y.Z`, push branch + tag.
-4. [`.github/workflows/release.yml`](.github/workflows/release.yml) builds on
-   `macos-latest` (Apple Silicon), uploads `.dmg` / `.zip` to the GitHub Release, and
-   removes downloadable assets from older releases (release notes and tags stay).
+---
 
-The tag must match root `package.json` `version` (the prepare script keeps them in
-sync). Builds are **unsigned**: on macOS right-click the app → Open. Intel Macs are
-not covered by the CI artifact.
+## Project structure
 
-## Interface language
+The repository is organized into distinct, focused parts:
 
-The UI ships in Polish and English. Nothing user-facing is hardcoded: every string
-lives in [`apps/web/src/i18n/locales/`](apps/web/src/i18n/locales), and the active language is
-the first path segment (`/pl`, `/en`). Visiting `/` negotiates a language from the
-`Accept-Language` header and redirects, so the URL always names the language it is
-showing.
+```text
+bga/
+├── apps/
+│   ├── web/               Web interface (Next.js 16, React 19, Mantine 9)
+│   └── desktop/           Desktop application shell (Electron)
+├── services/
+│   └── rag-engine/        Python engine (FastAPI, rulebook search, local models)
+│       ├── rag_engine/    Search logic and API endpoints
+│       └── storage/       Local folder where your rulebook files are stored (never uploaded)
+├── packages/
+│   └── api-contract/      Shared communication types between frontend and backend
+├── scripts/               Release and setup helper scripts
+└── docs/                  Architecture documentation and roadmap
+```
 
-## What works today, and what does not
+---
 
-**Works today:** the monorepo, the interface, the full answer-streaming path
-(browser → Next.js → FastAPI), an API contract guarded by a parity test, Polish and
-English translations, strict lint and types.
+## Languages
 
-**Not yet:** PDF ingestion, retrieval, a connected model, voice. Until then `/ask`
-returns a correctly shaped response with the `insufficient_evidence` state — which is
-exactly what it should return against an empty store.
+The assistant supports both **English** and **Polish**.
 
-The order of work and the acceptance criteria for each stage: [`docs/ROADMAP.md`](docs/ROADMAP.md).
-The reasoning behind the decisions and the architecture audit: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+Every user-facing label, button, and message is defined in language translation files (`apps/web/src/i18n/locales/`). You can switch the language anytime in the interface, and the URL will update accordingly (`/en` or `/pl`).
 
-## Source material
+---
 
-You download the rulebooks yourself, from legal sources (publisher sites offer PDFs for
-download) and keep them locally, for your own use. The repository does not contain them
-and contains no bulk downloader for services whose terms forbid it.
+## Current status
+
+### What is working today
+
+- Complete local monorepo setup (TypeScript frontend + Python search engine).
+- Live streaming connection from the Python engine to the web interface.
+- Complete English and Polish translations.
+- Automated desktop packaging (macOS arm64 DMG and ZIP).
+- Automated GitHub Release pipeline with changelog generation.
+- Strict tests ensuring the engine never invents document citations.
+
+### What is being added next
+
+- Automatic PDF ingestion (converting rulebook PDFs into searchable pages and images).
+- Hybrid keyword + vector search through rules.
+- Local voice recognition (Whisper) and speech synthesis (Piper).
+
+For details on the technical roadmap and milestones, see [`docs/ROADMAP.md`](docs/ROADMAP.md).
+For architectural decisions, see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+
+---
+
+## Source material and privacy
+
+You supply the rulebook PDFs yourself from publisher websites or personal scans. The software comes with no bundled rulebooks, and your game library never leaves your computer.

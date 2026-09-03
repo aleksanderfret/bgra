@@ -1,0 +1,15 @@
+---
+description: Do not automatically commit new code. Only commit when explicitly asked or during rebase/merge conflict resolution.
+alwaysApply: true
+---
+
+# Commit policy: No automatic commits
+
+1. **Do not automatically commit new code:**
+   - After implementing features, bug fixes, documentation, or configuration changes, leave the modified files in the working directory.
+   - Never run `git commit` on your own initiative after completing an implementation task.
+   - Always present the changes and let the user inspect them before deciding to commit.
+
+2. **When commits are allowed:**
+   - When the user explicitly requests a commit (e.g. "zacommituj to", "commit the changes", "zrób commit").
+   - During git maintenance operations that inherently require committing, such as resolving merge conflicts, continuing a rebase (`git rebase --continue`), or when the user triggers a release workflow.
