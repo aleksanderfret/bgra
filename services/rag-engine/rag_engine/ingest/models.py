@@ -4,13 +4,15 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from rag_engine.contract import GAME_ID_PATTERN, DocumentKind
+from rag_engine.contract import DOC_KEY_PATTERN, GAME_ID_PATTERN, DocumentKind
 
 
 class ChunkRecord(BaseModel):
     id: str
     game_id: str = Field(pattern=GAME_ID_PATTERN)
     document_kind: DocumentKind
+    doc_key: str = Field(pattern=DOC_KEY_PATTERN)
+    document_title: str = ""
     page: int | None = None
     text: str
     heading: str = ""
@@ -20,10 +22,11 @@ class ChunkRecord(BaseModel):
 def chunk_id_for_page(
     game_id: str,
     kind: DocumentKind,
+    doc_key: str,
     page: int,
     chunk_index: int,
 ) -> str:
-    return f"{game_id}:{kind}:p{page:02d}:c{chunk_index:02d}"
+    return f"{game_id}:{kind}:{doc_key}:p{page:02d}:c{chunk_index:02d}"
 
 
 def chunk_id_for_transcript(

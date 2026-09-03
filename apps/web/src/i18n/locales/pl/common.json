@@ -38,11 +38,17 @@
     },
     "game": {
       "label": "Gra",
-      "description": "Wyszukiwanie jest zawsze zawężone do jednej gry",
+      "description": "Odpowiedzi biorą dokumenty tej gry. Włącz rozszerzenia poniżej tylko wtedy, gdy grasz z nimi przy stole.",
       "loading": "Wczytuję…",
       "placeholder": "Wybierz grę"
     },
+    "expansions": {
+      "legend": "Rozszerzenia w grze",
+      "description": "Opcjonalne. Bez zaznaczenia — tylko zasady podstawowe.",
+      "cleared": "Wyczyszczono wybór rozszerzeń dla nowej gry."
+    },
     "mode": {
+      "legend": "Tryb odpowiedzi",
       "label": "Tryb odpowiedzi",
       "teach": "Naucz mnie gry",
       "arbitrate": "Rozstrzygnij zasadę"
@@ -160,6 +166,22 @@
   "pdfImport": {
     "title": "Dodaj PDF z instrukcją",
     "subtitle": "Zawsze wgrywasz własne PDF-y. Żadna cudza biblioteka gier nie jest dołączona. Odpowiedzi z tych dokumentów pojawią się w następnym etapie — na razie plik jest zamieniany w przeszukiwalne strony na tym komputerze.",
+    "howAdding": {
+      "legend": "Jak dodajesz",
+      "helper": "Druga książeczka, tryb solo albo późniejszy suplement należy do istniejącej gry — wybierz „Dodaj do istniejącej gry”. Nowe pudełko albo rozszerzenie kupione później to nowa gra.",
+      "create": "Nowa gra",
+      "attach": "Dodaj do istniejącej gry"
+    },
+    "newGame": {
+      "legend": "Nowa gra"
+    },
+    "attachGame": {
+      "legend": "Istniejąca gra",
+      "selectLabel": "Gra",
+      "selectDescription": "Wybierz grę, do której należy ten PDF",
+      "selectPlaceholder": "Wybierz grę",
+      "loading": "Wczytuję gry…"
+    },
     "gameId": {
       "label": "Identyfikator gry",
       "description": "Mały slug używany jako nazwa katalogu, na przykład azul albo brass-birmingham",
@@ -170,11 +192,24 @@
       "description": "Widoczny na liście gier. Jeśli puste, używany jest identyfikator.",
       "placeholder": "Azul"
     },
+    "baseGame": {
+      "label": "To jest rozszerzenie gry",
+      "description": "Opcjonalne. Zostaw puste dla samodzielnej lub bazowej gry. Tu widać tylko gry bazowe.",
+      "placeholder": "To nie jest rozszerzenie",
+      "none": "To nie jest rozszerzenie"
+    },
+    "documentTitle": {
+      "label": "Tytuł dokumentu",
+      "description": "Krótka nazwa zrozumiała dla ludzi, na przykład Instrukcja, Tryb solo albo Living rules maj 2024",
+      "placeholder": "Instrukcja",
+      "requiredAttach": "Wymagany przy dodawaniu do istniejącej gry"
+    },
     "communityFaq": {
       "label": "Pobierz też opis z BoardGameGeek",
       "description": "Tylko oficjalne API XML. Nigdy nie ściąga PDF-ów instrukcji z sekcji Files. Wymaga internetu; pominięcie nie blokuje importu PDF."
     },
     "drop": {
+      "legend": "Plik PDF",
       "title": "Upuść tu PDF",
       "body": "Przeciągnij instrukcję wydawcy na ten obszar albo wybierz plik. Strony są renderowane, a tekst dzielony na sekcje lokalnie.",
       "chooseFile": "Wybierz PDF",
@@ -183,11 +218,20 @@
     "busy": "Importuję…",
     "success": {
       "title": "Instrukcja wczytana",
-      "body": "„{{gameId}}” jest na liście gier. Pytania nadal korzystają z wiedzy ogólnej, dopóki nie będzie wyszukiwania w dokumentach (etap 3)."
+      "body": "„{{gameId}}” jest na liście gier. Pytania nadal korzystają z wiedzy ogólnej, dopóki nie będzie wyszukiwania w dokumentach (etap 3).",
+      "attachedBody": "Dokument „{{documentTitle}}” dodano pod „{{gameId}}”."
     },
     "error": {
       "invalidGameIdTitle": "Niepoprawny identyfikator gry",
       "invalidGameIdBody": "Użyj małego sluga: litery, cyfry i myślniki, zaczynając od litery lub cyfry.",
+      "unknownGameTitle": "Nie ma takiej gry",
+      "unknownGameBody": "Wybierz grę z listy albo przełącz na Nową grę.",
+      "invalidDocumentTitleTitle": "Potrzebny tytuł dokumentu",
+      "invalidDocumentTitleBody": "Podaj krótki tytuł tego PDF-a, żeby odróżnić go od innych książeczek.",
+      "invalidBaseGameTitle": "Niepoprawna gra bazowa",
+      "invalidBaseGameBody": "Wybierz grę bazową z listy albo zostaw rozszerzenie puste.",
+      "invalidDocKeyTitle": "Niepoprawny klucz dokumentu",
+      "invalidDocKeyBody": "Użyj małego sluga: litery, cyfry i myślniki.",
       "invalidFileTitle": "To nie jest PDF",
       "invalidFileBody": "Wybierz instrukcję wydawcy zapisaną jako PDF.",
       "ingestNotReadyTitle": "Import niedostępny",

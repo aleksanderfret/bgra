@@ -12,6 +12,8 @@ from rag_engine.contract import (
     AskRequest,
     AssistantEvent,
     DocumentKind,
+    GameDocumentSummary,
+    GameSummary,
     Groundedness,
     HealthReport,
     PipelineStage,
@@ -111,6 +113,20 @@ def test_retrieved_source_fields_match() -> None:
 def test_ask_request_fields_match() -> None:
     ts_fields = _interface_fields(_source(), "AskRequest")
     python_fields = {to_camel(name) for name in AskRequest.model_fields}
+
+    assert ts_fields == python_fields
+
+
+def test_game_summary_fields_match() -> None:
+    ts_fields = _interface_fields(_source(), "GameSummary")
+    python_fields = {to_camel(name) for name in GameSummary.model_fields}
+
+    assert ts_fields == python_fields
+
+
+def test_game_document_summary_fields_match() -> None:
+    ts_fields = _interface_fields(_source(), "GameDocumentSummary")
+    python_fields = {to_camel(name) for name in GameDocumentSummary.model_fields}
 
     assert ts_fields == python_fields
 

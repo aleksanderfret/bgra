@@ -198,7 +198,7 @@ To build an unsigned `.dmg` / `.zip` on your machine:
 pnpm release:package
 ```
 
-### Adding a rulebook PDF (Stage 2)
+### Adding a rulebook PDF (Stage 2 / 2B)
 
 Install the PDF tools once:
 
@@ -207,7 +207,10 @@ cd services/rag-engine
 uv sync --extra ingest
 ```
 
-Then, with `pnpm dev` running, open **Rulebooks** in the app (`/pl/rulebooks` or `/en/rulebooks`), type a game id such as `azul`, and drop your PDF. The file is copied into local storage and split into pages on this computer. You can do the same in the desktop app — it uses the same upload.
+Then, with `pnpm dev` running, open **Rulebooks** (`/pl/rulebooks` or `/en/rulebooks`).
+
+- **New game** — type a game id (for example `azul`), optional title, drop the PDF. If the box is an expansion, set **This is an expansion of** to the base game.
+- **Add to an existing game** — use this for a second booklet, solo mode, or a late supplement. Pick the game, give the PDF a short document title, drop the file. Do **not** create a second game for a supplement.
 
 The terminal command still works if you prefer it:
 
@@ -215,15 +218,27 @@ The terminal command still works if you prefer it:
 uv run python -m rag_engine.ingest add \
   --game azul --kind rulebook --title Azul \
   /path/to/your-rulebook.pdf
+
+# Extra booklet under the same game
+uv run python -m rag_engine.ingest add \
+  --game azul --kind rulebook --title Azul \
+  --doc-title "Solo mode" --doc-key solo \
+  /path/to/solo.pdf
+
+# Expansion linked to a base
+uv run python -m rag_engine.ingest add \
+  --game azul-crystal --kind rulebook --title "Azul: Crystal Mosaic" \
+  --base-game azul \
+  /path/to/expansion.pdf
 ```
 
 What this does:
 
-- Splits the PDF into text sections and page images under `storage/` (or `BGA_STORAGE_DIR` in the desktop app — the same folder the engine already uses).
-- Updates `games.json` so the game appears in the list.
+- Splits the PDF into text sections and page images under `storage/assets/<gameId>/documents/<kind>/<docKey>/` (or `BGA_STORAGE_DIR` in the desktop app — the same folder the engine already uses).
+- Updates `games.json` so the game appears in the list, including `documents[]` and optional `baseGameId`.
 - Optional `--fetch-community-faq` loads **text** from BoardGameGeek’s official XML API only (never Files / HTML scraping). If the network is down, the PDF import still succeeds.
 
-**Important:** after ingest, Ask still answers from the model’s general knowledge. Citing your rulebook pages is Stage 3. You can confirm the material is ready with `GET /games` (non-zero `chunkCount`) and by checking `storage/assets/<gameId>/pNN.png`. A live percent bar while a PDF is imported is Stage 3A (after retrieval).
+**Important:** after ingest, Ask still answers from the model’s general knowledge. Citing your rulebook pages is Stage 3. You can confirm the material is ready with `GET /games` (non-zero `chunkCount`, documents listed) and by checking `storage/assets/<gameId>/documents/rulebook/<docKey>/pNN.png`. On Ask, pick a base game and optionally tick expansions. A live percent bar while a PDF is imported is Stage 3A (after retrieval).
 
 For a YouTube teaching video (captions preferred; Whisper only if you also installed `--extra speech`):
 

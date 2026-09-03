@@ -46,6 +46,21 @@ def main(argv: list[str] | None = None) -> int:
     )
     add.add_argument("--title", default=None, help="Display title for the game list")
     add.add_argument(
+        "--doc-title",
+        default=None,
+        help="Human title for this PDF (defaults to Rulebook / game title)",
+    )
+    add.add_argument(
+        "--doc-key",
+        default=None,
+        help="Document key slug under the game (defaults from --doc-title)",
+    )
+    add.add_argument(
+        "--base-game",
+        default=None,
+        help="If set, register this game as an expansion of the given base game id",
+    )
+    add.add_argument(
         "--fetch-community-faq",
         action="store_true",
         help="Also fetch BoardGameGeek thing description text (XMLAPI2 only)",
@@ -73,6 +88,8 @@ def main(argv: list[str] | None = None) -> int:
                 doc_key=doc_key,
                 chunks=chunks,
                 title=title,
+                document_title=args.doc_title,
+                base_game_id=args.base_game,
             )
             if args.fetch_community_faq:
                 _maybe_fetch_faq(storage, args.game, title)
@@ -82,6 +99,9 @@ def main(argv: list[str] | None = None) -> int:
                 game_id=args.game,
                 pdf_path=Path(args.source),
                 title=title,
+                document_title=args.doc_title,
+                doc_key=args.doc_key,
+                base_game_id=args.base_game,
                 fetch_community_faq=args.fetch_community_faq,
             )
         else:
@@ -91,6 +111,9 @@ def main(argv: list[str] | None = None) -> int:
                 kind=args.kind,
                 pdf_path=Path(args.source),
                 title=title,
+                document_title=args.doc_title,
+                doc_key=args.doc_key,
+                base_game_id=args.base_game,
             )
             if args.fetch_community_faq:
                 _maybe_fetch_faq(storage, args.game, title)

@@ -92,18 +92,52 @@ general model knowledge until Stage 3.
 
 ---
 
+## Stage 2B — Library: documents and expansions
+
+**Goal:** several PDFs under one game (solo, almanac, late supplements) and expansions as
+**separate** library entries linked to a base game, without a complicated Ask UI.
+
+- Expansions are their own `gameId` with `baseGameId` pointing at the base (published
+  later, imported later).
+- Extra booklets for the same product are **documents** under one `gameId` (`docKey` +
+  human title + `manifest.json`), not new games.
+- Page images live **per document** (`documents/<kind>/<docKey>/pNN.png`), never in a
+  flat game folder — otherwise a second PDF overwrites the first.
+- Chunk ids include `docKey`: `{gameId}:{kind}:{docKey}:pNN:cNN`.
+- `GameSummary` lists `documents[]` and optional `baseGameId`; `AskRequest` adds
+  `expansionIds` (server accepts an id only if that game’s `baseGameId` equals `gameId`).
+- Retrieval (Stage 3) scopes to the **active game set** (`gameId` ∪ validated
+  `expansionIds`) **before** search — rewrite of the old “exactly one game id” wording.
+- Same `documentKind` conflict: prefer newer `indexedAt`; sources show `documentTitle`.
+- Instrukcje UI: one form, two modes (“New game” / “Add PDF to existing”), clear copy so a
+  supplement is not created as a new game; expansion link only on “New game”. Related
+  controls wrapped in real HTML `<fieldset>` + `<legend>`.
+- Ask UI: base-game select + expansion checkboxes (default off); no per-booklet picker.
+- Migrate legacy flat `assets/<gameId>/pNN.png` into `documents/rulebook/main/` (or gate
+  Stage 3 until re-ingest).
+
+**Acceptance:** two PDFs under one base keep distinct chunk ids and page URLs; `/games`
+lists both titles; an expansion appears as a checkbox only under its base; forged
+`expansionIds` are rejected; fieldset semantics covered by UI tests; helper copy for the
+two import modes exists in `en` and `pl`.
+
+---
+
 ## Stage 3 — Retrieval
 
 **Goal:** answers grounded in the documents, citing the page.
 
 - `uv sync --extra retrieval`; LanceDB in `storage/index`
-- Chunk schema: `id`, `gameId`, `documentKind`, `page`, `text`, `heading`, vector
-- A **mandatory** `gameId` filter before retrieval (see audit 3.1)
+- Chunk schema: `id`, `gameId`, `documentKind`, `docKey`, `documentTitle`, `page`, `text`,
+  `heading`, vector
+- A **mandatory** active-game-set filter before retrieval (`gameId` ∪ validated
+  `expansionIds`; see Stage 2B and audit 3.1)
 - Hybrid retrieval: BM25 + vector, results fused
 - Cross-encoder reranking, `retrieval_candidates` → `retrieval_top_k`
 - A `min_relevance_score` threshold; below it → `insufficient_evidence` without calling
   the model
-- A prompt carrying the `DOCUMENT_AUTHORITY` hierarchy and a ban on leaving the context
+- A prompt carrying the `DOCUMENT_AUTHORITY` hierarchy, same-kind newer-document rule, and
+  a ban on leaving the context
 - Retrieved chunks are wrapped in delimiters and labelled as source material, with the
   system prompt stating that nothing inside them changes it (D14). A transcript that says
   "ignore the previous instructions" is text about a game, not an instruction.
@@ -118,7 +152,8 @@ general model knowledge until Stage 3.
 **Acceptance:** a question about a rule from an ingested rulebook yields an answer with
 the correct page number; **a Polish question against an English rulebook hits the right
 passage**; a question about a game that was never ingested yields a refusal, not an
-invented rule; a question about game A never returns passages from game B.
+invented rule; a question about game A never returns passages from game B; with
+expansions unticked, expansion passages are not used.
 
 ---
 

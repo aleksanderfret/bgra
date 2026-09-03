@@ -38,11 +38,17 @@
     },
     "game": {
       "label": "Game",
-      "description": "Retrieval is always scoped to a single game",
+      "description": "Answers use this game’s documents. Turn on expansions below only when you are playing with them.",
       "loading": "Loading…",
       "placeholder": "Choose a game"
     },
+    "expansions": {
+      "legend": "Expansions in play",
+      "description": "Optional. Leave unticked for base rules only.",
+      "cleared": "Expansion selection cleared for the new game."
+    },
     "mode": {
+      "legend": "Answer mode",
       "label": "Answer mode",
       "teach": "Teach me the game",
       "arbitrate": "Settle a rule"
@@ -160,6 +166,22 @@
   "pdfImport": {
     "title": "Add a rulebook PDF",
     "subtitle": "You always load your own PDFs. Nothing from someone else’s library is bundled. Answers from those documents arrive in the next stage — for now the file is turned into searchable pages on this computer.",
+    "howAdding": {
+      "legend": "How you are adding",
+      "helper": "A second booklet, solo mode, or late supplement belongs under an existing game — use “Add to an existing game”. A new box or an expansion you bought later is a new game.",
+      "create": "New game",
+      "attach": "Add to an existing game"
+    },
+    "newGame": {
+      "legend": "New game"
+    },
+    "attachGame": {
+      "legend": "Existing game",
+      "selectLabel": "Game",
+      "selectDescription": "Choose the game this PDF belongs to",
+      "selectPlaceholder": "Choose a game",
+      "loading": "Loading games…"
+    },
     "gameId": {
       "label": "Game id",
       "description": "Lowercase slug used as the folder name, for example azul or brass-birmingham",
@@ -170,11 +192,24 @@
       "description": "Shown in the game list. Defaults to the game id if left blank.",
       "placeholder": "Azul"
     },
+    "baseGame": {
+      "label": "This is an expansion of",
+      "description": "Optional. Leave empty for a standalone or base game. Only base games appear here.",
+      "placeholder": "Not an expansion",
+      "none": "Not an expansion"
+    },
+    "documentTitle": {
+      "label": "Document title",
+      "description": "A short name people understand, for example Rulebook, Solo mode, or Living rules May 2024",
+      "placeholder": "Rulebook",
+      "requiredAttach": "Required when adding to an existing game"
+    },
     "communityFaq": {
       "label": "Also fetch BoardGameGeek description text",
       "description": "Uses the official XML API only. Never downloads rulebook PDFs from BGG Files. Needs internet; skipping it never blocks the PDF import."
     },
     "drop": {
+      "legend": "PDF file",
       "title": "Drop a PDF here",
       "body": "Drag a publisher rulebook onto this area, or choose a file. Pages are rendered and text is split into sections on this computer.",
       "chooseFile": "Choose PDF",
@@ -183,11 +218,20 @@
     "busy": "Importing…",
     "success": {
       "title": "Rulebook imported",
-      "body": "“{{gameId}}” is on the game list. Ask still answers from general knowledge until document search (stage 3) is ready."
+      "body": "“{{gameId}}” is on the game list. Ask still answers from general knowledge until document search (stage 3) is ready.",
+      "attachedBody": "Document “{{documentTitle}}” was added under “{{gameId}}”."
     },
     "error": {
       "invalidGameIdTitle": "Invalid game id",
       "invalidGameIdBody": "Use a lowercase slug: letters, digits and hyphens only, starting with a letter or digit.",
+      "unknownGameTitle": "Game not found",
+      "unknownGameBody": "Choose a game that is already on the list, or switch to New game.",
+      "invalidDocumentTitleTitle": "Document title needed",
+      "invalidDocumentTitleBody": "Type a short title for this PDF so it can be told apart from other booklets.",
+      "invalidBaseGameTitle": "Invalid base game",
+      "invalidBaseGameBody": "Pick a base game from the list, or leave expansion unset.",
+      "invalidDocKeyTitle": "Invalid document key",
+      "invalidDocKeyBody": "Use a lowercase slug: letters, digits and hyphens only.",
       "invalidFileTitle": "Not a PDF",
       "invalidFileBody": "Choose a publisher rulebook saved as a PDF.",
       "ingestNotReadyTitle": "Import is not available",

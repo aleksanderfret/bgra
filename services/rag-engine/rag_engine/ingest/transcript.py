@@ -11,6 +11,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from rag_engine.ingest.models import ChunkRecord, chunk_id_for_transcript
+from rag_engine.storage_paths import slugify_doc_key
 
 ProgressCallback = Callable[[str], None]
 
@@ -175,12 +176,15 @@ def build_transcript_chunks(
     video_id = extract_video_id(url_or_id)
     text = fetch_transcript_text(video_id, progress=progress)
     paragraphs = _split_transcript_paragraphs(text)
+    doc_key = slugify_doc_key(f"yt-{video_id}", fallback="yt-video")
 
     chunks = [
         ChunkRecord(
-            id=chunk_id_for_transcript(game_id, video_id, index),
+            id=chunk_id_for_transcript(game_id, doc_key, index),
             game_id=game_id,
             document_kind="video_transcript",
+            doc_key=doc_key,
+            document_title=f"YouTube {video_id}",
             page=None,
             text=paragraph,
             heading="",
@@ -188,4 +192,4 @@ def build_transcript_chunks(
         )
         for index, paragraph in enumerate(paragraphs)
     ]
-    return f"yt-{video_id}", chunks
+    return doc_key, chunks

@@ -39,8 +39,10 @@ package.json script: npm runs scripts with `sh`, which has no `source`.
 
 Breaking any of these produces an assistant that sounds right and is wrong.
 
-1. **Retrieval is always scoped to one game.** `gameId` is required on `AskRequest`
-   and the metadata filter is applied before search, never after.
+1. **Retrieval is scoped to the active game set.** `gameId` is required on `AskRequest`.
+   Optional `expansionIds` are allowed only when each id’s `baseGameId` equals that
+   `gameId`. The metadata filter (`gameId` ∪ validated expansions) is applied **before**
+   search, never after.
 2. **The model never names a file path.** Images are attached by the backend in the
    `sources` frame; the model may only reference an id. The frontend displays a
    figure only if that id is present in the sources it received.

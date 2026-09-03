@@ -16,6 +16,9 @@ DocumentKind = Literal["rulebook", "faq", "errata", "player_aid", "video_transcr
 #: `GAME_ID_PATTERN` in the TypeScript contract by the parity test.
 GAME_ID_PATTERN = r"^[a-z0-9][a-z0-9-]{0,63}$"
 
+#: Document keys reuse the same slug rules as game ids.
+DOC_KEY_PATTERN = GAME_ID_PATTERN
+
 #: Later entries win a conflict. Transcripts never establish a rule.
 DOCUMENT_AUTHORITY: tuple[DocumentKind, ...] = (
     "video_transcript",
@@ -53,6 +56,7 @@ class AskRequest(WireModel):
     question: str = Field(min_length=1, max_length=2000)
     mode: AnswerMode = "teach"
     session_id: str | None = None
+    expansion_ids: list[str] = Field(default_factory=list)
 
 
 class StatusEvent(WireModel):
@@ -122,12 +126,22 @@ AssistantEvent = Annotated[
 ]
 
 
+class GameDocumentSummary(WireModel):
+    doc_key: str = Field(pattern=DOC_KEY_PATTERN)
+    document_kind: DocumentKind
+    title: str
+    chunk_count: int = 0
+    indexed_at: str
+
+
 class GameSummary(WireModel):
     game_id: str = Field(pattern=GAME_ID_PATTERN)
     title: str
     chunk_count: int = 0
     document_kinds: list[DocumentKind] = Field(default_factory=list)
     indexed_at: str | None = None
+    base_game_id: str | None = None
+    documents: list[GameDocumentSummary] = Field(default_factory=list)
 
 
 class HealthReport(WireModel):

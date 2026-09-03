@@ -109,6 +109,8 @@ def build_faq_chunks(
                 id=chunk_id_for_faq(game_id, doc_key, index),
                 game_id=game_id,
                 document_kind="faq",
+                doc_key=doc_key,
+                document_title=name,
                 page=None,
                 text=paragraph,
                 heading=name if index == 0 else "",

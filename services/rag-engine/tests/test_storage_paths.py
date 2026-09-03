@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from rag_engine.storage_paths import (
+    InvalidDocKeyError,
     InvalidGameIdError,
     StoragePathEscapeError,
     assert_game_id,
@@ -12,6 +13,7 @@ from rag_engine.storage_paths import (
     game_assets_dir,
     page_image_url,
     page_png_path,
+    slugify_doc_key,
 )
 
 
@@ -36,8 +38,9 @@ def test_paths_stay_under_storage(tmp_path: Path) -> None:
     game_dir = game_assets_dir(storage, "azul")
     assert game_dir == (storage / "assets" / "azul").resolve()
 
-    png = page_png_path(storage, "azul", 4)
+    png = page_png_path(storage, "azul", "rulebook", "main", 4)
     assert png.name == "p04.png"
+    assert "documents/rulebook/main" in str(png)
 
     doc = document_dir(storage, "azul", "rulebook", "main")
     assert doc.name == "main"
@@ -59,9 +62,17 @@ def test_assert_under_storage_rejects_escape(tmp_path: Path) -> None:
 def test_document_key_rejects_path_segments(tmp_path: Path) -> None:
     storage = tmp_path / "storage"
     storage.mkdir()
-    with pytest.raises(StoragePathEscapeError):
+    with pytest.raises(InvalidDocKeyError):
         document_dir(storage, "azul", "rulebook", "../evil")
 
 
 def test_page_image_url_is_engine_relative() -> None:
-    assert page_image_url("azul", 4) == "/static/assets/azul/p04.png"
+    assert (
+        page_image_url("azul", "rulebook", "main", 4)
+        == "/static/assets/azul/documents/rulebook/main/p04.png"
+    )
+
+
+def test_slugify_doc_key() -> None:
+    assert slugify_doc_key("Solo mode") == "solo-mode"
+    assert slugify_doc_key("  ") == "main"

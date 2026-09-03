@@ -55,9 +55,11 @@ pull passages from several different rulebooks, and the model will merge them in
 single answer that sounds credible and is false.
 
 **Resolution:** `gameId` is a required request field (`AskRequest`), validated
-server-side, and the metadata filter is applied **before** retrieval, not after. The
-contract enforces this at the type level, and the test
-`test_ask_rejects_a_question_without_a_game` guards it.
+server-side. Optional `expansionIds` may widen the scope only to games whose
+`baseGameId` equals that `gameId`. The metadata filter for the **active game set**
+is applied **before** retrieval, not after. The contract enforces this at the type
+level, and the test `test_ask_rejects_a_question_without_a_game` guards the required
+base id (Stage 2B adds validation for expansions).
 
 ### 3.2. No document authority hierarchy
 
@@ -69,7 +71,9 @@ passage happened to score higher on similarity.
 `DOCUMENT_AUTHORITY` fixes the order: `video_transcript < player_aid < rulebook < faq <
 errata`. On a conflict the prompt tells the model to follow the higher-authority document
 and to say outright that an errata changed the rule. The order is identical on both sides
-— `test_document_authority_order_matches` guards that.
+— `test_document_authority_order_matches` guards that. When two documents share the same
+kind (e.g. two rulebooks), prefer the newer `indexedAt` and expose `documentTitle` in
+`sources` (Stage 2B).
 
 YouTube transcripts have the **lowest** authority on purpose: they supply style, not
 rules. A youtuber may be wrong, or playing with an old errata.

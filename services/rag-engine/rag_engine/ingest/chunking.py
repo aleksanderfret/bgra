@@ -62,6 +62,8 @@ def chunk_markdown(
     *,
     game_id: str,
     kind: DocumentKind,
+    doc_key: str,
+    document_title: str,
 ) -> list[ChunkRecord]:
     """One chunk per heading section; page comes from the nearest page marker."""
     chunks: list[ChunkRecord] = []
@@ -79,18 +81,19 @@ def chunk_markdown(
         page_counters[page] = index + 1
 
         if page is None:
-            # Unpaged markdown (rare for pymupdf4llm); still emit a stable id.
-            chunk_id = f"{game_id}:{kind}:p00:c{index:02d}"
+            chunk_id = f"{game_id}:{kind}:{doc_key}:p00:c{index:02d}"
             image_url = None
         else:
-            chunk_id = chunk_id_for_page(game_id, kind, page, index)
-            image_url = page_image_url(game_id, page)
+            chunk_id = chunk_id_for_page(game_id, kind, doc_key, page, index)
+            image_url = page_image_url(game_id, kind, doc_key, page)
 
         chunks.append(
             ChunkRecord(
                 id=chunk_id,
                 game_id=game_id,
                 document_kind=kind,
+                doc_key=doc_key,
+                document_title=document_title,
                 page=page,
                 text=text,
                 heading=section.heading,

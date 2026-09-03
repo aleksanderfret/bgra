@@ -61,8 +61,79 @@ def _ask_body(
     game_id: str = "azul",
     question: str = "Kto zaczyna?",
     mode: str = "teach",
-) -> dict[str, str]:
-    return {"gameId": game_id, "question": question, "mode": mode}
+    expansion_ids: list[str] | None = None,
+) -> dict[str, object]:
+    body: dict[str, object] = {"gameId": game_id, "question": question, "mode": mode}
+    if expansion_ids is not None:
+        body["expansionIds"] = expansion_ids
+    return body
+
+
+def test_ask_rejects_invalid_expansion_ids(
+    client: TestClient,
+    storage: Path,
+) -> None:
+    (storage / "games.json").write_text(
+        json.dumps(
+            [
+                {
+                    "gameId": "azul",
+                    "title": "Azul",
+                    "chunkCount": 1,
+                    "documentKinds": ["rulebook"],
+                    "indexedAt": "2026-01-05T10:00:00Z",
+                    "baseGameId": None,
+                    "documents": [],
+                },
+            ]
+        ),
+        encoding="utf-8",
+    )
+    response = client.post(
+        "/ask",
+        json=_ask_body(expansion_ids=["not-an-expansion"]),
+    )
+    assert response.status_code == 400
+    assert response.json()["code"] == "invalid_expansion_ids"
+
+
+def test_ask_accepts_validated_expansion_ids(
+    client: TestClient,
+    storage: Path,
+) -> None:
+    (storage / "games.json").write_text(
+        json.dumps(
+            [
+                {
+                    "gameId": "azul",
+                    "title": "Azul",
+                    "chunkCount": 1,
+                    "documentKinds": ["rulebook"],
+                    "indexedAt": "2026-01-05T10:00:00Z",
+                    "baseGameId": None,
+                    "documents": [],
+                },
+                {
+                    "gameId": "azul-crystal",
+                    "title": "Azul Crystal",
+                    "chunkCount": 1,
+                    "documentKinds": ["rulebook"],
+                    "indexedAt": "2026-02-01T10:00:00Z",
+                    "baseGameId": "azul",
+                    "documents": [],
+                },
+            ]
+        ),
+        encoding="utf-8",
+    )
+    with (
+        patch(_TAGS_PATCH, _mock_tags(_ALL_TAGS)),
+        patch(_GEN_PATCH, _fake_generate),
+        client.stream("POST", "/ask", json=_ask_body(expansion_ids=["azul-crystal"])) as response,
+    ):
+        assert response.status_code == 200
+        frames = _frames("".join(response.iter_text()))
+    assert frames[-1]["type"] == "done"
 
 
 # --- health ---
@@ -433,6 +504,8 @@ async def test_ingest_pdf_upload_rejects_a_second_import_while_busy(
             title="Azul",
             chunk_count=1,
             document_kinds=["rulebook"],
+            base_game_id=None,
+            documents=[],
         )
 
     transport = httpx.ASGITransport(app=app)

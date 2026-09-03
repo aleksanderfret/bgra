@@ -24,7 +24,7 @@ def test_build_transcript_chunks_from_captions() -> None:
             game_id="azul",
             url_or_id="dQw4w9WgXcQ",
         )
-    assert doc_key == "yt-dQw4w9WgXcQ"
+    assert doc_key == "yt-dqw4w9wgxcq"
     assert len(chunks) == 2
     assert chunks[0].document_kind == "video_transcript"
     assert chunks[0].page is None

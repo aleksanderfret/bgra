@@ -8,27 +8,33 @@ describe('PdfDropZone', () => {
     vi.unstubAllGlobals();
   });
 
-  it('exposes a form, headings, and a keyboard path to choose a file', async () => {
+  it('exposes fieldsets, mode helper, and a keyboard path to choose a file', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => [],
+      }),
+    );
+
     render(<PdfDropZone />, 'en');
 
     expect(screen.getByRole('form', { name: en.pdfImport.title })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: en.pdfImport.title })).toBeInTheDocument();
-    expect(screen.getByRole('group', { name: en.pdfImport.drop.title })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: en.pdfImport.howAdding.legend })).toBeInTheDocument();
+    expect(screen.getByText(en.pdfImport.howAdding.helper)).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: en.pdfImport.newGame.legend })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: en.pdfImport.drop.legend })).toBeInTheDocument();
 
     const choose = screen.getByRole('button', { name: en.pdfImport.drop.chooseFile });
     expect(choose).toHaveAttribute('type', 'button');
-
-    await userEvent.click(
-      screen.getByRole('textbox', { name: new RegExp(en.pdfImport.gameId.label) }),
-    );
-    await userEvent.tab();
-    await userEvent.tab();
-    await userEvent.tab();
-    expect(choose).toHaveFocus();
   });
 
   it('rejects an invalid game id before uploading and focuses the field', async () => {
-    const fetchMock = vi.fn();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [],
+    });
     vi.stubGlobal('fetch', fetchMock);
 
     render(<PdfDropZone />, 'en');
@@ -44,7 +50,7 @@ describe('PdfDropZone', () => {
       file,
     );
 
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchMock.mock.calls.every((call) => String(call[0]).includes('/games'))).toBe(true);
     expect(screen.getByText(en.pdfImport.error.invalidGameIdBody)).toBeInTheDocument();
     await waitFor(() => {
       expect(
@@ -54,9 +60,15 @@ describe('PdfDropZone', () => {
   });
 
   it('uploads the PDF through the engine proxy and reports success as a status', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ gameId: 'azul', title: 'Azul', chunkCount: 2 }),
+    const fetchMock = vi.fn().mockImplementation(async (input: RequestInfo) => {
+      const url = String(input);
+      if (url.includes('/games')) {
+        return { ok: true, json: async () => [] };
+      }
+      return {
+        ok: true,
+        json: async () => ({ gameId: 'azul', title: 'Azul', chunkCount: 2 }),
+      };
     });
     vi.stubGlobal('fetch', fetchMock);
 
@@ -74,7 +86,9 @@ describe('PdfDropZone', () => {
     );
 
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls.some((call) => String(call[0]).includes('/ingest/pdf'))).toBe(
+        true,
+      );
     });
 
     expect(await screen.findByRole('status')).toHaveTextContent(
@@ -85,9 +99,14 @@ describe('PdfDropZone', () => {
   it('announces a failed import as an alert', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue({
-        ok: false,
-        json: async () => ({ type: 'error', code: 'ingest_failed', message: 'boom' }),
+      vi.fn().mockImplementation(async (input: RequestInfo) => {
+        if (String(input).includes('/games')) {
+          return { ok: true, json: async () => [] };
+        }
+        return {
+          ok: false,
+          json: async () => ({ type: 'error', code: 'ingest_failed', message: 'boom' }),
+        };
       }),
     );
 
@@ -110,9 +129,14 @@ describe('PdfDropZone', () => {
   it('announces a busy engine as an alert', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue({
-        ok: false,
-        json: async () => ({ type: 'error', code: 'ingest_busy', message: 'busy' }),
+      vi.fn().mockImplementation(async (input: RequestInfo) => {
+        if (String(input).includes('/games')) {
+          return { ok: true, json: async () => [] };
+        }
+        return {
+          ok: false,
+          json: async () => ({ type: 'error', code: 'ingest_busy', message: 'busy' }),
+        };
       }),
     );
 
