@@ -24,8 +24,15 @@ export const DOCUMENT_AUTHORITY: readonly DocumentKind[] = [
  */
 export const GAME_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;
 
+/** Document keys reuse the same slug rules as game ids. */
+export const DOC_KEY_PATTERN = GAME_ID_PATTERN;
+
 export function isGameId(value: string): boolean {
   return GAME_ID_PATTERN.test(value);
+}
+
+export function isDocKey(value: string): boolean {
+  return DOC_KEY_PATTERN.test(value);
 }
 
 /**
@@ -51,11 +58,19 @@ export interface RetrievedSource {
 export type AnswerMode = 'teach' | 'arbitrate';
 
 export interface AskRequest {
-  /** Required: retrieval is scoped to one game before search, never after. */
+  /**
+   * Required base (or standalone) game. Retrieval uses this id plus any
+   * validated `expansionIds` — filter before search, never after.
+   */
   gameId: string;
   question: string;
   mode: AnswerMode;
   sessionId?: string;
+  /**
+   * Expansion game ids whose `baseGameId` must equal `gameId`. Empty / omitted
+   * means base rules only.
+   */
+  expansionIds?: string[];
 }
 
 export type PipelineStage = 'transcribing' | 'retrieving' | 'reranking' | 'generating' | 'speaking';
@@ -77,6 +92,14 @@ export type AssistantEvent =
   /** `message` is an English log detail, never the sentence on screen. */
   | { type: 'error'; code: string; message: string };
 
+export interface GameDocumentSummary {
+  docKey: string;
+  documentKind: DocumentKind;
+  title: string;
+  chunkCount: number;
+  indexedAt: string;
+}
+
 export interface GameSummary {
   gameId: string;
   title: string;
@@ -84,6 +107,9 @@ export interface GameSummary {
   chunkCount: number;
   documentKinds: DocumentKind[];
   indexedAt: string | null;
+  /** Null for a base or standalone game; set on expansions. */
+  baseGameId: string | null;
+  documents: GameDocumentSummary[];
 }
 
 export interface HealthReport {

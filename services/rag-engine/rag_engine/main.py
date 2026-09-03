@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from . import __version__
-from .routers import ask, games, health
+from .routers import ask, games, health, ingest
 from .settings import ensure_storage_writable, get_settings
 
 
@@ -20,6 +20,7 @@ def create_app() -> FastAPI:
     # No CORS: the browser only talks to Next.js, which proxies here.
     app.include_router(health.router)
     app.include_router(games.router)
+    app.include_router(ingest.router)
     app.include_router(ask.router)
 
     app.mount(

@@ -4,9 +4,11 @@ from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
+from rag_engine.contract import GameSummary
 from rag_engine.engines.llm import OllamaUnreachableError
 from rag_engine.main import create_app
 from rag_engine.settings import Settings, get_settings
@@ -59,8 +61,79 @@ def _ask_body(
     game_id: str = "azul",
     question: str = "Kto zaczyna?",
     mode: str = "teach",
-) -> dict[str, str]:
-    return {"gameId": game_id, "question": question, "mode": mode}
+    expansion_ids: list[str] | None = None,
+) -> dict[str, object]:
+    body: dict[str, object] = {"gameId": game_id, "question": question, "mode": mode}
+    if expansion_ids is not None:
+        body["expansionIds"] = expansion_ids
+    return body
+
+
+def test_ask_rejects_invalid_expansion_ids(
+    client: TestClient,
+    storage: Path,
+) -> None:
+    (storage / "games.json").write_text(
+        json.dumps(
+            [
+                {
+                    "gameId": "azul",
+                    "title": "Azul",
+                    "chunkCount": 1,
+                    "documentKinds": ["rulebook"],
+                    "indexedAt": "2026-01-05T10:00:00Z",
+                    "baseGameId": None,
+                    "documents": [],
+                },
+            ]
+        ),
+        encoding="utf-8",
+    )
+    response = client.post(
+        "/ask",
+        json=_ask_body(expansion_ids=["not-an-expansion"]),
+    )
+    assert response.status_code == 400
+    assert response.json()["code"] == "invalid_expansion_ids"
+
+
+def test_ask_accepts_validated_expansion_ids(
+    client: TestClient,
+    storage: Path,
+) -> None:
+    (storage / "games.json").write_text(
+        json.dumps(
+            [
+                {
+                    "gameId": "azul",
+                    "title": "Azul",
+                    "chunkCount": 1,
+                    "documentKinds": ["rulebook"],
+                    "indexedAt": "2026-01-05T10:00:00Z",
+                    "baseGameId": None,
+                    "documents": [],
+                },
+                {
+                    "gameId": "azul-crystal",
+                    "title": "Azul Crystal",
+                    "chunkCount": 1,
+                    "documentKinds": ["rulebook"],
+                    "indexedAt": "2026-02-01T10:00:00Z",
+                    "baseGameId": "azul",
+                    "documents": [],
+                },
+            ]
+        ),
+        encoding="utf-8",
+    )
+    with (
+        patch(_TAGS_PATCH, _mock_tags(_ALL_TAGS)),
+        patch(_GEN_PATCH, _fake_generate),
+        client.stream("POST", "/ask", json=_ask_body(expansion_ids=["azul-crystal"])) as response,
+    ):
+        assert response.status_code == 200
+        frames = _frames("".join(response.iter_text()))
+    assert frames[-1]["type"] == "done"
 
 
 # --- health ---
@@ -350,3 +423,114 @@ def test_two_requests_do_not_generate_in_parallel(
     starts = [t for label, t in call_log if label == "start"]
     ends = [t for label, t in call_log if label == "end"]
     assert starts[1] >= ends[0]
+
+
+# --- ingest ---
+
+
+def _tiny_pdf(path: Path) -> Path:
+    import pymupdf
+
+    doc = pymupdf.open()  # type: ignore[no-untyped-call,unused-ignore]
+    page = doc.new_page()
+    page.insert_text((72, 72), "# Setup\n\nDraw tiles.")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    doc.save(path)  # type: ignore[no-untyped-call,unused-ignore]
+    doc.close()  # type: ignore[no-untyped-call,unused-ignore]
+    return path
+
+
+def test_ingest_pdf_upload_registers_the_game(client: TestClient, tmp_path: Path) -> None:
+    pdf = _tiny_pdf(tmp_path / "demo.pdf")
+    with pdf.open("rb") as handle:
+        response = client.post(
+            "/ingest/pdf",
+            data={"gameId": "azul", "title": "Azul"},
+            files={"file": ("demo.pdf", handle, "application/pdf")},
+        )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["gameId"] == "azul"
+    assert payload["chunkCount"] > 0
+    assert "rulebook" in payload["documentKinds"]
+    listed = client.get("/games").json()
+    assert listed[0]["gameId"] == "azul"
+
+
+def test_ingest_pdf_upload_rejects_a_bad_game_id(client: TestClient, tmp_path: Path) -> None:
+    pdf = _tiny_pdf(tmp_path / "demo.pdf")
+    with pdf.open("rb") as handle:
+        response = client.post(
+            "/ingest/pdf",
+            data={"gameId": "Azul"},
+            files={"file": ("demo.pdf", handle, "application/pdf")},
+        )
+
+    assert response.status_code == 400
+    body = response.json()
+    assert body["type"] == "error"
+    assert body["code"] == "invalid_game_id"
+
+
+def test_ingest_pdf_upload_rejects_non_pdf_bytes(client: TestClient) -> None:
+    response = client.post(
+        "/ingest/pdf",
+        data={"gameId": "azul"},
+        files={"file": ("notes.txt", b"hello", "text/plain")},
+    )
+    assert response.status_code == 400
+    assert response.json()["code"] == "invalid_file"
+
+
+@pytest.mark.asyncio
+async def test_ingest_pdf_upload_rejects_a_second_import_while_busy(
+    storage: Path, tmp_path: Path
+) -> None:
+    import threading
+
+    app = create_app()
+    app.dependency_overrides[get_settings] = lambda: Settings(storage_dir=storage)
+    pdf_bytes = _tiny_pdf(tmp_path / "demo.pdf").read_bytes()
+    started = threading.Event()
+    release = threading.Event()
+
+    def _slow_ingest(*_args: object, **_kwargs: object) -> GameSummary:
+        started.set()
+        if not release.wait(timeout=5):
+            raise AssertionError("ingest lock test timed out")
+        return GameSummary(
+            game_id="azul",
+            title="Azul",
+            chunk_count=1,
+            document_kinds=["rulebook"],
+            base_game_id=None,
+            documents=[],
+        )
+
+    transport = httpx.ASGITransport(app=app)
+    try:
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            with patch("rag_engine.routers.ingest.ingest_rulebook", _slow_ingest):
+                first = asyncio.create_task(
+                    client.post(
+                        "/ingest/pdf",
+                        data={"gameId": "azul", "title": "Azul"},
+                        files={"file": ("demo.pdf", pdf_bytes, "application/pdf")},
+                    )
+                )
+                assert await asyncio.to_thread(started.wait, 5)
+                second = await client.post(
+                    "/ingest/pdf",
+                    data={"gameId": "brass", "title": "Brass"},
+                    files={"file": ("demo.pdf", pdf_bytes, "application/pdf")},
+                )
+                assert second.status_code == 409
+                assert second.json()["code"] == "ingest_busy"
+                release.set()
+                first_response = await first
+                assert first_response.status_code == 200
+                assert first_response.json()["gameId"] == "azul"
+    finally:
+        release.set()
+        app.dependency_overrides.clear()

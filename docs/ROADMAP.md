@@ -25,7 +25,7 @@ The monorepo, the interface, the streaming flow and the API contract.
 
 ---
 
-## Stage 1 — Running the models locally
+## Stage 1 — Running the models locally ✅ **complete**
 
 **Goal:** the engine actually talks to a model; `/health` tells the truth.
 
@@ -51,15 +51,19 @@ at once are answered one after the other, and killing the first frees the slot a
 
 ## Stage 2 — Document ingestion
 
-**Goal:** a PDF and a video become ordered, addressable material.
+**Goal:** a PDF and a video become ordered, addressable material ready for Stage 3
+search. Chunks are stored as **JSONL** (`ChunkRecord` without `vector`); LanceDB /
+embeddings arrive in Stage 3.
 
 - `uv sync --extra ingest`
 - PDF → Markdown via `pymupdf4llm`, **preserving page numbers** (without them there are
   no citations)
 - Render each page to a 150 DPI PNG in `storage/assets/<gameId>/pNN.png`
 - Split on Markdown headings; a chunk never crosses a section boundary
+- Persist chunks as JSONL under `storage/assets/<gameId>/documents/…` (no vector field yet)
 - YouTube subtitles: `youtube-transcript-api` (instance API, `.fetch()`), falling back to
-  `yt-dlp` + Whisper when the author disabled subtitles
+  `yt-dlp` + Whisper when the author disabled subtitles **and** the `speech` extra is
+  installed
 - A game registry in `storage/games.json` matching `GameSummary`
 - CLI: `uv run python -m rag_engine.ingest add --game azul --kind rulebook file.pdf`
 - `--game` is rejected unless it matches `GAME_ID_PATTERN` (D12) — the value becomes a
@@ -79,10 +83,43 @@ at once are answered one after the other, and killing the first frees the slot a
   ingestion** (when the user already has internet), never during gameplay. Only the game
   title is sent in the request — no personal data leaves the machine.
 
-**Acceptance:** after ingesting two or three games (one simple, one complex — decision
-Z5) `/games` returns them with a non-zero `chunkCount`, `storage/assets/<gameId>/`
-contains the rendered pages, and ingesting under a `--game` like `../x` fails before
-anything is written.
+**Acceptance:** CI uses a generated fixture PDF (no publisher rulebooks in git). After
+ingesting one or two of **your own** PDFs locally (Z5: one simple game, one complex —
+titles are not hardcoded in the repo) `/games` returns them with a non-zero
+`chunkCount`, `storage/assets/<gameId>/` contains the rendered pages, and ingesting
+under a `--game` like `../x` fails before anything is written. Answers still come from
+general model knowledge until Stage 3.
+
+---
+
+## Stage 2B — Library: documents and expansions
+
+**Goal:** several PDFs under one game (solo, almanac, late supplements) and expansions as
+**separate** library entries linked to a base game, without a complicated Ask UI.
+
+- Expansions are their own `gameId` with `baseGameId` pointing at the base (published
+  later, imported later).
+- Extra booklets for the same product are **documents** under one `gameId` (`docKey` +
+  human title + `manifest.json`), not new games.
+- Page images live **per document** (`documents/<kind>/<docKey>/pNN.png`), never in a
+  flat game folder — otherwise a second PDF overwrites the first.
+- Chunk ids include `docKey`: `{gameId}:{kind}:{docKey}:pNN:cNN`.
+- `GameSummary` lists `documents[]` and optional `baseGameId`; `AskRequest` adds
+  `expansionIds` (server accepts an id only if that game’s `baseGameId` equals `gameId`).
+- Retrieval (Stage 3) scopes to the **active game set** (`gameId` ∪ validated
+  `expansionIds`) **before** search — rewrite of the old “exactly one game id” wording.
+- Same `documentKind` conflict: prefer newer `indexedAt`; sources show `documentTitle`.
+- Instrukcje UI: one form, two modes (“New game” / “Add PDF to existing”), clear copy so a
+  supplement is not created as a new game; expansion link only on “New game”. Related
+  controls wrapped in real HTML `<fieldset>` + `<legend>`.
+- Ask UI: base-game select + expansion checkboxes (default off); no per-booklet picker.
+- Migrate legacy flat `assets/<gameId>/pNN.png` into `documents/rulebook/main/` (or gate
+  Stage 3 until re-ingest).
+
+**Acceptance:** two PDFs under one base keep distinct chunk ids and page URLs; `/games`
+lists both titles; an expansion appears as a checkbox only under its base; forged
+`expansionIds` are rejected; fieldset semantics covered by UI tests; helper copy for the
+two import modes exists in `en` and `pl`.
 
 ---
 
@@ -91,13 +128,16 @@ anything is written.
 **Goal:** answers grounded in the documents, citing the page.
 
 - `uv sync --extra retrieval`; LanceDB in `storage/index`
-- Chunk schema: `id`, `gameId`, `documentKind`, `page`, `text`, `heading`, vector
-- A **mandatory** `gameId` filter before retrieval (see audit 3.1)
+- Chunk schema: `id`, `gameId`, `documentKind`, `docKey`, `documentTitle`, `page`, `text`,
+  `heading`, vector
+- A **mandatory** active-game-set filter before retrieval (`gameId` ∪ validated
+  `expansionIds`; see Stage 2B and audit 3.1)
 - Hybrid retrieval: BM25 + vector, results fused
 - Cross-encoder reranking, `retrieval_candidates` → `retrieval_top_k`
 - A `min_relevance_score` threshold; below it → `insufficient_evidence` without calling
   the model
-- A prompt carrying the `DOCUMENT_AUTHORITY` hierarchy and a ban on leaving the context
+- A prompt carrying the `DOCUMENT_AUTHORITY` hierarchy, same-kind newer-document rule, and
+  a ban on leaving the context
 - Retrieved chunks are wrapped in delimiters and labelled as source material, with the
   system prompt stating that nothing inside them changes it (D14). A transcript that says
   "ignore the previous instructions" is text about a game, not an instruction.
@@ -112,7 +152,35 @@ anything is written.
 **Acceptance:** a question about a rule from an ingested rulebook yields an answer with
 the correct page number; **a Polish question against an English rulebook hits the right
 passage**; a question about a game that was never ingested yields a refusal, not an
-invented rule; a question about game A never returns passages from game B.
+invented rule; a question about game A never returns passages from game B; with
+expansions unticked, expansion passages are not used.
+
+---
+
+## Stage 3A — Ingest progress
+
+**Goal:** wherever a rulebook PDF is added (setup drop zone, desktop shell, or CLI), the
+user sees a **smooth percent** and a **stage label**, not four equal jumps of 25%.
+
+Do this **after** Stage 3. The last honest slice of the bar is writing search vectors
+(`indexing`). Before Stage 3 that work does not exist; faking “the chat model is learning
+the rules” would freeze the bar with nothing real happening.
+
+- Stages are **codes** (UI copy in `en`/`pl`): `sending`, `saving`, `reading`, `drawing`,
+  `filing`, `community` (only if the BoardGameGeek checkbox is on), `indexing`
+- Measure what actually moves: upload **bytes** (`sending`), disk **bytes** (`saving`),
+  **page i of n** (`reading` and `drawing`), library ticks (`filing`), then per-chunk or
+  per-batch index writes (`indexing`). Blend so the bar never goes backwards
+- `POST /ingest/pdf` streams progress the same way `/ask` streams an answer (progress
+  frames, then done or error). Upload percent is measured in the browser; the engine
+  cannot report it until the file has arrived
+- `indexing` is search vectors, not training the chat model
+- CLI prints the same percent and stage (English log lines, not the UI catalogues)
+
+**Acceptance:** a multi-page PDF makes the bar tick often (at least once per page while
+reading and drawing); the label under the bar matches the current code; a second import
+while one is running is still rejected; cancelling the upload stops the work. After
+Stage 3, `indexing` is visible and the bar reaches 100% only when the game is searchable.
 
 ---
 

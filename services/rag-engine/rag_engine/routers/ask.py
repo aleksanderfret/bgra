@@ -12,7 +12,7 @@ from typing import Annotated
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from ..contract import (
     AskRequest,
@@ -31,6 +31,7 @@ from ..engines.llm import (
     generate_stream,
     installed_ollama_tags,
 )
+from ..ingest.registry import validate_expansion_ids
 from ..settings import Settings, get_settings
 from ..sse import SSE_HEADERS, SSE_MEDIA_TYPE, encode_event
 
@@ -117,11 +118,22 @@ async def _stream_answer(request: AskRequest, settings: Settings) -> AsyncIterat
     yield encode_event(DoneEvent(answer_id=uuid4().hex, groundedness=groundedness))
 
 
-@router.post("/ask")
+@router.post("/ask", response_model=None)
 async def ask(
     request: AskRequest,
     settings: Annotated[Settings, Depends(get_settings)],
-) -> StreamingResponse:
+) -> StreamingResponse | JSONResponse:
+    try:
+        validate_expansion_ids(settings.storage_dir, request.game_id, request.expansion_ids)
+    except ValueError as error:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "type": "error",
+                "code": "invalid_expansion_ids",
+                "message": str(error),
+            },
+        )
     return StreamingResponse(
         _stream_answer(request, settings),
         media_type=SSE_MEDIA_TYPE,

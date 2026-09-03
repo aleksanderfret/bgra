@@ -14,6 +14,7 @@ describe('routeKind', () => {
     expect(routeKind(['ask'])).toBe('stream');
     expect(routeKind(['static', 'assets', 'azul', 'p04.png'])).toBe('asset');
     expect(routeKind(['games'])).toBe('api');
+    expect(routeKind(['ingest', 'pdf'])).toBe('long');
     expect(routeKind([])).toBe('api');
   });
 });
@@ -92,6 +93,7 @@ describe('responseHeadersFromEngine', () => {
       'private, max-age=3600',
     );
     expect(responseHeadersFromEngine(new Headers(), 'api').get('cache-control')).toBe('no-store');
+    expect(responseHeadersFromEngine(new Headers(), 'long').get('cache-control')).toBe('no-store');
   });
 });
 

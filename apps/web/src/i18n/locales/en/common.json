@@ -7,6 +7,15 @@
     "title": "Board game rules assistant",
     "subtitle": "Answers come only from the rulebooks, FAQs and errata indexed on this computer."
   },
+  "rulebooks": {
+    "title": "Rulebooks",
+    "subtitle": "Load your own publisher PDFs on this computer. Nothing from someone else’s library is bundled."
+  },
+  "appNav": {
+    "label": "Main views",
+    "assistant": "Assistant",
+    "rulebooks": "Rulebooks"
+  },
   "preferences": {
     "label": "Display preferences"
   },
@@ -29,11 +38,17 @@
     },
     "game": {
       "label": "Game",
-      "description": "Retrieval is always scoped to a single game",
+      "description": "Answers use this game’s documents. Turn on expansions below only when you are playing with them.",
       "loading": "Loading…",
       "placeholder": "Choose a game"
     },
+    "expansions": {
+      "legend": "Expansions in play",
+      "description": "Optional. Leave unticked for base rules only.",
+      "cleared": "Expansion selection cleared for the new game."
+    },
     "mode": {
+      "legend": "Answer mode",
       "label": "Answer mode",
       "teach": "Teach me the game",
       "arbitrate": "Settle a rule"
@@ -95,8 +110,8 @@
     "subtitle": "We check this computer and recommend a model profile. Page citation quality is the same on every profile — smaller machines only trade fluency for speed.",
     "loading": "Reading hardware…",
     "browserOnly": {
-      "title": "Running in the browser",
-      "body": "This screen is meant for the desktop app. In the browser, start the stack with pnpm dev as usual."
+      "title": "Model setup needs the desktop app",
+      "body": "Checking hardware and downloading models works in the packaged desktop app. In the browser, open Rulebooks to import a PDF — start the stack with pnpm dev first."
     },
     "hardware": {
       "title": "This computer",
@@ -131,7 +146,7 @@
     "ollama": {
       "missingTitle": "Ollama is not installed",
       "missingBody": "The language models run through Ollama on this computer. Install it, start it once, then reopen this app.",
-      "download": "Download Ollama",
+      "download": "Download Ollama (opens in a new tab)",
       "foundTitle": "Ollama found",
       "foundBody": "Using {{path}}"
     },
@@ -150,23 +165,87 @@
   },
   "pdfImport": {
     "title": "Add a rulebook PDF",
-    "subtitle": "You always load your own PDFs. Nothing from someone else’s library is bundled.",
+    "subtitle": "You always load your own PDFs. Nothing from someone else’s library is bundled. Answers from those documents arrive in the next stage — for now the file is turned into searchable pages on this computer.",
+    "howAdding": {
+      "legend": "How you are adding",
+      "helper": "A second booklet, solo mode, or late supplement belongs under an existing game — use “Add to an existing game”. A new box or an expansion you bought later is a new game.",
+      "create": "New game",
+      "attach": "Add to an existing game"
+    },
+    "newGame": {
+      "legend": "New game"
+    },
+    "attachGame": {
+      "legend": "Existing game",
+      "selectLabel": "Game",
+      "selectDescription": "Choose the game this PDF belongs to",
+      "selectPlaceholder": "Choose a game",
+      "loading": "Loading games…"
+    },
     "gameId": {
       "label": "Game id",
       "description": "Lowercase slug used as the folder name, for example azul or brass-birmingham",
       "placeholder": "azul"
     },
+    "gameTitle": {
+      "label": "Game title",
+      "description": "Shown in the game list. Defaults to the game id if left blank.",
+      "placeholder": "Azul"
+    },
+    "baseGame": {
+      "label": "This is an expansion of",
+      "description": "Optional. Leave empty for a standalone or base game. Only base games appear here.",
+      "placeholder": "Not an expansion",
+      "none": "Not an expansion"
+    },
+    "documentTitle": {
+      "label": "Document title",
+      "description": "A short name people understand, for example Rulebook, Solo mode, or Living rules May 2024",
+      "placeholder": "Rulebook",
+      "requiredAttach": "Required when adding to an existing game"
+    },
+    "communityFaq": {
+      "label": "Also fetch BoardGameGeek description text",
+      "description": "Uses the official XML API only. Never downloads rulebook PDFs from BGG Files. Needs internet; skipping it never blocks the PDF import."
+    },
     "drop": {
+      "legend": "PDF file",
       "title": "Drop a PDF here",
-      "body": "Drag a publisher rulebook onto this area. Indexing is stage 2 of the roadmap — until then the app explains that ingest is not ready yet."
+      "body": "Drag a publisher rulebook onto this area, or choose a file. Pages are rendered and text is split into sections on this computer.",
+      "chooseFile": "Choose PDF",
+      "keyboardHint": "To add a file with the keyboard, use Choose PDF."
+    },
+    "busy": "Importing…",
+    "success": {
+      "title": "Rulebook imported",
+      "body": "“{{gameId}}” is on the game list. Ask still answers from general knowledge until document search (stage 3) is ready.",
+      "attachedBody": "Document “{{documentTitle}}” was added under “{{gameId}}”."
     },
     "error": {
       "invalidGameIdTitle": "Invalid game id",
       "invalidGameIdBody": "Use a lowercase slug: letters, digits and hyphens only, starting with a letter or digit.",
-      "ingestNotReadyTitle": "Import is not ready yet",
-      "ingestNotReadyBody": "Received “{{fileName}}”, but document ingestion (stage 2) is not implemented. The file was not copied and no index was built.",
-      "browserOnlyTitle": "Desktop app required",
-      "browserOnlyBody": "Dragging a real file path needs the desktop shell. In the browser, wait for the stage 2 CLI, or open the Electron app."
+      "unknownGameTitle": "Game not found",
+      "unknownGameBody": "Choose a game that is already on the list, or switch to New game.",
+      "invalidDocumentTitleTitle": "Document title needed",
+      "invalidDocumentTitleBody": "Type a short title for this PDF so it can be told apart from other booklets.",
+      "invalidBaseGameTitle": "Invalid base game",
+      "invalidBaseGameBody": "Pick a base game from the list, or leave expansion unset.",
+      "invalidDocKeyTitle": "Invalid document key",
+      "invalidDocKeyBody": "Use a lowercase slug: letters, digits and hyphens only.",
+      "invalidFileTitle": "Not a PDF",
+      "invalidFileBody": "Choose a publisher rulebook saved as a PDF.",
+      "ingestNotReadyTitle": "Import is not available",
+      "ingestNotReadyBody": "Received “{{fileName}}”, but PDF tools are not installed in the engine environment. Run uv sync --extra ingest in services/rag-engine, then try again.",
+      "engineUnreachableTitle": "The assistant is offline",
+      "engineUnreachableBody": "Start the app with pnpm dev so the web interface and the engine are both running, then try again.",
+      "limitExceededTitle": "PDF is too large",
+      "limitExceededBody": "This file is over 80 MB or has more than 200 pages. Use a smaller publisher PDF.",
+      "pageImageTooLargeTitle": "A page image is too heavy",
+      "pageImageTooLargeBody": "One page still makes a picture larger than 5 MB even after lowering resolution. Try a lighter scan or a smaller publisher PDF.",
+      "ingestFailedTitle": "Import failed",
+      "ingestFailedBody": "The file could not be turned into pages. Try another PDF, or check the engine log.",
+      "ingestBusyTitle": "Another import is running",
+      "ingestBusyBody": "Wait until the current rulebook finishes, then try again."
     }
   }
 }

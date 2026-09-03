@@ -4,6 +4,8 @@ import type { AnswerMode, GameSummary } from '@bga/api-contract';
 import {
   Alert,
   Button,
+  Checkbox,
+  Fieldset,
   Group,
   SegmentedControl,
   Select,
@@ -11,8 +13,9 @@ import {
   Text,
   Textarea,
 } from '@mantine/core';
-import { type FormEvent, type KeyboardEvent, useEffect, useState } from 'react';
+import { type FormEvent, type KeyboardEvent, useEffect, useId, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
+import { GAMES_CHANGED_EVENT } from '@/lib/desktop-bridge';
 import { AnswerPanel } from './AnswerPanel';
 import { useAskStream } from './useAskStream';
 
@@ -26,8 +29,11 @@ export function RulesChat() {
   const [games, setGames] = useState<GameSummary[] | null>(null);
   const [engineOffline, setEngineOffline] = useState(false);
   const [gameId, setGameId] = useState<string | null>(null);
+  const [expansionIds, setExpansionIds] = useState<string[]>([]);
+  const [expansionsCleared, setExpansionsCleared] = useState(false);
   const [mode, setMode] = useState<AnswerMode>('teach');
   const [question, setQuestion] = useState('');
+  const expansionsStatusId = useId();
   const { state, ask, cancel } = useAskStream();
 
   useEffect(() => {
@@ -42,6 +48,7 @@ export function RulesChat() {
         const payload = (await response.json()) as GameSummary[];
         if (!cancelled) {
           setGames(payload);
+          setEngineOffline(false);
         }
       } catch {
         if (!cancelled) {
@@ -52,17 +59,52 @@ export function RulesChat() {
     };
 
     void loadGames();
+    const onGamesChanged = (): void => {
+      void loadGames();
+    };
+    window.addEventListener(GAMES_CHANGED_EVENT, onGamesChanged);
     return () => {
       cancelled = true;
+      window.removeEventListener(GAMES_CHANGED_EVENT, onGamesChanged);
     };
   }, []);
 
+  const baseGames = (games ?? []).filter((game) => game.baseGameId === null);
+  const expansionsForBase =
+    gameId === null ? [] : (games ?? []).filter((game) => game.baseGameId === gameId);
+
   const canAsk = gameId !== null && question.trim().length > 0 && !state.isStreaming;
 
-  const submitQuestion = (): void => {
-    if (canAsk) {
-      void ask({ gameId: gameId ?? '', question: question.trim(), mode });
+  const onBaseGameChange = (next: string | null): void => {
+    setGameId(next);
+    if (expansionIds.length > 0) {
+      setExpansionIds([]);
+      setExpansionsCleared(true);
+    } else {
+      setExpansionsCleared(false);
     }
+  };
+
+  const toggleExpansion = (expansionId: string, checked: boolean): void => {
+    setExpansionsCleared(false);
+    setExpansionIds((current) => {
+      if (checked) {
+        return current.includes(expansionId) ? current : [...current, expansionId];
+      }
+      return current.filter((id) => id !== expansionId);
+    });
+  };
+
+  const submitQuestion = (): void => {
+    if (!canAsk || gameId === null) {
+      return;
+    }
+    void ask({
+      gameId,
+      question: question.trim(),
+      mode,
+      expansionIds: expansionIds.length > 0 ? expansionIds : undefined,
+    });
   };
 
   const onSubmit = (event: FormEvent): void => {
@@ -89,30 +131,60 @@ export function RulesChat() {
           </Alert>
         )}
 
-        <Select
-          label={t('rulesChat.game.label')}
-          description={t('rulesChat.game.description')}
-          placeholder={
-            games === null ? t('rulesChat.game.loading') : t('rulesChat.game.placeholder')
-          }
-          data={(games ?? []).map((game) => ({ value: game.gameId, label: game.title }))}
-          value={gameId}
-          onChange={setGameId}
-          disabled={games === null || games.length === 0}
-          aria-busy={games === null}
-          searchable
-        />
-
-        <SegmentedControl
-          aria-label={t('rulesChat.mode.label')}
-          value={mode}
-          onChange={(value) => {
-            if (isAnswerMode(value)) {
-              setMode(value);
+        <Fieldset legend={t('rulesChat.game.label')} variant="filled">
+          <Select
+            description={t('rulesChat.game.description')}
+            placeholder={
+              games === null ? t('rulesChat.game.loading') : t('rulesChat.game.placeholder')
             }
-          }}
-          data={MODES.map((value) => ({ value, label: t(`rulesChat.mode.${value}`) }))}
-        />
+            data={baseGames.map((game) => ({ value: game.gameId, label: game.title }))}
+            value={gameId}
+            onChange={onBaseGameChange}
+            disabled={games === null || baseGames.length === 0}
+            aria-busy={games === null}
+            aria-describedby={expansionsCleared ? expansionsStatusId : undefined}
+            searchable
+          />
+          {expansionsCleared && (
+            <Text id={expansionsStatusId} size="sm" c="dimmed" role="status" aria-live="polite">
+              {t('rulesChat.expansions.cleared')}
+            </Text>
+          )}
+        </Fieldset>
+
+        {expansionsForBase.length > 0 && (
+          <Fieldset legend={t('rulesChat.expansions.legend')} variant="filled">
+            <Stack gap="xs">
+              <Text size="sm" c="dimmed">
+                {t('rulesChat.expansions.description')}
+              </Text>
+              {expansionsForBase.map((expansion) => (
+                <Checkbox
+                  key={expansion.gameId}
+                  label={expansion.title}
+                  checked={expansionIds.includes(expansion.gameId)}
+                  onChange={(event) =>
+                    toggleExpansion(expansion.gameId, event.currentTarget.checked)
+                  }
+                  disabled={state.isStreaming}
+                />
+              ))}
+            </Stack>
+          </Fieldset>
+        )}
+
+        <Fieldset legend={t('rulesChat.mode.legend')} variant="filled">
+          <SegmentedControl
+            value={mode}
+            onChange={(value) => {
+              if (isAnswerMode(value)) {
+                setMode(value);
+              }
+            }}
+            data={MODES.map((value) => ({ value, label: t(`rulesChat.mode.${value}`) }))}
+            fullWidth
+          />
+        </Fieldset>
 
         <Textarea
           label={t('rulesChat.question.label')}
@@ -129,7 +201,7 @@ export function RulesChat() {
             {t('rulesChat.submit')}
           </Button>
           {state.isStreaming && (
-            <Button variant="subtle" color="gray" onClick={cancel}>
+            <Button type="button" variant="subtle" color="gray" onClick={cancel}>
               {t('rulesChat.cancel')}
             </Button>
           )}

@@ -1,7 +1,6 @@
-import { Container, Group, Stack } from '@mantine/core';
+import { Container, Group, Stack, Text, Title } from '@mantine/core';
 import { notFound } from 'next/navigation';
 import { ColorSchemeSwitcher } from '@/features/color-scheme/ColorSchemeSwitcher';
-import { PdfDropZone } from '@/features/desktop-setup/PdfDropZone';
 import { SetupPanel } from '@/features/desktop-setup/SetupPanel';
 import { LanguageSwitcher } from '@/features/language-switcher/LanguageSwitcher';
 import { getTranslation } from '@/i18n/server';
@@ -23,8 +22,11 @@ export default async function SetupPage({ params }: PageProps<'/[locale]/setup'>
           <ColorSchemeSwitcher />
           <LanguageSwitcher />
         </Group>
+        <Stack gap={4}>
+          <Title order={1}>{t('setup.title')}</Title>
+          <Text c="dimmed">{t('setup.subtitle')}</Text>
+        </Stack>
         <SetupPanel />
-        <PdfDropZone />
       </Stack>
     </Container>
   );
