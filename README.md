@@ -159,6 +159,8 @@ exposed to the network.
 | `pnpm typecheck` | TypeScript 7 + mypy (strict) |
 | `pnpm check:fix` | Formatting and auto-fixable Biome rules |
 | `pnpm format` | Biome + Ruff formatters, in place |
+| `pnpm release:prepare` | Bump version + CHANGELOG (no commit); see Desktop / GitHub Release |
+| `pnpm release:package` | Web standalone + unsigned Electron DMG/zip |
 
 Git hooks (Husky): **pre-commit** lints and formats only the staged files
 (Biome for TypeScript/JSON, Ruff for Python). **pre-push** runs `pnpm verify` —
@@ -211,15 +213,32 @@ While iterating on the web UI, keep `pnpm dev` running and attach the shell:
 pnpm --filter desktop dev:attach
 ```
 
-Unsigned packages for a couple of friends (after `pnpm --filter web build`):
+Local unsigned package (builds web standalone, then Electron DMG/zip under
+`apps/desktop/release/`):
 
 ```bash
-pnpm --filter desktop package
+pnpm release:package
 ```
 
-On macOS: right-click the app → Open. On Windows: More info → Run anyway. There is no
-auto-update — send a new build when something changes. Do not share packaged game
-indexes; each person loads their own PDFs.
+The packaged app still needs **uv** and **Ollama** on the machine (models are not
+bundled). Do not share packaged game indexes; each person loads their own PDFs.
+
+### GitHub Release (macOS arm64)
+
+Releases are tagged locally; CI builds the binaries.
+
+1. `pnpm release:prepare` — or `pnpm release:prepare minor` / `major` — bumps every
+   product version file, regenerates `CHANGELOG.md`, and prints the next commands
+   (does **not** commit or push).
+2. `pnpm preflight` (or `pnpm verify`).
+3. Commit with `chore(repo): release vX.Y.Z`, create tag `vX.Y.Z`, push branch + tag.
+4. [`.github/workflows/release.yml`](.github/workflows/release.yml) builds on
+   `macos-latest` (Apple Silicon), uploads `.dmg` / `.zip` to the GitHub Release, and
+   removes downloadable assets from older releases (release notes and tags stay).
+
+The tag must match root `package.json` `version` (the prepare script keeps them in
+sync). Builds are **unsigned**: on macOS right-click the app → Open. Intel Macs are
+not covered by the CI artifact.
 
 ## Interface language
 

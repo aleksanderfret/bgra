@@ -1,0 +1,80 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    env:
+      HUSKY: 0
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Enable pnpm via corepack
+        run: corepack enable
+
+      - name: Install Node dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Assert tag matches package.json version
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          EXPECTED="v$(node -p "require('./package.json').version")"
+          if [ "$TAG" != "$EXPECTED" ]; then
+            echo "Tag $TAG does not match package.json version ($EXPECTED). Run pnpm release:prepare first."
+            exit 1
+          fi
+
+      - name: Build desktop package
+        run: pnpm release:package
+
+      - name: Collect release assets
+        id: assets
+        run: |
+          mkdir -p /tmp/bga-release-assets
+          shopt -s nullglob
+          files=(apps/desktop/release/*.dmg apps/desktop/release/*.zip)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No .dmg or .zip under apps/desktop/release/"
+            ls -la apps/desktop/release/ || true
+            exit 1
+          fi
+          for f in "${files[@]}"; do
+            cp "$f" /tmp/bga-release-assets/
+          done
+          echo "count=${#files[@]}" >> "$GITHUB_OUTPUT"
+          ls -la /tmp/bga-release-assets/
+
+      - name: Write release notes
+        run: |
+          node scripts/release-notes.mjs "${GITHUB_REF_NAME#v}" /tmp/bga-release-notes.md
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" /tmp/bga-release-assets/* \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file /tmp/bga-release-notes.md
+
+      - name: Prune assets from older releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/release-prune-assets.mjs "${{ github.ref_name }}"

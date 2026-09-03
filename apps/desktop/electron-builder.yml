@@ -9,22 +9,35 @@ files:
   - package.json
   - "!**/*.map"
 extraResources:
-  - from: ../../services/rag-engine
-    to: repo/services/rag-engine
-    filter:
-      - "**/*"
-      - "!.venv/**"
-      - "!storage/**"
-      - "!**/__pycache__/**"
-      - "!.mypy_cache/**"
-      - "!.ruff_cache/**"
-      - "!.pytest_cache/**"
+  # Monorepo standalone lays out apps/web/server.js under the standalone root.
+  # Copying to repo/ (not repo/apps/web) keeps server.js at repo/apps/web/server.js
+  # and the traced node_modules next to apps/.
   - from: ../../apps/web/.next/standalone
-    to: repo/apps/web
+    to: repo
     filter:
       - "**/*"
   - from: ../../apps/web/.next/static
     to: repo/apps/web/.next/static
+  - from: ../../services/rag-engine
+    to: repo/services/rag-engine
+    filter:
+      - "rag_engine/**/*"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".python-version"
+      - "!.env"
+      - "!.env.*"
+      - "!*.pdf"
+      - "!*.pem"
+      - "!models/**"
+      - "!*.gguf"
+      - "!tests/**"
+      - "!storage/**"
+      - "!.venv/**"
+      - "!**/__pycache__/**"
+      - "!.mypy_cache/**"
+      - "!.ruff_cache/**"
+      - "!.pytest_cache/**"
   - from: ../../packages/api-contract
     to: repo/packages/api-contract
     filter:
