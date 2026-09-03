@@ -28,20 +28,21 @@ trim = true
 conventional_commits = true
 filter_unconventional = true
 split_commits = false
+# Release notes are user-facing: only types with a visible effect on the app
+# make the cut. refactor/docs/test/build/ci/chore/revert are internal and
+# would just be noise for someone downloading a board game assistant.
 commit_parsers = [
   { message = "^feat", group = "Features" },
   { message = "^fix", group = "Bug Fixes" },
   { message = "^perf", group = "Performance" },
-  { message = "^refactor", group = "Refactor" },
-  { message = "^docs", group = "Documentation" },
-  { message = "^test", group = "Testing" },
-  { message = "^build", group = "Build" },
-  { message = "^ci", group = "CI" },
-  { message = "^chore\\(repo\\): release", skip = true },
-  { message = "^chore\\(release\\)", skip = true },
-  { message = "^chore", group = "Miscellaneous" },
-  { message = "^style", group = "Miscellaneous" },
-  { message = "^revert", group = "Reverts" },
+  { message = "^style", group = "Style" },
+  { message = "^refactor", skip = true },
+  { message = "^docs", skip = true },
+  { message = "^test", skip = true },
+  { message = "^build", skip = true },
+  { message = "^ci", skip = true },
+  { message = "^chore", skip = true },
+  { message = "^revert", skip = true },
 ]
 protect_breaking_commits = false
 filter_commits = false
