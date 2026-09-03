@@ -23,7 +23,6 @@ export interface DesktopSetupState {
   ollamaDownloadUrl: string;
   uvPath: string | null;
   setupComplete: boolean;
-  ingestAvailable: boolean;
 }
 
 export interface BgaDesktopApi {
@@ -31,10 +30,6 @@ export interface BgaDesktopApi {
   saveDiagnostics: () => Promise<{ path: string }>;
   markSetupComplete: () => Promise<DesktopSetupState>;
   pullModels: () => Promise<{ ok: true }>;
-  importPdf: (payload: {
-    filePath: string;
-    gameId: string;
-  }) => Promise<{ ok: false; reason: 'ingest_not_ready' | 'invalid_game_id' }>;
 }
 
 declare global {
@@ -49,3 +44,6 @@ export function getDesktopApi(): BgaDesktopApi | null {
   }
   return window.bgaDesktop ?? null;
 }
+
+/** Fired after a successful PDF import so the game list can refetch. */
+export const GAMES_CHANGED_EVENT = 'bga:games-changed';

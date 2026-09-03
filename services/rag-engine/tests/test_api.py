@@ -4,9 +4,11 @@ from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
+from rag_engine.contract import GameSummary
 from rag_engine.engines.llm import OllamaUnreachableError
 from rag_engine.main import create_app
 from rag_engine.settings import Settings, get_settings
@@ -350,3 +352,112 @@ def test_two_requests_do_not_generate_in_parallel(
     starts = [t for label, t in call_log if label == "start"]
     ends = [t for label, t in call_log if label == "end"]
     assert starts[1] >= ends[0]
+
+
+# --- ingest ---
+
+
+def _tiny_pdf(path: Path) -> Path:
+    import pymupdf
+
+    doc = pymupdf.open()  # type: ignore[no-untyped-call,unused-ignore]
+    page = doc.new_page()
+    page.insert_text((72, 72), "# Setup\n\nDraw tiles.")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    doc.save(path)  # type: ignore[no-untyped-call,unused-ignore]
+    doc.close()  # type: ignore[no-untyped-call,unused-ignore]
+    return path
+
+
+def test_ingest_pdf_upload_registers_the_game(client: TestClient, tmp_path: Path) -> None:
+    pdf = _tiny_pdf(tmp_path / "demo.pdf")
+    with pdf.open("rb") as handle:
+        response = client.post(
+            "/ingest/pdf",
+            data={"gameId": "azul", "title": "Azul"},
+            files={"file": ("demo.pdf", handle, "application/pdf")},
+        )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["gameId"] == "azul"
+    assert payload["chunkCount"] > 0
+    assert "rulebook" in payload["documentKinds"]
+    listed = client.get("/games").json()
+    assert listed[0]["gameId"] == "azul"
+
+
+def test_ingest_pdf_upload_rejects_a_bad_game_id(client: TestClient, tmp_path: Path) -> None:
+    pdf = _tiny_pdf(tmp_path / "demo.pdf")
+    with pdf.open("rb") as handle:
+        response = client.post(
+            "/ingest/pdf",
+            data={"gameId": "Azul"},
+            files={"file": ("demo.pdf", handle, "application/pdf")},
+        )
+
+    assert response.status_code == 400
+    body = response.json()
+    assert body["type"] == "error"
+    assert body["code"] == "invalid_game_id"
+
+
+def test_ingest_pdf_upload_rejects_non_pdf_bytes(client: TestClient) -> None:
+    response = client.post(
+        "/ingest/pdf",
+        data={"gameId": "azul"},
+        files={"file": ("notes.txt", b"hello", "text/plain")},
+    )
+    assert response.status_code == 400
+    assert response.json()["code"] == "invalid_file"
+
+
+@pytest.mark.asyncio
+async def test_ingest_pdf_upload_rejects_a_second_import_while_busy(
+    storage: Path, tmp_path: Path
+) -> None:
+    import threading
+
+    app = create_app()
+    app.dependency_overrides[get_settings] = lambda: Settings(storage_dir=storage)
+    pdf_bytes = _tiny_pdf(tmp_path / "demo.pdf").read_bytes()
+    started = threading.Event()
+    release = threading.Event()
+
+    def _slow_ingest(*_args: object, **_kwargs: object) -> GameSummary:
+        started.set()
+        if not release.wait(timeout=5):
+            raise AssertionError("ingest lock test timed out")
+        return GameSummary(
+            game_id="azul",
+            title="Azul",
+            chunk_count=1,
+            document_kinds=["rulebook"],
+        )
+
+    transport = httpx.ASGITransport(app=app)
+    try:
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            with patch("rag_engine.routers.ingest.ingest_rulebook", _slow_ingest):
+                first = asyncio.create_task(
+                    client.post(
+                        "/ingest/pdf",
+                        data={"gameId": "azul", "title": "Azul"},
+                        files={"file": ("demo.pdf", pdf_bytes, "application/pdf")},
+                    )
+                )
+                assert await asyncio.to_thread(started.wait, 5)
+                second = await client.post(
+                    "/ingest/pdf",
+                    data={"gameId": "brass", "title": "Brass"},
+                    files={"file": ("demo.pdf", pdf_bytes, "application/pdf")},
+                )
+                assert second.status_code == 409
+                assert second.json()["code"] == "ingest_busy"
+                release.set()
+                first_response = await first
+                assert first_response.status_code == 200
+                assert first_response.json()["gameId"] == "azul"
+    finally:
+        release.set()
+        app.dependency_overrides.clear()

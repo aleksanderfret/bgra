@@ -13,6 +13,7 @@ dependencies = [
     "pydantic>=2.9",
     "pydantic-settings>=2.6",
     "httpx>=0.28",
+    "python-multipart>=0.0.20",
 ]
 
 [project.optional-dependencies]
@@ -64,6 +65,23 @@ python_version = "3.14"
 strict = true
 warn_unreachable = true
 files = ["rag_engine", "tests"]
+
+[[tool.mypy.overrides]]
+module = [
+    "pymupdf",
+    "pymupdf.*",
+    "pymupdf4llm",
+    "pymupdf4llm.*",
+    "youtube_transcript_api",
+    "youtube_transcript_api.*",
+    "yt_dlp",
+    "yt_dlp.*",
+    "mlx_whisper",
+    "mlx_whisper.*",
+    "faster_whisper",
+    "faster_whisper.*",
+]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

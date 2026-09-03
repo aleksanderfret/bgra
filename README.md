@@ -198,6 +198,43 @@ To build an unsigned `.dmg` / `.zip` on your machine:
 pnpm release:package
 ```
 
+### Adding a rulebook PDF (Stage 2)
+
+Install the PDF tools once:
+
+```bash
+cd services/rag-engine
+uv sync --extra ingest
+```
+
+Then, with `pnpm dev` running, open the setup page in the browser (`/pl/setup` or `/en/setup`), type a game id such as `azul`, and drop your PDF. The file is copied into local storage and split into pages on this computer. You can do the same in the desktop app — it uses the same upload.
+
+The terminal command still works if you prefer it:
+
+```bash
+uv run python -m rag_engine.ingest add \
+  --game azul --kind rulebook --title Azul \
+  /path/to/your-rulebook.pdf
+```
+
+What this does:
+
+- Splits the PDF into text sections and page images under `storage/` (or `BGA_STORAGE_DIR` in the desktop app — the same folder the engine already uses).
+- Updates `games.json` so the game appears in the list.
+- Optional `--fetch-community-faq` loads **text** from BoardGameGeek’s official XML API only (never Files / HTML scraping). If the network is down, the PDF import still succeeds.
+
+**Important:** after ingest, Ask still answers from the model’s general knowledge. Citing your rulebook pages is Stage 3. You can confirm the material is ready with `GET /games` (non-zero `chunkCount`) and by checking `storage/assets/<gameId>/pNN.png`. A live percent bar while a PDF is imported is Stage 3A (after retrieval).
+
+For a YouTube teaching video (captions preferred; Whisper only if you also installed `--extra speech`):
+
+```bash
+uv run python -m rag_engine.ingest add \
+  --game azul --kind video_transcript \
+  'https://www.youtube.com/watch?v=…'
+```
+
+Manual check (Z5): try one simple and one complex game from **your own** PDFs — titles are not hardcoded in the repo.
+
 ---
 
 ## Everyday commands
@@ -250,9 +287,10 @@ Every user-facing label, button, and message is defined in language translation 
 
 - Complete local monorepo setup (TypeScript frontend + Python search engine).
 - Live streaming connection from the Python engine to the web interface.
-- **Local model answers** — the engine connects to Ollama and streams a real answer token by token. The model answers from general knowledge for now; it does not read your rulebooks yet (that is the next step).
+- **Local model answers** — the engine connects to Ollama and streams a real answer token by token. The model answers from general knowledge for now; it does not cite your rulebooks yet (that is Stage 3).
 - **Honest health check** — `/health` tells you exactly which models are installed and which are missing, instead of just saying "Ollama is running".
 - **One question at a time** — the engine makes sure only one answer is being generated at any moment, so your computer is not overloaded. A second question waits in line. If you cancel a question, the slot opens immediately.
+- **Rulebook PDF import** — CLI and desktop drop zone turn your own PDFs into page images and text fragments on disk, and register the game in `games.json`. Optional BoardGameGeek description text via the official XML API only.
 - Complete English and Polish translations.
 - Automated desktop packaging (macOS arm64 DMG and ZIP).
 - Automated GitHub Release pipeline with changelog generation.
@@ -260,8 +298,7 @@ Every user-facing label, button, and message is defined in language translation 
 
 ### What is being added next
 
-- Automatic PDF ingestion (converting rulebook PDFs into searchable pages and images).
-- Hybrid keyword + vector search through rules.
+- Hybrid keyword + vector search through rules (answers that cite your pages).
 - Local voice recognition (Whisper) and speech synthesis (Piper).
 
 For details on the technical roadmap and milestones, see [`docs/ROADMAP.md`](docs/ROADMAP.md).

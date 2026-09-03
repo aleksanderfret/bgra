@@ -11,8 +11,9 @@ import {
   Text,
   Textarea,
 } from '@mantine/core';
-import { type FormEvent, type KeyboardEvent, useEffect, useState } from 'react';
+import { type FormEvent, type KeyboardEvent, useEffect, useId, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
+import { GAMES_CHANGED_EVENT } from '@/lib/desktop-bridge';
 import { AnswerPanel } from './AnswerPanel';
 import { useAskStream } from './useAskStream';
 
@@ -23,6 +24,7 @@ const isAnswerMode = (value: string): value is AnswerMode =>
 
 export function RulesChat() {
   const { t } = useTranslation();
+  const modeLabelId = useId();
   const [games, setGames] = useState<GameSummary[] | null>(null);
   const [engineOffline, setEngineOffline] = useState(false);
   const [gameId, setGameId] = useState<string | null>(null);
@@ -42,6 +44,7 @@ export function RulesChat() {
         const payload = (await response.json()) as GameSummary[];
         if (!cancelled) {
           setGames(payload);
+          setEngineOffline(false);
         }
       } catch {
         if (!cancelled) {
@@ -52,8 +55,13 @@ export function RulesChat() {
     };
 
     void loadGames();
+    const onGamesChanged = (): void => {
+      void loadGames();
+    };
+    window.addEventListener(GAMES_CHANGED_EVENT, onGamesChanged);
     return () => {
       cancelled = true;
+      window.removeEventListener(GAMES_CHANGED_EVENT, onGamesChanged);
     };
   }, []);
 
@@ -103,16 +111,21 @@ export function RulesChat() {
           searchable
         />
 
-        <SegmentedControl
-          aria-label={t('rulesChat.mode.label')}
-          value={mode}
-          onChange={(value) => {
-            if (isAnswerMode(value)) {
-              setMode(value);
-            }
-          }}
-          data={MODES.map((value) => ({ value, label: t(`rulesChat.mode.${value}`) }))}
-        />
+        <Stack gap={4}>
+          <Text id={modeLabelId} size="sm" fw={500}>
+            {t('rulesChat.mode.label')}
+          </Text>
+          <SegmentedControl
+            aria-labelledby={modeLabelId}
+            value={mode}
+            onChange={(value) => {
+              if (isAnswerMode(value)) {
+                setMode(value);
+              }
+            }}
+            data={MODES.map((value) => ({ value, label: t(`rulesChat.mode.${value}`) }))}
+          />
+        </Stack>
 
         <Textarea
           label={t('rulesChat.question.label')}
@@ -129,7 +142,7 @@ export function RulesChat() {
             {t('rulesChat.submit')}
           </Button>
           {state.isStreaming && (
-            <Button variant="subtle" color="gray" onClick={cancel}>
+            <Button type="button" variant="subtle" color="gray" onClick={cancel}>
               {t('rulesChat.cancel')}
             </Button>
           )}

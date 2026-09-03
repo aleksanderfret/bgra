@@ -95,8 +95,8 @@
     "subtitle": "Sprawdzamy ten komputer i proponujemy profil modeli. Trafność cytowanej strony instrukcji jest taka sama w każdym profilu — na słabszym sprzęcie tracisz tylko płynność języka, nie źródło.",
     "loading": "Odczytuję sprzęt…",
     "browserOnly": {
-      "title": "Uruchomione w przeglądarce",
-      "body": "Ten ekran jest przeznaczony dla aplikacji desktopowej. W przeglądarce uruchom stos poleceniem pnpm dev jak zwykle."
+      "title": "Konfiguracja modeli wymaga aplikacji desktopowej",
+      "body": "Sprawdzanie sprzętu i pobieranie modeli działa w spakowanej aplikacji desktopowej. W przeglądarce nadal możesz wczytać instrukcję PDF poniżej — najpierw uruchom stos poleceniem pnpm dev."
     },
     "hardware": {
       "title": "Ten komputer",
@@ -131,7 +131,7 @@
     "ollama": {
       "missingTitle": "Brak Ollamy",
       "missingBody": "Modele językowe działają przez Ollamę na tym komputerze. Zainstaluj ją, uruchom raz, potem otwórz tę aplikację ponownie.",
-      "download": "Pobierz Ollamę",
+      "download": "Pobierz Ollamę (otwiera nową kartę)",
       "foundTitle": "Znaleziono Ollamę",
       "foundBody": "Używam {{path}}"
     },
@@ -150,23 +150,47 @@
   },
   "pdfImport": {
     "title": "Dodaj PDF z instrukcją",
-    "subtitle": "Zawsze wgrywasz własne PDF-y. Żadna cudza biblioteka gier nie jest dołączona do aplikacji.",
+    "subtitle": "Zawsze wgrywasz własne PDF-y. Żadna cudza biblioteka gier nie jest dołączona. Odpowiedzi z tych dokumentów pojawią się w następnym etapie — na razie plik jest zamieniany w przeszukiwalne strony na tym komputerze.",
     "gameId": {
       "label": "Identyfikator gry",
       "description": "Mały slug używany jako nazwa katalogu, na przykład azul albo brass-birmingham",
       "placeholder": "azul"
     },
+    "gameTitle": {
+      "label": "Tytuł gry",
+      "description": "Widoczny na liście gier. Jeśli puste, używany jest identyfikator.",
+      "placeholder": "Azul"
+    },
+    "communityFaq": {
+      "label": "Pobierz też opis z BoardGameGeek",
+      "description": "Tylko oficjalne API XML. Nigdy nie ściąga PDF-ów instrukcji z sekcji Files. Wymaga internetu; pominięcie nie blokuje importu PDF."
+    },
     "drop": {
       "title": "Upuść tu PDF",
-      "body": "Przeciągnij instrukcję wydawcy na ten obszar. Indeksowanie to etap 2 planu — do tego czasu aplikacja uczciwie napisze, że import jeszcze nie jest gotowy."
+      "body": "Przeciągnij instrukcję wydawcy na ten obszar albo wybierz plik. Strony są renderowane, a tekst dzielony na sekcje lokalnie.",
+      "chooseFile": "Wybierz PDF",
+      "keyboardHint": "Żeby dodać plik z klawiatury, użyj Wybierz PDF."
+    },
+    "busy": "Importuję…",
+    "success": {
+      "title": "Instrukcja wczytana",
+      "body": "„{{gameId}}” jest na liście gier. Pytania nadal korzystają z wiedzy ogólnej, dopóki nie będzie wyszukiwania w dokumentach (etap 3)."
     },
     "error": {
       "invalidGameIdTitle": "Niepoprawny identyfikator gry",
       "invalidGameIdBody": "Użyj małego sluga: litery, cyfry i myślniki, zaczynając od litery lub cyfry.",
-      "ingestNotReadyTitle": "Import jeszcze nie działa",
-      "ingestNotReadyBody": "Odebrano „{{fileName}}”, ale wczytywanie dokumentów (etap 2) nie jest zaimplementowane. Plik nie został skopiowany i nie powstał żaden indeks.",
-      "browserOnlyTitle": "Potrzebna aplikacja desktopowa",
-      "browserOnlyBody": "Przeciąganie prawdziwej ścieżki do pliku wymaga powłoki desktopowej. W przeglądarce poczekaj na CLI etapu 2 albo otwórz aplikację Electron."
+      "invalidFileTitle": "To nie jest PDF",
+      "invalidFileBody": "Wybierz instrukcję wydawcy zapisaną jako PDF.",
+      "ingestNotReadyTitle": "Import niedostępny",
+      "ingestNotReadyBody": "Odebrano „{{fileName}}”, ale narzędzia PDF nie są zainstalowane w środowisku silnika. Uruchom uv sync --extra ingest w services/rag-engine i spróbuj ponownie.",
+      "engineUnreachableTitle": "Asystent jest wyłączony",
+      "engineUnreachableBody": "Uruchom aplikację przez pnpm dev, żeby interfejs i silnik działały razem, i spróbuj ponownie.",
+      "limitExceededTitle": "PDF jest za duży",
+      "limitExceededBody": "Plik ma ponad 80 MB, więcej niż 200 stron albo obraz strony jest za duży. Użyj mniejszego PDF-a od wydawcy.",
+      "ingestFailedTitle": "Import nie powiódł się",
+      "ingestFailedBody": "Nie udało się zamienić pliku na strony. Spróbuj innego PDF-a albo sprawdź dziennik silnika.",
+      "ingestBusyTitle": "Trwa inny import",
+      "ingestBusyBody": "Poczekaj, aż skończy się wczytywanie obecnej instrukcji, i spróbuj ponownie."
     }
   }
 }

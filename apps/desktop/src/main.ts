@@ -6,7 +6,6 @@ import { BinaryNotFoundError, resolveBinary } from './binaries';
 import { type MachineSnapshot, type ProfileRecommendation, recommendProfile } from './capabilities';
 import type { DesktopSetupState } from './desktop-api';
 import { writeDiagnosticsFile } from './diagnostics';
-import { isGameId } from './game-id';
 import { readMachineSnapshot } from './machine';
 import { findFreePort } from './ports';
 import {
@@ -207,7 +206,6 @@ function setupState(): DesktopSetupState {
     ollamaDownloadUrl: OLLAMA_DOWNLOAD_URL,
     uvPath,
     setupComplete: existsSync(setupCompletePath()),
-    ingestAvailable: false,
   };
 }
 
@@ -231,16 +229,6 @@ function registerIpc(): void {
     });
     return { path };
   });
-
-  ipcMain.handle(
-    'desktop:import-pdf',
-    async (_event, payload: { filePath: string; gameId: string }) => {
-      if (!isGameId(payload.gameId)) {
-        return { ok: false as const, reason: 'invalid_game_id' as const };
-      }
-      return { ok: false as const, reason: 'ingest_not_ready' as const };
-    },
-  );
 
   ipcMain.handle('desktop:mark-setup-complete', async () => {
     mkdirSync(app.getPath('userData'), { recursive: true });

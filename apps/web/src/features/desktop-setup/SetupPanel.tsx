@@ -1,6 +1,6 @@
 'use client';
 
-import { Alert, Button, Group, List, Stack, Text, Title } from '@mantine/core';
+import { Alert, Button, Group, List, Stack, Text } from '@mantine/core';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -45,11 +45,6 @@ export function SetupPanel() {
 
   return (
     <Stack gap="lg">
-      <Stack gap={4}>
-        <Title order={2}>{t('setup.title')}</Title>
-        <Text c="dimmed">{t('setup.subtitle')}</Text>
-      </Stack>
-
       <Alert color="gray" title={t('setup.hardware.title')}>
         <List spacing="xs" size="sm">
           <List.Item>
@@ -116,6 +111,7 @@ export function SetupPanel() {
         <Stack gap="sm">
           <Text size="sm">{t('setup.models.body')}</Text>
           <Button
+            type="button"
             loading={pulling}
             disabled={state.ollamaPath === null || state.uvPath === null}
             onClick={() => {
@@ -155,6 +151,7 @@ export function SetupPanel() {
 
       <Group>
         <Button
+          type="button"
           onClick={() => {
             const api = getDesktopApi();
             if (api === null) {
@@ -168,6 +165,7 @@ export function SetupPanel() {
           {t('setup.continue')}
         </Button>
         <Button
+          type="button"
           variant="default"
           onClick={() => {
             const api = getDesktopApi();

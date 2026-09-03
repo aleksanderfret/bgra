@@ -17,10 +17,10 @@ const RESPONSE_ALLOWLIST = [
   'last-modified',
 ] as const;
 
-/** A stalled `/games` is a bug; a long generation is not. */
+/** A stalled `/games` is a bug; a long generation or PDF import is not. */
 export const ENGINE_TIMEOUT_MS = 10_000;
 
-export type EngineRouteKind = 'stream' | 'asset' | 'api';
+export type EngineRouteKind = 'stream' | 'asset' | 'api' | 'long';
 
 export function routeKind(segments: string[]): EngineRouteKind {
   switch (segments[0]) {
@@ -28,6 +28,8 @@ export function routeKind(segments: string[]): EngineRouteKind {
       return 'stream';
     case 'static':
       return 'asset';
+    case 'ingest':
+      return 'long';
     default:
       return 'api';
   }

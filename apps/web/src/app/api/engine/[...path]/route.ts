@@ -10,6 +10,7 @@ import {
 const ENGINE_URL = process.env.RAG_ENGINE_URL ?? 'http://127.0.0.1:8000';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 300;
 
 /**
  * The only way from the browser to the engine — answers, images and audio
