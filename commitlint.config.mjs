@@ -1,4 +1,13 @@
-export const scopes = ['web', 'rag-engine', 'api-contract', 'cursor', 'repo', 'docs', 'ci'];
+export const scopes = [
+  'web',
+  'desktop',
+  'rag-engine',
+  'api-contract',
+  'cursor',
+  'repo',
+  'docs',
+  'ci',
+];
 
 /** @type {import('cz-git').UserConfig} */
 export default {

@@ -86,5 +86,84 @@
   "notice": {
     "unknown": "The engine reported a state that has no description here yet.",
     "engine_not_indexed": "No documents are indexed for “{{gameId}}” yet, so there is nothing to base a rules answer on.\n\nThe engine is running and streaming works — what is missing is the retrieval step (stage 3 of the plan). Active model profile: {{profile}}."
+  },
+  "setup": {
+    "title": "First-run setup",
+    "subtitle": "We check this computer and recommend a model profile. Page citation quality is the same on every profile — smaller machines only trade fluency for speed.",
+    "loading": "Reading hardware…",
+    "browserOnly": {
+      "title": "Running in the browser",
+      "body": "This screen is meant for the desktop app. In the browser, start the stack with pnpm dev as usual."
+    },
+    "hardware": {
+      "title": "This computer",
+      "memory": "System memory: {{gib}} GB",
+      "gpu": "Graphics memory: {{gib}} GB",
+      "disk": "Free disk space: {{gib}} GB",
+      "platform": "Platform: {{platform}}"
+    },
+    "profile": {
+      "sharedRetrieval": "Search and reranking models are identical on every profile, so the cited rulebook page stays equally accurate.",
+      "diskNeed": "About {{gib}} GB of disk will be used after models are downloaded.",
+      "minimal-16gb": {
+        "title": "Recommended: minimal (16 GB class)",
+        "body": "A smaller language model. Answers stay grounded in the same pages, but wording is simpler, teaching is weaker, and “I don’t know” appears more often."
+      },
+      "starter-32gb": {
+        "title": "Recommended: starter (32 GB class)",
+        "body": "The default build profile. Good balance of speed and explanation quality for settling rules at the table."
+      },
+      "full-64gb": {
+        "title": "Recommended: full (64 GB class)",
+        "body": "Largest local models, including an optional vision model later. Best fluency for teaching a new game out loud."
+      }
+    },
+    "reason": {
+      "full": "This machine has enough memory for the full profile.",
+      "starter": "This machine matches the starter profile.",
+      "minimal": "This machine fits the minimal profile comfortably.",
+      "insufficient_disk": "Free disk space is low for the recommended profile. Free space before downloading models.",
+      "insufficient_memory": "Memory is below the comfortable minimum. The minimal profile is still offered, but answers may be slow or truncated."
+    },
+    "ollama": {
+      "missingTitle": "Ollama is not installed",
+      "missingBody": "The language models run through Ollama on this computer. Install it, start it once, then reopen this app.",
+      "download": "Download Ollama",
+      "foundTitle": "Ollama found",
+      "foundBody": "Using {{path}}"
+    },
+    "models": {
+      "title": "Model download",
+      "body": "Models are downloaded with a visible progress step so the app never looks frozen. The installer itself stays small; the weights are several gigabytes.",
+      "pull": "Download recommended models",
+      "pullDone": "Models are ready.",
+      "pullFailed": "Download failed: {{message}}"
+    },
+    "continue": "Continue to the assistant",
+    "diagnostics": {
+      "save": "Save diagnostics to a file",
+      "saved": "Saved to {{path}}. Send that file if something breaks — nothing is uploaded automatically."
+    }
+  },
+  "pdfImport": {
+    "title": "Add a rulebook PDF",
+    "subtitle": "You always load your own PDFs. Nothing from someone else’s library is bundled.",
+    "gameId": {
+      "label": "Game id",
+      "description": "Lowercase slug used as the folder name, for example azul or brass-birmingham",
+      "placeholder": "azul"
+    },
+    "drop": {
+      "title": "Drop a PDF here",
+      "body": "Drag a publisher rulebook onto this area. Indexing is stage 2 of the roadmap — until then the app explains that ingest is not ready yet."
+    },
+    "error": {
+      "invalidGameIdTitle": "Invalid game id",
+      "invalidGameIdBody": "Use a lowercase slug: letters, digits and hyphens only, starting with a letter or digit.",
+      "ingestNotReadyTitle": "Import is not ready yet",
+      "ingestNotReadyBody": "Received “{{fileName}}”, but document ingestion (stage 2) is not implemented. The file was not copied and no index was built.",
+      "browserOnlyTitle": "Desktop app required",
+      "browserOnlyBody": "Dragging a real file path needs the desktop shell. In the browser, wait for the stage 2 CLI, or open the Electron app."
+    }
   }
 }

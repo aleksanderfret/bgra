@@ -26,10 +26,13 @@ ingest = [
 retrieval = [
     "lancedb>=0.38",
     "sentence-transformers>=6.0",
+    "huggingface-hub>=0.30",
 ]
-# Stage 5 — speech in and speech out, Apple Silicon only.
+# Stage 5 — speech in and speech out. mlx-whisper is Apple Silicon only;
+# Windows and Linux use faster-whisper behind the same interface (see ROADMAP).
 speech = [
-    "mlx-whisper>=0.4",
+    "mlx-whisper>=0.4; sys_platform == 'darwin'",
+    "faster-whisper>=1.1; sys_platform != 'darwin'",
     "piper-tts>=1.7",
 ]
 

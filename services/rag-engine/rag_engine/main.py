@@ -3,11 +3,12 @@ from fastapi.staticfiles import StaticFiles
 
 from . import __version__
 from .routers import ask, games, health
-from .settings import get_settings
+from .settings import ensure_storage_writable, get_settings
 
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    ensure_storage_writable(settings.storage_dir)
     settings.assets_dir.mkdir(parents=True, exist_ok=True)
 
     app = FastAPI(

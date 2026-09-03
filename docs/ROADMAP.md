@@ -134,13 +134,18 @@ answer with a citation.
 **Goal:** a conversation without a keyboard.
 
 - `uv sync --extra speech`
-- Push-to-talk in the browser (`MediaRecorder`), transcription via `mlx-whisper`
-- The `transcript` frame shows what it heard before it answers
+- Speech-to-text behind one interface (`rag_engine.speech.SpeechToText`):
+  **`mlx-whisper` on macOS (Apple Silicon)** and **`faster-whisper` on Windows/Linux**.
+  The desktop decision O1 requires voice on both platforms; do not call mlx directly
+  from routers.
+- Push-to-talk in the browser / Electron window (`MediaRecorder`); the `transcript`
+  frame shows what it heard before it answers
 - Piper with a Polish voice, audio streamed **sentence by sentence** — not after the
   whole answer is generated
-- **A local HTTPS setup is required** (`mkcert`), because the assistant is meant to work
-  from a tablet on the home network, and `getUserMedia` does not work over HTTP outside
-  `localhost` (decision Z4)
+- **A local HTTPS setup is required** (`mkcert`) for a tablet on the home network —
+  `getUserMedia` does not work over HTTP outside `localhost` (decision Z4). Inside
+  Electron on `http://127.0.0.1` the mic works without mkcert, but still needs the
+  Electron permission handler and `NSMicrophoneUsageDescription`.
 - Opening the LAN interface is **one change with the access check**, not a step before
   it: Next.js stops binding `127.0.0.1` (D9) only in the same commit that fills in
   `assertMayReachEngine` (D10). The Python engine stays on `127.0.0.1` either way.
@@ -150,9 +155,10 @@ answer with a citation.
 - Recorded audio goes through the same proxy as everything else; `Permissions-Policy`
   already limits the microphone to this origin
 
-**Acceptance:** a spoken question produces a spoken answer; the first sound arrives
-before the model finishes generating; **the microphone works on the tablet**, not only on
-the Mac; and a request from the tablet without credentials is refused by the proxy.
+**Acceptance:** a spoken question produces a spoken answer on **both macOS and Windows**;
+the first sound arrives before the model finishes generating; **the microphone works on
+the tablet**, not only on the Mac; and a request from the tablet without credentials is
+refused by the proxy.
 
 ---
 

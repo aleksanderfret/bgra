@@ -8,7 +8,7 @@
     "node": ">=22.0.0"
   },
   "scripts": {
-    "dev": "turbo run dev",
+    "dev": "turbo run dev --filter=web --filter=rag-engine",
     "build": "turbo run build",
     "test": "turbo run test",
     "test:watch": "turbo run test:watch",

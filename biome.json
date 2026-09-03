@@ -17,6 +17,7 @@
       "!**/coverage",
       "!**/next-env.d.ts",
       "!**/generated",
+      "!**/release",
       "!services/rag-engine/storage"
     ]
   },

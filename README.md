@@ -79,6 +79,7 @@ these decide the speed, not the core count.
 
 | Profile | Hardware | Main model | Disk | What it feels like |
 | --- | --- | --- | --- | --- |
+| `minimal-16gb` | 16 GB unified / ~10 GB VRAM | Qwen3 8B | ~6 GB | Settles rules; weaker teaching prose |
 | `starter-32gb` | M1/M2 Pro, 32 GB | Qwen3 14B (Q4) | ~12 GB | Brisk; build the pipeline on this |
 | `full-64gb` | M4/M5 Pro/Max, 64 GB | Qwen3 30B-A3B (MoE) | ~48 GB | Target quality and fluent conversation |
 
@@ -180,9 +181,10 @@ matters, Python where the AI ecosystem is mature.
 bga/
 ├── apps/web/                 Next.js 16 · React 19 · Mantine 9 · TypeScript 7
 │   └── src/
-│       ├── app/[locale]/     routing, layout, engine proxy
+│       ├── app/[locale]/     routing, layout, engine proxy, setup
 │       ├── features/         answer and streaming logic
 │       └── i18n/             i18next setup and pl/en resources
+├── apps/desktop/             Electron shell (one icon → Next + engine)
 ├── packages/api-contract/    shared TS contract + reference SSE decoder
 ├── services/rag-engine/      FastAPI · Python 3.14 · uv
 │   ├── rag_engine/           API, configuration, model profiles
@@ -190,6 +192,34 @@ bga/
 ├── .cursor/                  committed agent harness (skills, rules, commands)
 └── docs/                     architecture and execution plan
 ```
+
+### Desktop app (Electron)
+
+Same UI as the browser; the Electron main process starts the Python engine and a local
+Next.js server, then opens `http://127.0.0.1`. From a checkout:
+
+```bash
+pnpm install
+pnpm --filter web build          # once, for the production Next server
+pnpm --filter desktop build
+pnpm --filter desktop dev        # starts engine + Next + window
+```
+
+While iterating on the web UI, keep `pnpm dev` running and attach the shell:
+
+```bash
+pnpm --filter desktop dev:attach
+```
+
+Unsigned packages for a couple of friends (after `pnpm --filter web build`):
+
+```bash
+pnpm --filter desktop package
+```
+
+On macOS: right-click the app → Open. On Windows: More info → Run anyway. There is no
+auto-update — send a new build when something changes. Do not share packaged game
+indexes; each person loads their own PDFs.
 
 ## Interface language
 

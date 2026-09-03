@@ -1,0 +1,51 @@
+appId: local.bga.desktop
+productName: BGA
+copyright: Copyright © BGA contributors
+directories:
+  output: release
+  buildResources: packaging
+files:
+  - dist/**/*
+  - package.json
+  - "!**/*.map"
+extraResources:
+  - from: ../../services/rag-engine
+    to: repo/services/rag-engine
+    filter:
+      - "**/*"
+      - "!.venv/**"
+      - "!storage/**"
+      - "!**/__pycache__/**"
+      - "!.mypy_cache/**"
+      - "!.ruff_cache/**"
+      - "!.pytest_cache/**"
+  - from: ../../apps/web/.next/standalone
+    to: repo/apps/web
+    filter:
+      - "**/*"
+  - from: ../../apps/web/.next/static
+    to: repo/apps/web/.next/static
+  - from: ../../packages/api-contract
+    to: repo/packages/api-contract
+    filter:
+      - "**/*"
+      - "!node_modules/**"
+mac:
+  category: public.app-category.utilities
+  target:
+    - dmg
+    - zip
+  hardenedRuntime: false
+  gatekeeperAssess: false
+  entitlements: packaging/entitlements.mac.plist
+  entitlementsInherit: packaging/entitlements.mac.plist
+  extendInfo:
+    NSMicrophoneUsageDescription: BGA needs the microphone for push-to-talk questions about board game rules.
+win:
+  target:
+    - nsis
+  artifactName: ${productName}-Setup-${version}.${ext}
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+electronVersion: 35.7.5

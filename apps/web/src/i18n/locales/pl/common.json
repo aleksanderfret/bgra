@@ -86,5 +86,84 @@
   "notice": {
     "unknown": "Silnik zgłosił stan, dla którego nie ma tu jeszcze opisu.",
     "engine_not_indexed": "Nie mam jeszcze wczytanych dokumentów do gry „{{gameId}}”, więc nie odpowiem na to pytanie w sposób oparty na zasadach.\n\nSilnik działa i strumieniowanie jest sprawne — brakuje kroku wyszukiwania (etap 3 planu). Aktywny profil modeli: {{profile}}."
+  },
+  "setup": {
+    "title": "Pierwsze uruchomienie",
+    "subtitle": "Sprawdzamy ten komputer i proponujemy profil modeli. Trafność cytowanej strony instrukcji jest taka sama w każdym profilu — na słabszym sprzęcie tracisz tylko płynność języka, nie źródło.",
+    "loading": "Odczytuję sprzęt…",
+    "browserOnly": {
+      "title": "Uruchomione w przeglądarce",
+      "body": "Ten ekran jest przeznaczony dla aplikacji desktopowej. W przeglądarce uruchom stos poleceniem pnpm dev jak zwykle."
+    },
+    "hardware": {
+      "title": "Ten komputer",
+      "memory": "Pamięć systemowa: {{gib}} GB",
+      "gpu": "Pamięć karty graficznej: {{gib}} GB",
+      "disk": "Wolne miejsce na dysku: {{gib}} GB",
+      "platform": "Platforma: {{platform}}"
+    },
+    "profile": {
+      "sharedRetrieval": "Modele wyszukiwania i przesiewania są identyczne w każdym profilu, więc cytowana strona instrukcji pozostaje równie trafna.",
+      "diskNeed": "Po pobraniu modeli zajmie to około {{gib}} GB na dysku.",
+      "minimal-16gb": {
+        "title": "Rekomendacja: minimalny (klasa 16 GB)",
+        "body": "Mniejszy model językowy. Odpowiedzi nadal opierają się na tych samych stronach, ale język jest prostszy, uczenie gry słabsze, a „nie wiem” pojawia się częściej."
+      },
+      "starter-32gb": {
+        "title": "Rekomendacja: starter (klasa 32 GB)",
+        "body": "Domyślny profil do budowy. Dobry kompromis szybkości i jakości wyjaśnień przy rozstrzyganiu zasad przy stole."
+      },
+      "full-64gb": {
+        "title": "Rekomendacja: pełny (klasa 64 GB)",
+        "body": "Największe lokalne modele, w tym opcjonalny model wizyjny później. Najlepsza płynność przy nauce nowej gry na głos."
+      }
+    },
+    "reason": {
+      "full": "Ten komputer ma dość pamięci na pełny profil.",
+      "starter": "Ten komputer pasuje do profilu starter.",
+      "minimal": "Ten komputer wygodnie mieści profil minimalny.",
+      "insufficient_disk": "Za mało wolnego miejsca na dysku dla rekomendowanego profilu. Zwolnij miejsce przed pobieraniem modeli.",
+      "insufficient_memory": "Pamięć jest poniżej wygodnego minimum. Profil minimalny jest nadal proponowany, ale odpowiedzi mogą być wolne lub ucięte."
+    },
+    "ollama": {
+      "missingTitle": "Brak Ollamy",
+      "missingBody": "Modele językowe działają przez Ollamę na tym komputerze. Zainstaluj ją, uruchom raz, potem otwórz tę aplikację ponownie.",
+      "download": "Pobierz Ollamę",
+      "foundTitle": "Znaleziono Ollamę",
+      "foundBody": "Używam {{path}}"
+    },
+    "models": {
+      "title": "Pobieranie modeli",
+      "body": "Modele pobierane są z widocznym postępem, żeby aplikacja nie wyglądała na zawieszoną. Sam instalator zostaje mały; wagi to kilka gigabajtów.",
+      "pull": "Pobierz rekomendowane modele",
+      "pullDone": "Modele są gotowe.",
+      "pullFailed": "Pobieranie nie powiodło się: {{message}}"
+    },
+    "continue": "Przejdź do asystenta",
+    "diagnostics": {
+      "save": "Zapisz diagnostykę do pliku",
+      "saved": "Zapisano w {{path}}. Wyślij ten plik, jeśli coś się zepsuje — nic nie jest wysyłane automatycznie."
+    }
+  },
+  "pdfImport": {
+    "title": "Dodaj PDF z instrukcją",
+    "subtitle": "Zawsze wgrywasz własne PDF-y. Żadna cudza biblioteka gier nie jest dołączona do aplikacji.",
+    "gameId": {
+      "label": "Identyfikator gry",
+      "description": "Mały slug używany jako nazwa katalogu, na przykład azul albo brass-birmingham",
+      "placeholder": "azul"
+    },
+    "drop": {
+      "title": "Upuść tu PDF",
+      "body": "Przeciągnij instrukcję wydawcy na ten obszar. Indeksowanie to etap 2 planu — do tego czasu aplikacja uczciwie napisze, że import jeszcze nie jest gotowy."
+    },
+    "error": {
+      "invalidGameIdTitle": "Niepoprawny identyfikator gry",
+      "invalidGameIdBody": "Użyj małego sluga: litery, cyfry i myślniki, zaczynając od litery lub cyfry.",
+      "ingestNotReadyTitle": "Import jeszcze nie działa",
+      "ingestNotReadyBody": "Odebrano „{{fileName}}”, ale wczytywanie dokumentów (etap 2) nie jest zaimplementowane. Plik nie został skopiowany i nie powstał żaden indeks.",
+      "browserOnlyTitle": "Potrzebna aplikacja desktopowa",
+      "browserOnlyBody": "Przeciąganie prawdziwej ścieżki do pliku wymaga powłoki desktopowej. W przeglądarce poczekaj na CLI etapu 2 albo otwórz aplikację Electron."
+    }
   }
 }

@@ -1,0 +1,25 @@
+{
+  "name": "desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Electron shell that starts the local Next.js UI and Python engine with one icon",
+  "main": "dist/main.js",
+  "scripts": {
+    "dev": "tsc -p tsconfig.json && env -u ELECTRON_RUN_AS_NODE electron .",
+    "dev:attach": "tsc -p tsconfig.json && env -u ELECTRON_RUN_AS_NODE BGA_WEB_URL=http://127.0.0.1:3000 BGA_ENGINE_PORT=8000 electron .",
+    "build": "tsc -p tsconfig.json",
+    "package": "pnpm run build && electron-builder --config electron-builder.yml",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "biome check"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "26.4.1",
+    "electron": "35.7.5",
+    "electron-builder": "26.16.0",
+    "typescript": "7.0.2",
+    "vitest": "4.1.11"
+  }
+}

@@ -395,9 +395,24 @@ Everything above is only coherent against a written answer to "trusted by whom".
 | The internet | No, and it is not reachable | The engine is never published; only Next may ever be |
 | Rulebooks, FAQs, transcripts | As **data**, never as instructions | Third-party text inside a prompt (D14) |
 | The model's own output | No | It may name a source id, never a path (invariant 2) |
+| Electron preload bridge | Read-only by design | `contextBridge` exposes only setup/diagnostics/import helpers; no Node, no arbitrary IPC. Relevant once stage 7 renders model Markdown — keep the surface minimal so document text cannot reach privileged APIs |
 
 The engine never leaves `127.0.0.1` under any of these. The only process that may ever
 be exposed is Next, and only behind `assertMayReachEngine`.
+
+**D15 — Desktop shell runs Next as a local server, not as a static export.**
+Electron's `BrowserWindow` loads `http://127.0.0.1:<port>` where that port is a
+`next start` (or standalone `server.js`) child of the main process. The `/api/engine/*`
+proxy, `proxy.ts` locale redirect, and RSC layouts stay intact — a static export would
+force the renderer to talk to Python directly and bypass `assertMayReachEngine` (D10).
+The Python environment is created under `app.getPath('userData')` via a resolved `uv`
+binary (never via PATH alone: a Dock-launched app has no shell PATH). Storage is the
+same `BGA_STORAGE_DIR` root, pointed at userData so an auto-update cannot wipe the
+index. Packaging (`electron-builder`) is a separate `package` script, outside
+`pnpm verify`, so `git push` does not build installers. Unsigned builds are enough for
+a handful of testers; code signing and notarisation wait until distribution is a real
+goal. Sharing packaged indexes between users is deliberately unsupported: an index
+contains rulebook text and page renders.
 
 ---
 

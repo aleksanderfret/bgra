@@ -9,9 +9,20 @@ saveWorkspaceProtocol: rolling
 
 # Native postinstall scripts are opt-in in pnpm 10+. Only allow what we need.
 allowBuilds:
+  electron: true
+  electron-winstaller: true
   sharp: false
   unrs-resolver: false
+
+# electron-builder 26 still pulls @electron/rebuild@3.x which declares
+# @electron/node-gyp via a git URL; pnpm 11 rejects that under blockExoticSubdeps.
+overrides:
+  "@electron/rebuild": "^4.0.4"
 
 minimumReleaseAgeExclude:
   - '@testing-library/user-event@14.6.7'
   - '@types/node@26.4.1'
+  - electron
+  - electron-builder
+  - electron-winstaller
+  - '@electron/rebuild'

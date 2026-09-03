@@ -1,6 +1,7 @@
 import { Container, Group, Stack, Text, Title } from '@mantine/core';
 import { notFound } from 'next/navigation';
 import { ColorSchemeSwitcher } from '@/features/color-scheme/ColorSchemeSwitcher';
+import { DiagnosticsButton } from '@/features/desktop-setup/DiagnosticsButton';
 import { LanguageSwitcher } from '@/features/language-switcher/LanguageSwitcher';
 import { RulesChat } from '@/features/rules-chat/RulesChat';
 import { getTranslation } from '@/i18n/server';
@@ -33,6 +34,7 @@ export default async function Home({ params }: PageProps<'/[locale]'>) {
           >
             <ColorSchemeSwitcher />
             <LanguageSwitcher />
+            <DiagnosticsButton />
           </Group>
         </Group>
         <RulesChat />

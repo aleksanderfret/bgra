@@ -17,6 +17,10 @@ const CONTENT_SECURITY_POLICY = [
 ].join('; ');
 
 const nextConfig: NextConfig = {
+  // Electron packaging copies `.next/standalone`. Leaving this unset would
+  // force the desktop shell to ship a full node_modules tree.
+  output: 'standalone',
+
   // Without this, Turbopack walks up past the repo looking for a lockfile and
   // picks a root outside git. Point it at the workspace root so that
   // `@bga/api-contract` resolves from source.
