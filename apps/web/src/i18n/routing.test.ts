@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { localeFromPathname, prefixLocale, withLocale } from './routing';
+import { DEFAULT_LOCALE } from './settings';
+
+describe('DEFAULT_LOCALE', () => {
+  it('is Polish — the table language (Z1)', () => {
+    expect(DEFAULT_LOCALE).toBe('pl');
+  });
+});
 
 describe('localeFromPathname', () => {
   it('reads the locale out of the first segment', () => {
@@ -32,5 +39,10 @@ describe('prefixLocale', () => {
 
   it('keeps the original path underneath the locale', () => {
     expect(prefixLocale('/games/azul', 'en')).toBe('/en/games/azul');
+  });
+
+  it('defaults to Polish when no locale is given', () => {
+    expect(prefixLocale('/')).toBe('/pl');
+    expect(prefixLocale('/rulebooks')).toBe('/pl/rulebooks');
   });
 });

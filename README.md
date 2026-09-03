@@ -207,7 +207,7 @@ cd services/rag-engine
 uv sync --extra ingest
 ```
 
-Then, with `pnpm dev` running, open the setup page in the browser (`/pl/setup` or `/en/setup`), type a game id such as `azul`, and drop your PDF. The file is copied into local storage and split into pages on this computer. You can do the same in the desktop app — it uses the same upload.
+Then, with `pnpm dev` running, open **Rulebooks** in the app (`/pl/rulebooks` or `/en/rulebooks`), type a game id such as `azul`, and drop your PDF. The file is copied into local storage and split into pages on this computer. You can do the same in the desktop app — it uses the same upload.
 
 The terminal command still works if you prefer it:
 
