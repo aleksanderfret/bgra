@@ -72,6 +72,12 @@ at once are answered one after the other, and killing the first frees the slot a
   routes; an absolute URL is dropped by the reducer instead of rendered (D10).
 - A PDF and a transcript are **someone else's file**: parse defensively, cap page counts
   and extracted sizes, and never let a filename from the document reach the filesystem
+- **Community FAQ fetch (option A):** during ingestion, when the user adds a game, the
+  app offers to download the official FAQ and popular rules-clarification threads from
+  BoardGameGeek for that game. Downloaded material is saved locally as documents with
+  `documentKind: "faq"` and indexed alongside the rulebook. This happens **only during
+  ingestion** (when the user already has internet), never during gameplay. Only the game
+  title is sent in the request — no personal data leaves the machine.
 
 **Acceptance:** after ingesting two or three games (one simple, one complex — decision
 Z5) `/games` returns them with a non-zero `chunkCount`, `storage/assets/<gameId>/`
@@ -204,9 +210,36 @@ or fell.
 
 ---
 
+## Stage 8 — Online rules lookup
+
+**Goal:** when the local documents do not answer the question, let the user choose to
+search the internet — without leaking anything personal.
+
+- A "Search online" button appears **only** when the model answers
+  `insufficient_evidence` or `partial` — never automatically, always by user action
+- The query sent to the internet is **only** the game title and the rules question,
+  stripped of any session or personal context
+- Search is scoped to trusted sources: BoardGameGeek, official publisher sites, and
+  curated rules-clarification forums
+- Results are saved locally as documents (`documentKind: "faq"`) so the same question
+  works offline next time
+- The feature is **opt-in per game** in settings: a user who wants a fully offline
+  experience never sees the button
+- Network requests go through a dedicated module with an allowlist of domains — no
+  arbitrary URLs can be reached
+- The privacy policy is explicit: only the game name and rule question leave the machine,
+  and only when the user clicks the button
+
+**Acceptance:** a question that cannot be answered from local documents shows a "Search
+online" option; clicking it finds a relevant BGG thread; the answer is then available
+offline; and disabling online search in settings hides the button entirely.
+
+---
+
 ## The order, if you want results fastest
 
 Stages 1 → 2 → 3 give you **a working rules arbiter over text**, and that is a natural
 stopping point. Stage 6 is worth doing right after 3 — before you start tuning prompts,
 because otherwise you are tuning by feel. Voice (5) and images (7) polish the experience;
-they are not a condition of usefulness.
+they are not a condition of usefulness. Online lookup (8) comes last because the app
+should be fully useful offline first — internet is a convenience, not a requirement.
