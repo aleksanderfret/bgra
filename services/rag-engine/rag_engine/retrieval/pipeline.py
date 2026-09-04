@@ -1,3 +1,4 @@
+import asyncio
 from typing import Protocol
 
 from rag_engine.contract import DocumentKind
@@ -71,7 +72,7 @@ async def retrieve(
     ordered = [by_id[chunk_id] for chunk_id in fused_ids if chunk_id in by_id]
     if not ordered:
         return []
-    scores = reranker.score(question, ordered)
+    scores = await asyncio.to_thread(reranker.score, question, ordered)
     scored: list[RetrievedChunk] = []
     for chunk, score in zip(ordered, scores, strict=True):
         if score < min_relevance_score:

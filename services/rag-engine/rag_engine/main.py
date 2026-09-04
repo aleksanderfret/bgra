@@ -7,20 +7,39 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from . import __version__
+from .engines.embed import embed_texts
+from .engines.llm import load_model
 from .retrieval.service import try_load
 from .routers import ask, games, health, ingest
-from .settings import ensure_storage_writable, get_settings
+from .settings import Settings, ensure_storage_writable, get_settings
 
 logger = logging.getLogger(__name__)
 
 
-async def _warm_retrieval(app: FastAPI, reranker_id: str) -> None:
+async def _pin_ollama_weights(settings: Settings) -> None:
     try:
-        stack = await asyncio.to_thread(try_load, reranker_id)
-        app.state.retrieval_stack = stack
+        await embed_texts(settings.ollama_url, settings.profile.embedding, ["."])
+        await load_model(
+            settings.ollama_url,
+            settings.profile.llm,
+            context_tokens=settings.profile.context_tokens,
+        )
     except Exception:
-        logger.exception("Failed to load the retrieval stack.")
-        app.state.retrieval_stack = None
+        logger.exception("Could not pin Ollama models; the first question may be slow.")
+
+
+async def _warm_retrieval(app: FastAPI, reranker_id: str) -> None:
+    settings = get_settings()
+    try:
+        try:
+            stack = await asyncio.to_thread(try_load, reranker_id)
+        except Exception:
+            logger.exception("Failed to load the retrieval stack.")
+            app.state.retrieval_stack = None
+            return
+        app.state.retrieval_stack = stack
+        if stack is not None:
+            await _pin_ollama_weights(settings)
     finally:
         app.state.retrieval_loading = False
 

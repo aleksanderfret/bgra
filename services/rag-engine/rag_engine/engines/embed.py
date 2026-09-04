@@ -2,7 +2,11 @@ from collections.abc import Sequence
 
 import httpx
 
-from rag_engine.engines.llm import ModelNotInstalledError, OllamaUnreachableError
+from rag_engine.engines.llm import (
+    OLLAMA_KEEP_ALIVE,
+    ModelNotInstalledError,
+    OllamaUnreachableError,
+)
 
 QUERY_TIMEOUT_SECONDS = 30.0
 INGEST_TIMEOUT_SECONDS = 120.0
@@ -51,7 +55,11 @@ async def embed_texts(
         async with httpx.AsyncClient(timeout=timeout) as client:
             response = await client.post(
                 url,
-                json={"model": model, "input": list(texts)},
+                json={
+                    "model": model,
+                    "input": list(texts),
+                    "keep_alive": OLLAMA_KEEP_ALIVE,
+                },
             )
     except httpx.ConnectError as error:
         raise OllamaUnreachableError(f"Cannot reach Ollama at {ollama_url}: {error}") from error
@@ -73,7 +81,11 @@ def embed_texts_sync(
         with httpx.Client(timeout=timeout) as client:
             response = client.post(
                 url,
-                json={"model": model, "input": list(texts)},
+                json={
+                    "model": model,
+                    "input": list(texts),
+                    "keep_alive": OLLAMA_KEEP_ALIVE,
+                },
             )
     except httpx.ConnectError as error:
         raise OllamaUnreachableError(f"Cannot reach Ollama at {ollama_url}: {error}") from error

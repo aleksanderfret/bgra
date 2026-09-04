@@ -131,7 +131,12 @@ async def _stream_answer(
             return
         yield encode_event(StatusEvent(stage="generating"))
         messages = build_messages(payload.question, hits)
-        async for text in generate_stream(settings.ollama_url, settings.profile.llm, messages):
+        async for text in generate_stream(
+            settings.ollama_url,
+            settings.profile.llm,
+            messages,
+            context_tokens=settings.profile.context_tokens,
+        ):
             if await http_request.is_disconnected():
                 return
             yield encode_event(TokenEvent(text=text))

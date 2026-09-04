@@ -29,7 +29,11 @@ async def test_embed_texts_posts_to_api_embed_and_returns_vectors() -> None:
     mock_client.post.assert_awaited_once()
     args, kwargs = mock_client.post.call_args
     assert args[0] == "http://127.0.0.1:11434/api/embed"
-    assert kwargs["json"] == {"model": "bge-m3", "input": ["hello", "world"]}
+    assert kwargs["json"] == {
+        "model": "bge-m3",
+        "input": ["hello", "world"],
+        "keep_alive": "30m",
+    }
 
 
 @pytest.mark.asyncio
