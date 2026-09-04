@@ -7,7 +7,7 @@ facts — they can be handed to an agent as a definition of done.
 A rule that applies to every stage: `pnpm verify` must pass before a stage is closed.
 
 Implementation plans used to build each stage (English, numbered in the order they
-were done) live in [`.archiwum/`](../.archiwum/README.md).
+were done) live in [`docs/archive/`](archive/README.md).
 
 ---
 
@@ -15,8 +15,8 @@ were done) live in [`.archiwum/`](../.archiwum/README.md).
 
 The monorepo, the interface, the streaming flow and the API contract.
 
-Plans: `.archiwum/stage-0-architecture-and-plan-audit.md` (original plan and
-decisions) and `.archiwum/stage-0-execution-roadmap.md` (stage list).
+Plans: `docs/archive/stage-0-architecture-and-plan-audit.md` (original plan and
+decisions) and `docs/archive/stage-0-execution-roadmap.md` (stage list).
 
 - pnpm workspaces + Turborepo, one `pnpm dev` command runs both processes
 - Next.js 16.3 · React 19 · Mantine 9 · TypeScript 7 · Vitest 4 · Biome 2.5
@@ -33,7 +33,7 @@ decisions) and `.archiwum/stage-0-execution-roadmap.md` (stage list).
 processes listen on this computer only, and cheap mistakes (a bad game id, a
 leaked disk path, a hung health check) are caught before they get expensive.
 
-Done after the harness, before local models. Plan: `.archiwum/stage-0a-security-and-performance-hardening.md`.
+Done after the harness, before local models. Plan: `docs/archive/stage-0a-security-and-performance-hardening.md`.
 
 - Both processes bind to `127.0.0.1` (D9)
 - One un-bypassable route to the engine (`/api/engine/*`) with allowlisted
@@ -56,7 +56,7 @@ page images go through `/api/engine/static`, not a rewrite; a `gameId` like
 
 **Goal:** one Dock icon starts the same web app and engine, without a terminal.
 
-Done after 0A, before local models. Plan: `.archiwum/stage-0b-electron-desktop-shell.md`.
+Done after 0A, before local models. Plan: `docs/archive/stage-0b-electron-desktop-shell.md`.
 
 - `apps/desktop`: main process resolves `uv` and Ollama without relying on
   `PATH` (a Dock launch has no shell profile)
@@ -83,7 +83,7 @@ build a `.dmg`.
 **Goal:** a version tag produces a macOS installer and a GitHub Release, without
 shipping rulebooks, models, or secrets.
 
-Done after 0B, before local models. Plan: `.archiwum/stage-0c-desktop-release-pipeline.md`.
+Done after 0B, before local models. Plan: `docs/archive/stage-0c-desktop-release-pipeline.md`.
 
 - `pnpm release:prepare` bumps every package version and writes `CHANGELOG.md`
   (no auto-tag)
@@ -103,7 +103,7 @@ tag creates a Release with notes from the changelog.
 
 **Goal:** the engine actually talks to a model; `/health` tells the truth.
 
-Plan: `.archiwum/stage-1-local-models.md`.
+Plan: `docs/archive/stage-1-local-models.md`.
 
 - `scripts/pull-models.sh` downloads the models of the active profile and **stops with a
   readable error** when a tag does not exist in the Ollama registry (model labels change
@@ -131,7 +131,7 @@ at once are answered one after the other, and killing the first frees the slot a
 search. Chunks are stored as **JSONL** (`ChunkRecord` without `vector`); LanceDB /
 embeddings arrive in Stage 3.
 
-Plan: `.archiwum/stage-2-document-ingestion.md`.
+Plan: `docs/archive/stage-2-document-ingestion.md`.
 
 - `uv sync --extra ingest`
 - PDF → Markdown via `pymupdf4llm`, **preserving page numbers** (without them there are
@@ -175,7 +175,7 @@ general model knowledge until Stage 3.
 **Goal:** several PDFs under one game (solo, almanac, late supplements) and expansions as
 **separate** library entries linked to a base game, without a complicated Ask UI.
 
-Plan: `.archiwum/stage-2a-multi-doc-expansions.md`. Originally labelled 2B; nothing was
+Plan: `docs/archive/stage-2a-multi-doc-expansions.md`. Originally labelled 2B; nothing was
 built between Stage 2 and this work, so it is 2A.
 
 - Expansions are their own `gameId` with `baseGameId` pointing at the base (published
@@ -208,7 +208,7 @@ two import modes exists in `en` and `pl`.
 
 **Goal:** answers grounded in the documents, citing the page.
 
-Plan: `.archiwum/stage-3-retrieval.md`.
+Plan: `docs/archive/stage-3-retrieval.md`.
 
 - `uv sync --extra retrieval`; LanceDB in `storage/index`
 - Chunk schema: `id`, `gameId`, `documentKind`, `docKey`, `documentTitle`, `page`, `text`,
@@ -237,6 +237,35 @@ the correct page number; **a Polish question against an English rulebook hits th
 passage**; a question about a game that was never ingested yields a refusal, not an
 invented rule; a question about game A never returns passages from game B; with
 expansions unticked, expansion passages are not used.
+
+---
+
+## Stage 3E — Think only when the sources need it
+
+**Goal:** simple questions stay fast (no hidden reasoning). Hard ones — conflicting
+passages, errata vs rulebook, a near-miss search — may think, without dumping that
+trace as the answer.
+
+Do this **next**, **after Stage 3**, **before 3C / 3B / 3A / 3D**. It only changes
+`/ask`. Catch-up, the install gate, the progress bar, and the chat thread do not
+block it. Default stays `think: false` (D16). Thinking is an exception, not the
+default.
+
+- Keep streaming only `message.content`. A think trace is never shown as the ruling.
+- Turn thinking **on** only when a checkable trigger fires, for example: hits from
+  different `documentKind` that can disagree; two passages that contradict on the
+  same topic; scores close to `min_relevance_score`. Plain “how many cards do I
+  draw?” with one clear hit stays `think: false`.
+- If thinking will take a while, the engine sends a **notice code** and the UI says
+  so in `en`/`pl` (e.g. working through a conflict). No silent wait, no “open a
+  terminal”.
+- Tests pin the request JSON: `think` is false on the simple fixture, true on the
+  conflict fixture. Do not wait for Stage 6 to ship this; Stage 6 later measures
+  whether adaptive thinking beats always-off.
+
+**Acceptance:** a single-source rules question still answers without a think payload;
+a fixture with rulebook vs errata sends `think: true` and still cites the page; the
+player sees a wait notice when thinking runs; `pnpm verify` passes.
 
 ---
 
@@ -312,7 +341,7 @@ half-ready UI; Mac and Windows present the same steps.
 **Goal:** wherever a rulebook PDF is added (setup drop zone, desktop shell, or CLI), the
 user sees a **smooth percent** and a **stage label**, not four equal jumps of 25%.
 
-Plan: `.archiwum/stage-3a-ingest-progress.md`.
+Plan: `docs/archive/stage-3a-ingest-progress.md`.
 
 Do this **after Stage 3, 3C and 3B**. The last honest slice of the bar is writing search vectors
 (`indexing`). Before Stage 3 that work does not exist; faking “the chat model is learning
@@ -338,9 +367,44 @@ Stage 3, `indexing` is visible and the bar reaches 100% only when the game is se
 
 ---
 
+## Stage 3D — Conversation thread
+
+**Goal:** the rules assistant is a **chat you can scroll**, not a form that forgets the
+last answer. At the table you need to look back: someone did not hear, the room is too
+loud to play sound, or the same ruling comes up two turns later. Voice (Stage 5) reads
+these same messages aloud — it never replaces the written thread.
+
+Do this **after Stage 3** (answers must be grounded first) and **before Stage 4 and 5**.
+Teaching is a conversation; speech is the same conversation spoken. Today the Ask screen
+replaces the previous answer on every submit.
+
+- A new question **appends** a player / assistant pair. The earlier turns stay on
+  screen and can be scrolled.
+- Each **game** has its own thread, stored on this computer with that game. Choosing
+  the game again loads that thread. Switching games switches threads — Azul never
+  shows Wingspan's answers.
+- Written text is always on screen, including when the answer is also spoken. Sound
+  off, or no headphones, still leaves a complete answer to read.
+- History is the **player's notes**, not a rules document. Do **not** ingest past
+  answers as `documentKind: "faq"`. Official FAQ outranks the rulebook; a wrong chat
+  answer must not become the law the next time retrieval runs.
+- Optional later, still in this stage if cheap: if a new question is very similar to
+  an earlier turn, the UI can point at that turn ("you asked something like this").
+  A fresh answer still comes from the rulebook unless the player only wanted to
+  re-read what was already said.
+
+**Acceptance:** a second question leaves the first visible; quitting and reopening the
+same game shows the thread; another game's thread is not mixed in; with sound off the
+full answer is still readable; past chat is not in the search index as FAQ;
+`pnpm verify` passes.
+
+---
+
 ## Stage 4 — Teaching mode
 
-**Goal:** the assistant teaches rather than merely answering.
+**Goal:** the assistant teaches rather than merely answering. The lesson uses the
+**same visible thread** as Stage 3D — modules appear as turns you can scroll back to,
+not a panel that wipes the last one.
 
 - Separate prompts for `teach` and `arbitrate`
 - Teaching style drawn from tutorial transcripts, supplied as an example in the system
@@ -348,18 +412,21 @@ Stage 3, `indexing` is visible and the bar reaches 100% only when the game is se
 - Session state keyed by `sessionId`, **issued by the server and given a TTL** (D13). A
   client-chosen identifier would be someone else's lesson for the price of a guess — the
   cost of getting this right is nil today and considerable once anyone else can connect.
+  That id tracks *where the lesson is*, not the written history (the thread is per game
+  and durable; this id is short-lived).
 - Lesson structure: goal → theme → mechanics → turn → sample move, with a comprehension
   check after each module
 
 **Acceptance:** a "teach me this game" conversation walks through the modules without
-dumping everything at once, and switching to `arbitrate` mid-session produces a short
-answer with a citation.
+dumping everything at once, earlier modules stay visible in the thread, and switching
+to `arbitrate` mid-session produces a short answer with a citation.
 
 ---
 
 ## Stage 5 — Voice
 
-**Goal:** a conversation without a keyboard.
+**Goal:** a conversation without a keyboard. Speech is an extra pair of ears and a
+mouth on the **same written thread** from Stage 3D — never a voice-only mode.
 
 - `uv sync --extra speech`
 - Speech-to-text behind one interface (`rag_engine.speech.SpeechToText`):
@@ -367,7 +434,10 @@ answer with a citation.
   The desktop decision O1 requires voice on both platforms; do not call mlx directly
   from routers.
 - Push-to-talk in the browser / Electron window (`MediaRecorder`); the `transcript`
-  frame shows what it heard before it answers
+  frame shows what it heard before it answers, and that text lands in the thread as
+  the player's turn
+- The spoken answer is the assistant turn already on screen, read aloud. If the
+  player cannot listen, they still have the written message to scroll back to
 - Piper with a Polish voice, audio streamed **sentence by sentence** — not after the
   whole answer is generated
 - **A local HTTPS setup is required** (`mkcert`) for a tablet on the home network —
@@ -384,9 +454,9 @@ answer with a citation.
   already limits the microphone to this origin
 
 **Acceptance:** a spoken question produces a spoken answer on **both macOS and Windows**;
-the first sound arrives before the model finishes generating; **the microphone works on
-the tablet**, not only on the Mac; and a request from the tablet without credentials is
-refused by the proxy.
+the first sound arrives before the model finishes generating; the same words stay in the
+thread so they can be read later; **the microphone works on the tablet**, not only on
+the Mac; and a request from the tablet without credentials is refused by the proxy.
 
 ---
 
@@ -410,6 +480,45 @@ for the credibility of the whole thing.
 
 **Acceptance:** changing a prompt or a chunk size produces a number by which quality rose
 or fell.
+
+---
+
+## Stage 6A — Page layout (columns, boxes, examples)
+
+**Goal:** know whether fancy rulebook pages are where we lose answers — and only then
+spend the work to understand the **layout**, not just the words. This stage is a
+**gate**. Shipping a heavier reader is optional; measuring the miss is not.
+
+Publisher books are often two columns, with sidenotes in frames and “Example”
+callouts beside the rule they illustrate. Today we copy the text out once
+(`pymupdf4llm`) and split on headings. Words in a box usually survive. The link
+“this box belongs to that paragraph” does not. A later vision pass on cropped
+diagrams (Stage 7) does not replace this: that is pictures; this is reading order
+and which note sits next to which rule.
+
+Do this **after Stage 6**. Without numbered questions we would be guessing whether
+a heavier parser is worth the disk, RAM, and slower import.
+
+- Add an eval slice whose answers live in a sidenote, an example box, or the
+  second column — not only in the main story. Record: right page, right passage,
+  answer agrees. That share is the miss rate of the current reader.
+- **Stop if the miss is small.** Keep the light reader. Write the number down so
+  the next person does not re-litigate it.
+- **Continue only if the miss is large** on real publisher PDFs (your own copies,
+  never in git). Then, at **import time only**, reconstruct regions: columns in
+  reading order; a callout kept with the rule it sits beside, tagged as example
+  or note so a chunk is not an orphan heading. The ask path still receives a
+  handful of passages — it does not open the PDF and it does not run a layout
+  model per question.
+- The light reader stays the default and the fallback. A scan with no text layer
+  is still the existing OCR extra, not this stage.
+- Page pictures stay. Layout understanding must not become an excuse to hide the
+  original page from the player.
+
+**Acceptance:** the eval slice exists and has been run on at least one simple and
+one dense rulebook; the miss rate is written down; either we keep the current
+reader with that number as the reason, or a layout-aware import raises that
+slice without dropping ordinary heading-based questions; `pnpm verify` passes.
 
 ---
 
@@ -458,14 +567,74 @@ offline; and disabling online search in settings hides the button entirely.
 
 ---
 
+## Stage 9 — Context window strategy
+
+**Goal:** decide how large the model’s reading window should be **once** the prompt
+is no longer “question + a handful of passages”.
+
+Do this **after the main product** (Stage 3D thread, Stage 4 teaching, Stage 5 voice,
+Stage 6 eval). Today `num_ctx` is the profile’s `context_tokens` (8192 on 32 GB) so
+two models fit in RAM (D16). Growing it too early only costs memory. After a
+scrollable thread and teaching turns, the risk is the opposite: the window silently
+drops the system prompt or the first sources.
+
+- Measure real prompt size: system + sources + **kept thread**, on 32 GB and on the
+  64 GB profile.
+- Write the rule: what we never truncate (system prompt, the passages for *this*
+  question); what we may drop or summarise (old turns); when we raise `num_ctx` vs
+  when we shrink the thread instead.
+- Re-run Stage 6 after any change. A larger window that mixes two games or eats the
+  authority order is a regression.
+
+**Acceptance:** the rule is written down and implemented; a long thread still answers
+from the current question’s sources; eval does not drop vs the Stage 6 baseline;
+`pnpm verify` passes.
+
+---
+
+## Stage 9A — When models load and when they leave memory
+
+**Goal:** the packaged app does not keep the big answer model in RAM unless the
+player is about to ask — and the next question at the table still does not wait for
+a reload from disk.
+
+Do this **after the app is otherwise done** (including 3B, so first-run already has
+models on disk). Today we pin embed + chat during “preparing the assistant” and keep
+them ~30 minutes (D16). That helped the second question; it also makes every engine
+start heavier and holds RAM while someone only adds a PDF.
+
+- Decide, in the UI, three moments: **importing a rulebook** (need search vectors,
+  not a long chat load); **first Ask** (load the answer model, show a plain wait if
+  it is not ready); **idle at the table** (keep both long enough for the next
+  question; then unload so the laptop can rest).
+- Do not tell the player to run a command or pick a model. Status copy stays in
+  `en`/`pl`.
+- Optional later: run embeddings outside the chat runtime so looking up a question
+  does not kick the answer model out of memory. Only if Stage 9A still sees that
+  swap on 32 GB.
+
+**Acceptance:** adding a PDF does not wait on the full chat model; the first question
+after a pause either answers promptly or shows an in-app “loading the assistant”
+state, then works; after a long idle, RAM is released and the next question recovers
+in the UI; `pnpm verify` passes.
+
+---
+
 ## The order, if you want results fastest
 
 Stages 1 → 2 → 2A → 3 give you **a working rules arbiter over text**, and that is a
-natural stopping point for development. Stage 0A–0C (hardening, desktop window,
-release) are already done; they sit under the numbered product stages. Stage 3B is
-what makes that arbiter usable from the packaged app (Ollama + models behind a
-one-click gate). Stage 6 is worth doing right after 3 — before you start tuning
-prompts, because otherwise you are tuning by feel. Voice (5) and images (7) polish
-the experience; they are not a condition of usefulness. Online lookup (8) comes last
-because the app should be fully useful offline first — internet is a convenience,
-not a requirement.
+natural stopping point for development. **Stage 3E is the next slice on that
+arbiter:** think only when sources conflict, so easy questions stay fast. Stage 3D
+(the scrollable, per-game thread) is what makes that arbiter usable **at the
+table** — you can look back, and sound is optional. Stage 0A–0C (hardening, desktop
+window, release) are already done; they sit under the numbered product stages.
+Stage 3B is what makes that arbiter usable from the packaged app (Ollama + models
+behind a one-click gate). Stage 6 is worth doing right after 3 — before you start
+tuning prompts, because otherwise you are tuning by feel. Stage 6A (page layout)
+comes **after that measurement**: first learn how often columns and sidenotes cost
+us an answer, then decide whether a heavier import is worth it. Voice (5) and
+images (7) polish the experience; they are not a condition of usefulness. Online
+lookup (8) comes last because the app should be fully useful offline first —
+internet is a convenience, not a requirement. Stage 9 (context window) and 9A
+(when models sit in RAM) wait until that product exists; growing the window or
+rewriting load/unload earlier is guessing.

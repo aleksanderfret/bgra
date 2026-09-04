@@ -3,8 +3,9 @@
 English-only copies of the plans used to build this app. Cursor kept the working
 files in `~/.cursor/plans/` (outside git). This folder is the in-repo record.
 
-The **living** documents stay in `docs/`. Edit those when the product changes.
-Files here are historical: what we planned, not a second source of truth.
+The **living** documents stay beside this folder (`docs/ARCHITECTURE.md`,
+`docs/ROADMAP.md`). Edit those when the product changes. Files here are
+historical: what we planned, not a second source of truth.
 
 Stage numbers follow **implementation order**. A letter means the work sat
 between two numbered roadmap stages (0a after 0 and before 1; 2a after 2 and

@@ -4,6 +4,7 @@
 > **Outcome:** implemented.
 
 ---
+
 # Stage 3 — Retrieval
 
 > Agentic workers: TDD, task-by-task. Do not commit unless asked. Do not implement Stage 3A or 3B. Treat the Premortem tigers as **required work**, not notes.

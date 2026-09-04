@@ -15,7 +15,7 @@ facts — they can be handed to an agent as a definition of done.
 A rule that applies to every stage: `pnpm verify` must pass before a stage is closed.
 
 Implementation plans used to build each stage (English, numbered in the order they
-were done) live in [`.archiwum/`](../.archiwum/README.md).
+were done) live in [`docs/archive/`](README.md).
 
 ---
 
@@ -23,8 +23,8 @@ were done) live in [`.archiwum/`](../.archiwum/README.md).
 
 The monorepo, the interface, the streaming flow and the API contract.
 
-Plans: `.archiwum/stage-0-architecture-and-plan-audit.md` (original plan and
-decisions) and `.archiwum/stage-0-execution-roadmap.md` (stage list).
+Plans: `docs/archive/stage-0-architecture-and-plan-audit.md` (original plan and
+decisions) and `docs/archive/stage-0-execution-roadmap.md` (stage list).
 
 - pnpm workspaces + Turborepo, one `pnpm dev` command runs both processes
 - Next.js 16.3 · React 19 · Mantine 9 · TypeScript 7 · Vitest 4 · Biome 2.5
@@ -41,7 +41,7 @@ decisions) and `.archiwum/stage-0-execution-roadmap.md` (stage list).
 processes listen on this computer only, and cheap mistakes (a bad game id, a
 leaked disk path, a hung health check) are caught before they get expensive.
 
-Done after the harness, before local models. Plan: `.archiwum/stage-0a-security-and-performance-hardening.md`.
+Done after the harness, before local models. Plan: `docs/archive/stage-0a-security-and-performance-hardening.md`.
 
 - Both processes bind to `127.0.0.1` (D9)
 - One un-bypassable route to the engine (`/api/engine/*`) with allowlisted
@@ -64,7 +64,7 @@ page images go through `/api/engine/static`, not a rewrite; a `gameId` like
 
 **Goal:** one Dock icon starts the same web app and engine, without a terminal.
 
-Done after 0A, before local models. Plan: `.archiwum/stage-0b-electron-desktop-shell.md`.
+Done after 0A, before local models. Plan: `docs/archive/stage-0b-electron-desktop-shell.md`.
 
 - `apps/desktop`: main process resolves `uv` and Ollama without relying on
   `PATH` (a Dock launch has no shell profile)
@@ -91,7 +91,7 @@ build a `.dmg`.
 **Goal:** a version tag produces a macOS installer and a GitHub Release, without
 shipping rulebooks, models, or secrets.
 
-Done after 0B, before local models. Plan: `.archiwum/stage-0c-desktop-release-pipeline.md`.
+Done after 0B, before local models. Plan: `docs/archive/stage-0c-desktop-release-pipeline.md`.
 
 - `pnpm release:prepare` bumps every package version and writes `CHANGELOG.md`
   (no auto-tag)
@@ -111,7 +111,7 @@ tag creates a Release with notes from the changelog.
 
 **Goal:** the engine actually talks to a model; `/health` tells the truth.
 
-Plan: `.archiwum/stage-1-local-models.md`.
+Plan: `docs/archive/stage-1-local-models.md`.
 
 - `scripts/pull-models.sh` downloads the models of the active profile and **stops with a
   readable error** when a tag does not exist in the Ollama registry (model labels change
@@ -139,7 +139,7 @@ at once are answered one after the other, and killing the first frees the slot a
 search. Chunks are stored as **JSONL** (`ChunkRecord` without `vector`); LanceDB /
 embeddings arrive in Stage 3.
 
-Plan: `.archiwum/stage-2-document-ingestion.md`.
+Plan: `docs/archive/stage-2-document-ingestion.md`.
 
 - `uv sync --extra ingest`
 - PDF → Markdown via `pymupdf4llm`, **preserving page numbers** (without them there are
@@ -183,7 +183,7 @@ general model knowledge until Stage 3.
 **Goal:** several PDFs under one game (solo, almanac, late supplements) and expansions as
 **separate** library entries linked to a base game, without a complicated Ask UI.
 
-Plan: `.archiwum/stage-2a-multi-doc-expansions.md`. Originally labelled 2B; nothing was
+Plan: `docs/archive/stage-2a-multi-doc-expansions.md`. Originally labelled 2B; nothing was
 built between Stage 2 and this work, so it is 2A.
 
 - Expansions are their own `gameId` with `baseGameId` pointing at the base (published
@@ -216,7 +216,7 @@ two import modes exists in `en` and `pl`.
 
 **Goal:** answers grounded in the documents, citing the page.
 
-Plan: `.archiwum/stage-3-retrieval.md`.
+Plan: `docs/archive/stage-3-retrieval.md`.
 
 - `uv sync --extra retrieval`; LanceDB in `storage/index`
 - Chunk schema: `id`, `gameId`, `documentKind`, `docKey`, `documentTitle`, `page`, `text`,
@@ -289,7 +289,7 @@ half-ready UI; Mac and Windows present the same steps.
 **Goal:** wherever a rulebook PDF is added (setup drop zone, desktop shell, or CLI), the
 user sees a **smooth percent** and a **stage label**, not four equal jumps of 25%.
 
-Plan: `.archiwum/stage-3a-ingest-progress.md`.
+Plan: `docs/archive/stage-3a-ingest-progress.md`.
 
 Do this **after Stage 3 and 3B**. The last honest slice of the bar is writing search vectors
 (`indexing`). Before Stage 3 that work does not exist; faking “the chat model is learning

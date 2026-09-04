@@ -299,7 +299,7 @@ bga/
 ├── packages/
 │   └── api-contract/      Shared communication types between frontend and backend
 ├── scripts/               Release and setup helper scripts
-└── docs/                  Architecture documentation and roadmap
+└── docs/                  Architecture, roadmap, and historical plans
 ```
 
 ---

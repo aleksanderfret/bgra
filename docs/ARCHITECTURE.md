@@ -418,6 +418,14 @@ a handful of testers; code signing and notarisation wait until distribution is a
 goal. Sharing packaged indexes between users is deliberately unsupported: an index
 contains rulebook text and page renders.
 
+**D16 — Qwen3 must answer, not think, on `/ask`.**
+Qwen3 models produce a hidden reasoning trace by default. The engine only streams
+`message.content`, so that trace is a silent wait of tens of seconds — including on the
+second question. `/api/chat` therefore sets `think: false`. Embed and chat both send
+`keep_alive: 30m` so looking up the question (the embedding model) does not unload the
+answer model before the next turn. Chat uses the profile's `context_tokens` as Ollama
+`num_ctx`; a 32k default window would bloat memory and force a reload.
+
 ---
 
 ## 7. Annex: what changes on a remote server
