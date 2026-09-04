@@ -1,0 +1,42 @@
+---
+description: The app is for board-game players, not programmers — keep every user-facing flow simple, automatic, and transparent.
+alwaysApply: true
+---
+
+# Player-first product
+
+The people who open this app are **board-game players**. They do not need to know
+anything about AI, terminals, config files, or how software is built. Design and
+proposals must assume that audience, not a developer at a keyboard.
+
+This is distinct from `plain-language.mdc` (how we explain things in chat). This
+rule is about **what we build and what we ask a player to do**.
+
+## Defaults
+
+- The player’s path is the app: click, type, speak, look at the screen.
+- As much as possible happens **by itself**. The player should not set up,
+  wire, or “just run a command”.
+- Automatic is not silent. The UI must say what is happening in plain words
+  (“Looking through the rulebook…”, “Couldn’t find that in these rules”).
+- Errors tell the player what to try next in the app. Never “open a terminal”,
+  “check the logs”, or “edit this file”.
+- Developer tools (CLI, scripts, env files, logs) exist for building the product.
+  They are not a feature of the product.
+
+## When proposing a solution
+
+Ask: could someone who only plays board games finish this without help?
+
+- **Forbidden as the player’s path:** console commands, editing config, installing
+  models by hand, reading logs, copying file paths, knowing what “the engine”
+  or “Ollama” is.
+- **Required:** a screen, a button, a status, a recovery that stays in the app.
+- If a step truly cannot be automatic yet, say so and put a **visible in-app
+  gap** on the table — do not paper over it with “the user can run …”.
+
+```
+Forbidden: “Have the user run `ollama pull …` if the model is missing.”
+Required:  Detect the missing model, show a plain-language status, start the
+           download from the app, and show progress until it is ready.
+```

@@ -16,6 +16,16 @@
     "assistant": "Assistant",
     "rulebooks": "Rulebooks"
   },
+  "engineReadiness": {
+    "starting": {
+      "title": "Preparing the assistant",
+      "body": "Loading search on this computer. The first time can take a few minutes. You can look around; questions about the rules will wait until this finishes."
+    },
+    "offline": {
+      "title": "The assistant did not start",
+      "body": "Close the app and open it again."
+    }
+  },
   "preferences": {
     "label": "Display preferences"
   },
@@ -91,7 +101,9 @@
       "stream_truncated": "The answer stream stopped before it finished.",
       "http_error": "The engine responded with an error.",
       "malformed_frame": "The engine sent a frame that is not valid JSON.",
-      "unknown_event": "The engine sent a frame that does not match the event contract."
+      "unknown_event": "The engine sent a frame that does not match the event contract.",
+      "generation_timeout": "The model stopped producing words. Ask again, or check that Ollama is still running.",
+      "model_missing": "A required local model is not installed. Download the models for this profile, then ask again."
     }
   },
   "documentKind": {
@@ -103,7 +115,9 @@
   },
   "notice": {
     "unknown": "The engine reported a state that has no description here yet.",
-    "engine_not_indexed": "No documents are indexed for “{{gameId}}” yet, so there is nothing to base a rules answer on.\n\nThe engine is running and streaming works — what is missing is the retrieval step (stage 3 of the plan). Active model profile: {{profile}}."
+    "engine_not_indexed": "There are no searchable documents for “{{gameId}}” yet. Import a rulebook PDF, then ask again.\n\nActive model profile: {{profile}}.",
+    "retrieval_not_ready": "This computer can store rulebook pages, but search is not installed yet. In the project folder run: uv sync --extra ingest --extra retrieval",
+    "retrieval_loading": "Search is still starting on this computer. Wait a moment, then ask again."
   },
   "setup": {
     "title": "First-run setup",
@@ -218,7 +232,7 @@
     "busy": "Importing…",
     "success": {
       "title": "Rulebook imported",
-      "body": "“{{gameId}}” is on the game list. Ask still answers from general knowledge until document search (stage 3) is ready.",
+      "body": "“{{gameId}}” is on the game list. You can ask about this rulebook; answers cite the page.",
       "attachedBody": "Document “{{documentTitle}}” was added under “{{gameId}}”."
     },
     "error": {
@@ -244,6 +258,8 @@
       "pageImageTooLargeBody": "One page still makes a picture larger than 5 MB even after lowering resolution. Try a lighter scan or a smaller publisher PDF.",
       "ingestFailedTitle": "Import failed",
       "ingestFailedBody": "The file could not be turned into pages. Try another PDF, or check the engine log.",
+      "indexFailedTitle": "Pages saved, search not ready",
+      "indexFailedBody": "The PDF is on this computer, but it could not be added to search (Ollama may be stopped). Start Ollama, then run: uv run python -m rag_engine.ingest index",
       "ingestBusyTitle": "Another import is running",
       "ingestBusyBody": "Wait until the current rulebook finishes, then try again."
     }

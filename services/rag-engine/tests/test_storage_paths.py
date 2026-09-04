@@ -11,6 +11,7 @@ from rag_engine.storage_paths import (
     chunks_path,
     document_dir,
     game_assets_dir,
+    index_dir,
     page_image_url,
     page_png_path,
     slugify_doc_key,
@@ -47,6 +48,9 @@ def test_paths_stay_under_storage(tmp_path: Path) -> None:
 
     chunks = chunks_path(storage, "azul", "rulebook", "main")
     assert chunks.name == "chunks.jsonl"
+
+    index = index_dir(storage)
+    assert index == (storage / "index").resolve()
 
 
 def test_assert_under_storage_rejects_escape(tmp_path: Path) -> None:

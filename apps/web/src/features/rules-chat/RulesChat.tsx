@@ -2,7 +2,6 @@
 
 import type { AnswerMode, GameSummary } from '@bga/api-contract';
 import {
-  Alert,
   Button,
   Checkbox,
   Fieldset,
@@ -14,7 +13,8 @@ import {
   Textarea,
 } from '@mantine/core';
 import { type FormEvent, type KeyboardEvent, useEffect, useId, useState } from 'react';
-import { Trans, useTranslation } from 'react-i18next';
+import { useTranslation } from 'react-i18next';
+import { useEngineReadiness } from '@/features/engine-readiness/useEngineReadiness';
 import { GAMES_CHANGED_EVENT } from '@/lib/desktop-bridge';
 import { AnswerPanel } from './AnswerPanel';
 import { useAskStream } from './useAskStream';
@@ -27,8 +27,8 @@ const isAnswerMode = (value: string): value is AnswerMode =>
 export function RulesChat() {
   const { t } = useTranslation();
   const [games, setGames] = useState<GameSummary[] | null>(null);
-  const [engineOffline, setEngineOffline] = useState(false);
   const [gameId, setGameId] = useState<string | null>(null);
+  const enginePhase = useEngineReadiness();
   const [expansionIds, setExpansionIds] = useState<string[]>([]);
   const [expansionsCleared, setExpansionsCleared] = useState(false);
   const [mode, setMode] = useState<AnswerMode>('teach');
@@ -48,11 +48,9 @@ export function RulesChat() {
         const payload = (await response.json()) as GameSummary[];
         if (!cancelled) {
           setGames(payload);
-          setEngineOffline(false);
         }
       } catch {
-        if (!cancelled) {
-          setEngineOffline(true);
+        if (!cancelled && enginePhase === 'offline') {
           setGames([]);
         }
       }
@@ -63,17 +61,27 @@ export function RulesChat() {
       void loadGames();
     };
     window.addEventListener(GAMES_CHANGED_EVENT, onGamesChanged);
+    const retry =
+      enginePhase === 'ready'
+        ? null
+        : window.setInterval(() => {
+            void loadGames();
+          }, 1_000);
     return () => {
       cancelled = true;
       window.removeEventListener(GAMES_CHANGED_EVENT, onGamesChanged);
+      if (retry !== null) {
+        window.clearInterval(retry);
+      }
     };
-  }, []);
+  }, [enginePhase]);
 
   const baseGames = (games ?? []).filter((game) => game.baseGameId === null);
   const expansionsForBase =
     gameId === null ? [] : (games ?? []).filter((game) => game.baseGameId === gameId);
 
-  const canAsk = gameId !== null && question.trim().length > 0 && !state.isStreaming;
+  const canAsk =
+    enginePhase === 'ready' && gameId !== null && question.trim().length > 0 && !state.isStreaming;
 
   const onBaseGameChange = (next: string | null): void => {
     setGameId(next);
@@ -122,15 +130,6 @@ export function RulesChat() {
   return (
     <form onSubmit={onSubmit} aria-label={t('rulesChat.formLabel')}>
       <Stack gap="lg">
-        {engineOffline && (
-          <Alert color="orange" title={t('rulesChat.engineOffline.title')} role="alert">
-            <Trans
-              i18nKey="rulesChat.engineOffline.body"
-              components={{ command: <Text component="code" /> }}
-            />
-          </Alert>
-        )}
-
         <Fieldset legend={t('rulesChat.game.label')} variant="filled">
           <Select
             description={t('rulesChat.game.description')}

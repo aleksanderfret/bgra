@@ -16,6 +16,16 @@
     "assistant": "Asystent",
     "rulebooks": "Instrukcje"
   },
+  "engineReadiness": {
+    "starting": {
+      "title": "Przygotowuję asystenta",
+      "body": "Wczytuję wyszukiwanie na tym komputerze. Za pierwszym razem może to potrwać kilka minut. Możesz się rozglądać; pytania o zasady poczekają, aż to się skończy."
+    },
+    "offline": {
+      "title": "Asystent się nie uruchomił",
+      "body": "Zamknij aplikację i otwórz ją ponownie."
+    }
+  },
   "preferences": {
     "label": "Ustawienia wyświetlania"
   },
@@ -91,7 +101,9 @@
       "stream_truncated": "Strumień odpowiedzi urwał się przed zakończeniem.",
       "http_error": "Silnik odpowiedział błędem.",
       "malformed_frame": "Silnik przysłał ramkę, która nie jest poprawnym JSON-em.",
-      "unknown_event": "Silnik przysłał ramkę niezgodną z kontraktem zdarzeń."
+      "unknown_event": "Silnik przysłał ramkę niezgodną z kontraktem zdarzeń.",
+      "generation_timeout": "Model przestał dopisywać słowa. Zadaj pytanie jeszcze raz albo sprawdź, czy Ollama nadal działa.",
+      "model_missing": "Brakuje wymaganego lokalnego modelu. Pobierz modele dla tego profilu i zapytaj ponownie."
     }
   },
   "documentKind": {
@@ -103,7 +115,9 @@
   },
   "notice": {
     "unknown": "Silnik zgłosił stan, dla którego nie ma tu jeszcze opisu.",
-    "engine_not_indexed": "Nie mam jeszcze wczytanych dokumentów do gry „{{gameId}}”, więc nie odpowiem na to pytanie w sposób oparty na zasadach.\n\nSilnik działa i strumieniowanie jest sprawne — brakuje kroku wyszukiwania (etap 3 planu). Aktywny profil modeli: {{profile}}."
+    "engine_not_indexed": "Nie mam jeszcze przeszukiwalnych dokumentów do gry „{{gameId}}”. Wczytaj PDF instrukcji i zapytaj ponownie.\n\nAktywny profil modeli: {{profile}}.",
+    "retrieval_not_ready": "Ten komputer umie zapisać strony instrukcji, ale wyszukiwanie nie jest jeszcze zainstalowane. W katalogu projektu uruchom: uv sync --extra ingest --extra retrieval",
+    "retrieval_loading": "Wyszukiwanie nadal się uruchamia na tym komputerze. Poczekaj chwilę i zapytaj ponownie."
   },
   "setup": {
     "title": "Pierwsze uruchomienie",
@@ -218,7 +232,7 @@
     "busy": "Importuję…",
     "success": {
       "title": "Instrukcja wczytana",
-      "body": "„{{gameId}}” jest na liście gier. Pytania nadal korzystają z wiedzy ogólnej, dopóki nie będzie wyszukiwania w dokumentach (etap 3).",
+      "body": "„{{gameId}}” jest na liście gier. Możesz pytać o tę instrukcję; odpowiedzi podają numer strony.",
       "attachedBody": "Dokument „{{documentTitle}}” dodano pod „{{gameId}}”."
     },
     "error": {
@@ -244,6 +258,8 @@
       "pageImageTooLargeBody": "Jedna strona nadal daje obraz większy niż 5 MB nawet po obniżeniu rozdzielczości. Spróbuj lżejszego skanu albo mniejszego PDF-a od wydawcy.",
       "ingestFailedTitle": "Import nie powiódł się",
       "ingestFailedBody": "Nie udało się zamienić pliku na strony. Spróbuj innego PDF-a albo sprawdź dziennik silnika.",
+      "indexFailedTitle": "Strony zapisane, wyszukiwanie niegotowe",
+      "indexFailedBody": "PDF jest już na tym komputerze, ale nie udało się dodać go do wyszukiwania (Ollama może być wyłączona). Włącz Ollamę, potem uruchom: uv run python -m rag_engine.ingest index",
       "ingestBusyTitle": "Trwa inny import",
       "ingestBusyBody": "Poczekaj, aż skończy się wczytywanie obecnej instrukcji, i spróbuj ponownie."
     }

@@ -10,6 +10,12 @@ export const ERROR_CODES = [
   'http_error',
   'malformed_frame',
   'unknown_event',
+  'generation_timeout',
+  'model_missing',
 ] as const;
 
-export const NOTICE_CODES = ['engine_not_indexed'] as const;
+export const NOTICE_CODES = [
+  'engine_not_indexed',
+  'retrieval_not_ready',
+  'retrieval_loading',
+] as const;

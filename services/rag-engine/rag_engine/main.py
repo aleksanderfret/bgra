@@ -1,9 +1,48 @@
+import asyncio
+import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager, suppress
+
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from . import __version__
+from .retrieval.service import try_load
 from .routers import ask, games, health, ingest
 from .settings import ensure_storage_writable, get_settings
+
+logger = logging.getLogger(__name__)
+
+
+async def _warm_retrieval(app: FastAPI, reranker_id: str) -> None:
+    try:
+        stack = await asyncio.to_thread(try_load, reranker_id)
+        app.state.retrieval_stack = stack
+    except Exception:
+        logger.exception("Failed to load the retrieval stack.")
+        app.state.retrieval_stack = None
+    finally:
+        app.state.retrieval_loading = False
+
+
+def schedule_retrieval_load(app: FastAPI, reranker_id: str) -> asyncio.Task[None] | None:
+    app.state.retrieval_stack = None
+    app.state.retrieval_loading = True
+    return asyncio.get_running_loop().create_task(_warm_retrieval(app, reranker_id))
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    settings = get_settings()
+    # Serve /health and /games immediately; CrossEncoder load can take minutes.
+    task = schedule_retrieval_load(app, settings.profile.reranker)
+    try:
+        yield
+    finally:
+        if task is not None:
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
 
 
 def create_app() -> FastAPI:
@@ -15,6 +54,7 @@ def create_app() -> FastAPI:
         title="BGA rules engine",
         version=__version__,
         summary="Answers board game rules questions from locally indexed documents",
+        lifespan=lifespan,
     )
 
     # No CORS: the browser only talks to Next.js, which proxies here.

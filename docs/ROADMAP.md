@@ -204,7 +204,7 @@ two import modes exists in `en` and `pl`.
 
 ---
 
-## Stage 3 — Retrieval
+## Stage 3 — Retrieval ✅ **complete**
 
 **Goal:** answers grounded in the documents, citing the page.
 
@@ -240,6 +240,36 @@ expansions unticked, expansion passages are not used.
 
 ---
 
+## Stage 3C — Search catch-up for an existing library
+
+**Goal:** a game that is already on the list is never treated as “no rulebook”. If
+the pages are on disk but search is empty or still starting, the player sees a wait
+state — not an error that tells them to import the PDF again.
+
+Do this **after Stage 3**. In `pnpm dev` it can ship **before 3B** (Ollama and models
+are already there). On a packaged install it must run **after 3B**, because catch-up
+needs the embedding model. Stage 3A (new-import percent bar) does not replace this:
+3A is the next PDF; 3C is yesterday’s library.
+
+- On engine start, if `games.json` lists documents with chunks on disk but the search
+  index has no rows for that game, **rebuild the index automatically** (same work as
+  `python -m rag_engine.ingest index`). No terminal step for the player.
+- While that rebuild (or the reranker load) is running, the UI keeps the existing
+  preparing status. Ask stays disabled or returns a wait notice, not `engine_not_indexed`.
+- `engine_not_indexed` only when there is **no** material on disk for the active game
+  set. Chunks present + empty index is catch-up, not “import a PDF”.
+- Catch-up also upgrades Stage 2 files (missing `doc_key`, page pictures in the flat
+  game folder) so an old import becomes searchable without dropping the PDF again.
+- Failure to embed (Ollama down) is an in-app recovery (“start the assistant again”),
+  never a command to paste.
+
+**Acceptance:** a library like World Order — on the list, chunks on disk, empty index —
+becomes searchable after one normal app start, without importing the PDF again; Ask
+does not show “load a rulebook PDF” for that game; a game with nothing on disk still
+refuses honestly; `pnpm verify` passes.
+
+---
+
 ## Stage 3B — First-run install gate
 
 **Goal:** a packaged Mac or Windows build cannot be used until the machine has Ollama
@@ -248,10 +278,11 @@ either finishes or quits — there is no “skip” into an empty assistant.
 
 Do this **after Stage 3**, **before 3A**. Retrieval is what those downloads are *for*;
 until then a first-run wall would install gigabytes so the model can still guess.
-Ingest progress (3A) can wait: a person who opens the `.dmg` must be able to get a
-working arbiter before we polish the PDF bar. Same screen on both platforms (the
-setup route already exists); do not split this into an NSIS page vs a Finder `.dmg`
-note.
+Stage 3C (catch-up for an existing library) can land in `pnpm dev` before this gate;
+on a packaged install catch-up waits until this gate has models. Ingest progress (3A)
+can wait: a person who opens the `.dmg` must be able to get a working arbiter before
+we polish the PDF bar. Same screen on both platforms (the setup route already exists);
+do not split this into an NSIS page vs a Finder `.dmg` note.
 
 - On every desktop launch, if the gate is not passed, show **only** this view. The
   rest of the app is unreachable. Closing the window is the only way out.
@@ -283,10 +314,11 @@ user sees a **smooth percent** and a **stage label**, not four equal jumps of 25
 
 Plan: `.archiwum/stage-3a-ingest-progress.md`.
 
-Do this **after Stage 3 and 3B**. The last honest slice of the bar is writing search vectors
+Do this **after Stage 3, 3C and 3B**. The last honest slice of the bar is writing search vectors
 (`indexing`). Before Stage 3 that work does not exist; faking “the chat model is learning
-the rules” would freeze the bar with nothing real happening. 3B comes first so a packaged
-install can actually download the models the bar is indexing for.
+the rules” would freeze the bar with nothing real happening. 3C covers games already in
+the library; 3A is only the import happening now. 3B comes first on a packaged install so
+the models the bar is indexing for are actually present.
 
 - Stages are **codes** (UI copy in `en`/`pl`): `sending`, `saving`, `reading`, `drawing`,
   `filing`, `community` (only if the BoardGameGeek checkbox is on), `indexing`

@@ -422,7 +422,7 @@ contains rulebook text and page renders.
 
 ## 7. Annex: what changes on a remote server
 
-Nothing in the retrieval path. The index is data — `storage/lancedb` and
+Nothing in the retrieval path. The index is data — `storage/index` and
 `storage/assets` copy across and the assistant knows exactly the same rules, because
 nothing was ever trained (that is the whole point of RAG over fine-tuning). Four things
 do change, and they are the reason this is not a deployment target today.

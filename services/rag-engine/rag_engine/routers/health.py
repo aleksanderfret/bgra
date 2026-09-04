@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 
 from ..contract import HealthReport
 from ..engines.llm import OllamaUnreachableError, installed_ollama_tags
@@ -14,6 +14,7 @@ PROBE_TIMEOUT_SECONDS = 1.0
 
 @router.get("/health")
 async def read_health(
+    request: Request,
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> HealthReport:
     profile = settings.profile
@@ -29,9 +30,16 @@ async def read_health(
     except OllamaUnreachableError:
         ollama_up = False
 
+    stack = getattr(request.app.state, "retrieval_stack", None)
+    retrieval_ready = stack is not None
+    retrieval_loading = bool(getattr(request.app.state, "retrieval_loading", False))
+    storage_ok = settings.storage_dir.is_dir()
     components = {
         "ollama": ollama_up,
-        "storage": settings.storage_dir.is_dir(),
+        "storage": storage_ok,
+        "index": retrieval_ready,
+        "reranker": retrieval_ready,
+        "retrieval_loading": retrieval_loading,
     }
     models: dict[str, str] = {
         "profile": settings.model_profile,
@@ -46,7 +54,7 @@ async def read_health(
     if profile.vision:
         models["vision"] = profile.vision
 
-    degraded = not all(components.values()) or len(missing) > 0
+    degraded = (not ollama_up) or (not storage_ok) or len(missing) > 0
 
     return HealthReport(
         status="degraded" if degraded else "ok",

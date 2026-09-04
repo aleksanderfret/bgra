@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import en from '@/i18n/locales/en/common.json';
 import pl from '@/i18n/locales/pl/common.json';
-import { render, screen, userEvent, waitFor, within } from '@/test-utils';
+import { render, screen, userEvent, waitFor } from '@/test-utils';
 import { RulesChat } from './RulesChat';
 
 function withEngineOffline(): void {
@@ -13,23 +13,14 @@ afterEach(() => {
 });
 
 describe('RulesChat', () => {
-  it('explains how to start the engine when it is unreachable', async () => {
+  it('does not tell a player to run a terminal command when the engine is still starting', async () => {
     withEngineOffline();
 
     render(<RulesChat />);
 
-    const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent(pl.rulesChat.engineOffline.title);
-  });
-
-  it('renders the command in the offline alert as markup, not as literal tags', async () => {
-    withEngineOffline();
-
-    render(<RulesChat />);
-
-    const alert = await screen.findByRole('alert');
-    expect(within(alert).getByText('pnpm dev')).toBeInTheDocument();
-    expect(screen.queryByText(/<command>/)).not.toBeInTheDocument();
+    expect(await screen.findByRole('form', { name: pl.rulesChat.formLabel })).toBeInTheDocument();
+    expect(screen.queryByText(/pnpm/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('labels every control in the requested language', async () => {
@@ -50,6 +41,12 @@ describe('RulesChat', () => {
   it('lists only base games and sends expansionIds when an expansion is ticked', async () => {
     const fetchMock = vi.fn().mockImplementation(async (input: RequestInfo, init?: RequestInit) => {
       const url = String(input);
+      if (url.includes('/health')) {
+        return {
+          ok: true,
+          json: async () => ({ components: { retrieval_loading: false, reranker: true } }),
+        };
+      }
       if (url.includes('/games')) {
         return {
           ok: true,

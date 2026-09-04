@@ -194,6 +194,7 @@ async function startBackend(): Promise<void> {
     });
   }
 
+  // /health answers before the reranker finishes loading; the UI shows a preparing state.
   await waitForHttp(`http://127.0.0.1:${enginePort}/health`, { timeoutMs: 60_000 });
   await waitForHttp(`http://127.0.0.1:${webPort}/pl`, { timeoutMs: 60_000 });
 }

@@ -80,6 +80,10 @@ module = [
     "mlx_whisper.*",
     "faster_whisper",
     "faster_whisper.*",
+    "lancedb",
+    "lancedb.*",
+    "sentence_transformers",
+    "sentence_transformers.*",
 ]
 ignore_missing_imports = true
 
@@ -89,3 +93,7 @@ asyncio_mode = "auto"
 # The project is not installed as a package, so the service root has to be on
 # the import path for `import rag_engine` to resolve.
 pythonpath = ["."]
+markers = [
+    "live_index: run ingest against a real search index",
+    "live_retrieval: run with a real or held retrieval stack loader",
+]

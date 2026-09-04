@@ -9,8 +9,15 @@ from pathlib import Path
 from rag_engine.contract import DOCUMENT_AUTHORITY, DocumentKind
 from rag_engine.ingest.bgg_faq import BggUnavailableError, build_faq_chunks
 from rag_engine.ingest.pdf import IngestExtraMissingError, PdfLimitError
-from rag_engine.ingest.pipeline import ingest_chunks, ingest_pdf, ingest_rulebook
+from rag_engine.ingest.pipeline import (
+    ingest_chunks,
+    ingest_pdf,
+    ingest_rulebook,
+    rebuild_search_index,
+)
 from rag_engine.ingest.transcript import build_transcript_chunks
+from rag_engine.retrieval.indexer import IndexingError
+from rag_engine.retrieval.service import lancedb_available
 from rag_engine.settings import Settings, get_settings
 from rag_engine.storage_paths import InvalidGameIdError, StoragePathEscapeError
 
@@ -69,10 +76,28 @@ def main(argv: list[str] | None = None) -> int:
         "source",
         help="Path to a PDF, or a YouTube URL / video id when --kind video_transcript",
     )
+    sub.add_parser("index", help="Rebuild the search index from stored JSONL chunks")
 
     args = parser.parse_args(argv)
     settings: Settings = get_settings()
     storage = settings.storage_dir
+
+    if args.command == "index":
+        if not lancedb_available():
+            print(
+                "error: retrieval extra is not installed. "
+                "Run: uv sync --extra ingest --extra retrieval",
+                file=sys.stderr,
+            )
+            return 2
+        try:
+            count = rebuild_search_index(storage)
+        except IndexingError as error:
+            print(f"error: {error}", file=sys.stderr)
+            return 1
+        print(f"Indexed {count} document(s).")
+        return 0
+
     title = args.title or args.game
 
     try:
@@ -122,6 +147,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: {error}", file=sys.stderr)
         return 2
     except FileNotFoundError as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 2
+    except IndexingError as error:
         print(f"error: {error}", file=sys.stderr)
         return 2
     except IngestExtraMissingError as error:

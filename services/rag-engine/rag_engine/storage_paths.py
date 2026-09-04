@@ -145,6 +145,10 @@ def games_registry_path(storage_dir: Path) -> Path:
     return assert_under_storage(storage_dir / "games.json", storage_dir)
 
 
+def index_dir(storage_dir: Path) -> Path:
+    return assert_under_storage(storage_dir / "index", storage_dir)
+
+
 def slugify_doc_key(title: str, *, fallback: str = "main") -> str:
     """Turn a human document title into a safe doc_key slug."""
     lowered = title.strip().lower()

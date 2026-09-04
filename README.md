@@ -238,7 +238,23 @@ What this does:
 - Updates `games.json` so the game appears in the list, including `documents[]` and optional `baseGameId`.
 - Optional `--fetch-community-faq` loads **text** from BoardGameGeek’s official XML API only (never Files / HTML scraping). If the network is down, the PDF import still succeeds.
 
-**Important:** after ingest, Ask still answers from the model’s general knowledge. Citing your rulebook pages is Stage 3. You can confirm the material is ready with `GET /games` (non-zero `chunkCount`, documents listed) and by checking `storage/assets/<gameId>/documents/rulebook/<docKey>/pNN.png`. On Ask, pick a base game and optionally tick expansions. A live percent bar while a PDF is imported is Stage 3A (after retrieval).
+**Important:** after ingest, Ask answers from your documents and cites the page (Stage 3).
+Install search tools once:
+
+```bash
+cd services/rag-engine
+uv sync --extra ingest --extra retrieval
+```
+
+Ollama must have the chat model **and** `bge-m3`. Download the reranker too (do not pass
+`--skip-huggingface` on `./scripts/pull-models.sh` once you reach this stage). If a PDF
+was imported before search was installed, rebuild the index:
+
+```bash
+uv run python -m rag_engine.ingest index
+```
+
+You can confirm the material is ready with `GET /games` (non-zero `chunkCount`, documents listed) and by checking `storage/assets/<gameId>/documents/rulebook/<docKey>/pNN.png`. On Ask, pick a base game and optionally tick expansions. A live percent bar while a PDF is imported is Stage 3A. A first-run wall that installs Ollama for a packaged app is Stage 3B.
 
 For a YouTube teaching video (captions preferred; Whisper only if you also installed `--extra speech`):
 
@@ -302,7 +318,7 @@ Every user-facing label, button, and message is defined in language translation 
 
 - Complete local monorepo setup (TypeScript frontend + Python search engine).
 - Live streaming connection from the Python engine to the web interface.
-- **Local model answers** — the engine connects to Ollama and streams a real answer token by token. The model answers from general knowledge for now; it does not cite your rulebooks yet (that is Stage 3).
+- **Grounded answers** — after you import a rulebook and install the search extra, Ask cites the page from your documents instead of guessing from general knowledge.
 - **Honest health check** — `/health` tells you exactly which models are installed and which are missing, instead of just saying "Ollama is running".
 - **One question at a time** — the engine makes sure only one answer is being generated at any moment, so your computer is not overloaded. A second question waits in line. If you cancel a question, the slot opens immediately.
 - **Rulebook PDF import** — CLI and desktop drop zone turn your own PDFs into page images and text fragments on disk, and register the game in `games.json`. Optional BoardGameGeek description text via the official XML API only.
@@ -313,7 +329,10 @@ Every user-facing label, button, and message is defined in language translation 
 
 ### What is being added next
 
-- Hybrid keyword + vector search through rules (answers that cite your pages).
+- Search catch-up for games already in the library (Stage 3C): no “import the PDF again”
+  when the rulebook is already on disk.
+- A first-run screen that installs Ollama and the models a packaged app needs (Stage 3B).
+- A live percent bar while a PDF is imported (Stage 3A).
 - Local voice recognition (Whisper) and speech synthesis (Piper).
 
 For details on the technical roadmap and milestones, see [`docs/ROADMAP.md`](docs/ROADMAP.md).
