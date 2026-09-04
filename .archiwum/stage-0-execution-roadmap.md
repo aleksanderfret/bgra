@@ -1,3 +1,11 @@
+> **Archive copy.** English-only historical plans used to build BGA.
+> **Stage:** 0 (written at the start, with the harness).
+> **Origin:** Stage-by-stage execution plan (definition of done for each stage).
+> **Outcome:** still the canonical living document
+> **Living document:** `docs/ROADMAP.md` — edit that file, not this copy.
+
+---
+
 # Execution plan
 
 The stages are ordered so that **each one ends with something runnable**, rather than

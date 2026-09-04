@@ -1,3 +1,11 @@
+> **Archive copy.** English-only historical plans used to build BGA.
+> **Stage:** 0 (written at the start, with the harness).
+> **Origin:** Master architecture and audit of the original product plan.
+> **Outcome:** still the canonical living document
+> **Living document:** `docs/ARCHITECTURE.md` — edit that file, not this copy.
+
+---
+
 # Architecture and plan audit
 
 This document has two parts: an **audit** of the original plan (what did not hold up and

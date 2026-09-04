@@ -198,7 +198,7 @@ To build an unsigned `.dmg` / `.zip` on your machine:
 pnpm release:package
 ```
 
-### Adding a rulebook PDF (Stage 2 / 2B)
+### Adding a rulebook PDF (Stage 2 / 2A)
 
 Install the PDF tools once:
 
