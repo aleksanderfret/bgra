@@ -16,7 +16,7 @@ A private, offline assistant that **teaches board game rules** and **settles rul
 - [Everyday commands](#everyday-commands)
 - [Project structure](#project-structure)
 - [Languages](#languages)
-- [Current status](#current-status)
+- [Roadmap](#roadmap)
 - [Source material and privacy](#source-material-and-privacy)
 
 ---
@@ -312,31 +312,41 @@ Every user-facing label, button, and message is defined in language translation 
 
 ---
 
-## Current status
+## Roadmap
 
-### What is working today
+What you can already do, and what is still on the way. The numbered engineering plan lives in [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
-- Complete local monorepo setup (TypeScript frontend + Python search engine).
-- Live streaming connection from the Python engine to the web interface.
-- **Grounded answers** — after you import a rulebook and install the search extra, Ask cites the page from your documents instead of guessing from general knowledge.
-- **Honest health check** — `/health` tells you exactly which models are installed and which are missing, instead of just saying "Ollama is running".
-- **One question at a time** — the engine makes sure only one answer is being generated at any moment, so your computer is not overloaded. A second question waits in line. If you cancel a question, the slot opens immediately.
-- **Rulebook PDF import** — CLI and desktop drop zone turn your own PDFs into page images and text fragments on disk, and register the game in `games.json`. Optional BoardGameGeek description text via the official XML API only.
-- Complete English and Polish translations.
-- Automated desktop packaging (macOS arm64 DMG and ZIP).
-- Automated GitHub Release pipeline with changelog generation.
-- Strict tests ensuring the engine never invents document citations.
+**Ready today**
 
-### What is being added next
+- [x] Open it on this computer and watch an answer appear word by word.
+- [x] Keep it private: it does not listen on your home network.
+- [x] Launch it from the Dock, like any other Mac app.
+- [x] Download a Mac installer from GitHub Releases.
+- [x] The assistant runs on your computer and tells you plainly if it is not ready yet.
+- [x] Add your own rulebook PDF, or a teaching video.
+- [x] Keep extra booklets and expansions with the base game, not as a jumble.
+- [x] Get an answer from those files, with the page so everyone at the table can check.
 
-- Search catch-up for games already in the library (Stage 3C): no “import the PDF again”
-  when the rulebook is already on disk.
-- A first-run screen that installs Ollama and the models a packaged app needs (Stage 3B).
-- A live percent bar while a PDF is imported (Stage 3A).
-- Local voice recognition (Whisper) and speech synthesis (Piper).
+**Next at the table**
 
-For details on the technical roadmap and milestones, see [`docs/ROADMAP.md`](docs/ROADMAP.md).
-For architectural decisions, see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+- [ ] Take extra care when the book and an errata disagree; everyday questions stay snappy.
+- [ ] After an update, a game already in your library just works — no dropping the PDF again.
+- [ ] The first time you open the downloaded app, it sets itself up. No terminal.
+- [ ] Watch a real progress bar while a rulebook is being added.
+- [ ] Scroll back through earlier questions for that game.
+- [ ] Learn a new game step by step, not only settle a fight mid-session.
+- [ ] Ask out loud and hear the answer; the text stays on screen either way.
+
+**Later**
+
+- [ ] Keep a set of real questions so we can tell if answers got better or worse.
+- [ ] Find out whether busy pages (two columns, side boxes) make us miss a rule.
+- [ ] Show the diagram that matters, not only the whole page.
+- [ ] If your files are silent, offer an optional look online — never by itself.
+- [ ] In a long chat, still answer from this question’s pages, not leftover talk.
+- [ ] Let the laptop rest when you are only adding a PDF; asking should still feel ready.
+
+Decisions behind the plan: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ---
 
