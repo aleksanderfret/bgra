@@ -20,6 +20,7 @@ from rag_engine.ingest.pdf import (
 )
 from rag_engine.ingest.pipeline import ingest_rulebook
 from rag_engine.ingest.registry import load_games
+from rag_engine.retrieval.indexer import IndexingError
 from rag_engine.settings import Settings, get_settings
 from rag_engine.storage_paths import InvalidDocKeyError, InvalidGameIdError, slugify_doc_key
 
@@ -172,6 +173,8 @@ async def ingest_pdf_upload(
         return _error(400, "invalid_file", str(error))
     except IngestExtraMissingError as error:
         return _error(503, "ingest_not_ready", str(error))
+    except IndexingError as error:
+        return _error(503, "index_failed", str(error))
     except Exception as error:
         _logger.exception("PDF ingest failed")
         return _error(500, "ingest_failed", str(error))

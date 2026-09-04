@@ -57,7 +57,7 @@ def pull_ollama_model(ollama_url: str, tag: str, progress: ProgressCallback | No
 def pull_huggingface_snapshot(repo_id: str, progress: ProgressCallback | None) -> None:
     _log(f"downloading Hugging Face snapshot: {repo_id}", progress)
     try:
-        from huggingface_hub import snapshot_download  # type: ignore[import-not-found]
+        from huggingface_hub import snapshot_download
     except ImportError as error:
         raise SystemExit(
             "huggingface_hub is required to pre-download the reranker/STT. "

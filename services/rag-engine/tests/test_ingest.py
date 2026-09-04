@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import pytest
@@ -153,6 +154,29 @@ def test_legacy_flat_pages_migrate_into_main(tmp_path: Path) -> None:
     assert not (assets / "p01.png").exists()
     migrated = read_chunks_jsonl(dest / "chunks.jsonl")
     assert migrated[0].image_url == "/static/assets/azul/documents/rulebook/main/p01.png"
+
+
+def test_read_chunks_jsonl_upgrades_records_without_doc_key(tmp_path: Path) -> None:
+    path = tmp_path / "rulebook" / "main" / "chunks.jsonl"
+    path.parent.mkdir(parents=True)
+    path.write_text(
+        json.dumps(
+            {
+                "id": "world-order:rulebook:p01:c00",
+                "game_id": "world-order",
+                "document_kind": "rulebook",
+                "page": 1,
+                "text": "INSTRUKCJA",
+                "image_url": "/static/assets/world-order/p01.png",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    chunks = read_chunks_jsonl(path)
+    assert chunks[0].doc_key == "main"
+    assert chunks[0].id == "world-order:rulebook:main:p01:c00"
+    assert chunks[0].image_url == ("/static/assets/world-order/documents/rulebook/main/p01.png")
 
 
 def test_bad_game_id_writes_nothing(tmp_path: Path) -> None:

@@ -30,6 +30,7 @@ __pycache__/
 # ignored directory, so the pattern has to target its entries.
 services/rag-engine/storage/*
 !services/rag-engine/storage/.gitkeep
+services/rag-engine/:memory:.ses
 
 # --- Model weights (tens of GB, always fetched locally) ---
 models/

@@ -50,7 +50,12 @@ describe('PdfDropZone', () => {
       file,
     );
 
-    expect(fetchMock.mock.calls.every((call) => String(call[0]).includes('/games'))).toBe(true);
+    expect(
+      fetchMock.mock.calls.every((call) => {
+        const url = String(call[0]);
+        return url.includes('/games') || url.includes('/health');
+      }),
+    ).toBe(true);
     expect(screen.getByText(en.pdfImport.error.invalidGameIdBody)).toBeInTheDocument();
     await waitFor(() => {
       expect(
@@ -154,5 +159,35 @@ describe('PdfDropZone', () => {
     );
 
     expect(await screen.findByRole('alert')).toHaveTextContent(en.pdfImport.error.ingestBusyBody);
+  });
+
+  it('announces a search-index failure as an alert', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(async (input: RequestInfo) => {
+        if (String(input).includes('/games')) {
+          return { ok: true, json: async () => [] };
+        }
+        return {
+          ok: false,
+          json: async () => ({ type: 'error', code: 'index_failed', message: 'embed down' }),
+        };
+      }),
+    );
+
+    render(<PdfDropZone />, 'en');
+
+    await userEvent.type(
+      screen.getByRole('textbox', { name: new RegExp(en.pdfImport.gameId.label) }),
+      'azul',
+    );
+
+    const file = new File(['%PDF'], 'rules.pdf', { type: 'application/pdf' });
+    await userEvent.upload(
+      screen.getByLabelText(en.pdfImport.drop.chooseFile, { selector: 'input' }),
+      file,
+    );
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(en.pdfImport.error.indexFailedBody);
   });
 });

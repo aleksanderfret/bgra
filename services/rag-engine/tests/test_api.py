@@ -6,11 +6,15 @@ from unittest.mock import AsyncMock, patch
 
 import httpx
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from rag_engine.contract import GameSummary
 from rag_engine.engines.llm import OllamaUnreachableError
 from rag_engine.main import create_app
+from rag_engine.retrieval.memory import MemoryIndex
+from rag_engine.retrieval.service import RetrievalStack
+from rag_engine.retrieval.types import RetrievedChunk
 from rag_engine.settings import Settings, get_settings
 
 _ALL_TAGS = {"qwen3:14b", "bge-m3"}
@@ -55,6 +59,63 @@ async def _fake_generate(
 ) -> AsyncIterator[str]:
     for word in ["Hello", " world", "!"]:
         yield word
+
+
+class _AlwaysRelevant:
+    def score(self, _query: str, passages: list[RetrievedChunk]) -> list[float]:
+        return [0.9 for _ in passages]
+
+
+class _FakeOllamaEmbedder:
+    def __init__(self, *_args: object, **_kwargs: object) -> None:
+        pass
+
+    async def embed(self, texts: list[str]) -> list[list[float]]:
+        return [[0.1, 0.2] for _ in texts]
+
+
+def _seed_chunk(
+    *,
+    game_id: str = "azul",
+    doc_key: str = "main",
+    page: int = 3,
+    text: str = "Gracz z największą liczbą kafelków zaczyna.",
+) -> RetrievedChunk:
+    return RetrievedChunk(
+        id=f"{game_id}:rulebook:{doc_key}:p{page:02d}:c00",
+        game_id=game_id,
+        document_kind="rulebook",
+        doc_key=doc_key,
+        document_title=game_id,
+        page=page,
+        text=text,
+        image_url=f"/static/assets/{game_id}/documents/rulebook/{doc_key}/p{page:02d}.png",
+        indexed_at="2026-01-01T00:00:00Z",
+        vector=[0.1, 0.2],
+        score=0.9,
+    )
+
+
+def _attach_index(client: TestClient, *chunks: RetrievedChunk) -> MemoryIndex:
+    index = MemoryIndex()
+    index.upsert(list(chunks))
+    app = client.app
+    assert isinstance(app, FastAPI)
+    app.state.retrieval_stack = RetrievalStack(
+        reranker=_AlwaysRelevant(),
+        open_index=lambda _storage: index,
+    )
+    return index
+
+
+def _source_rows(events: list[dict[str, object]]) -> list[dict[str, object]]:
+    payload = next(event for event in events if event["type"] == "sources")["sources"]
+    assert isinstance(payload, list)
+    rows: list[dict[str, object]] = []
+    for item in payload:
+        assert isinstance(item, dict)
+        rows.append(item)
+    return rows
 
 
 def _ask_body(
@@ -126,9 +187,15 @@ def test_ask_accepts_validated_expansion_ids(
         ),
         encoding="utf-8",
     )
+    _attach_index(
+        client,
+        _seed_chunk(game_id="azul"),
+        _seed_chunk(game_id="azul-crystal", text="Place a crystal overlay."),
+    )
     with (
         patch(_TAGS_PATCH, _mock_tags(_ALL_TAGS)),
         patch(_GEN_PATCH, _fake_generate),
+        patch("rag_engine.routers.ask.OllamaEmbedder", _FakeOllamaEmbedder),
         client.stream("POST", "/ask", json=_ask_body(expansion_ids=["azul-crystal"])) as response,
     ):
         assert response.status_code == 200
@@ -255,31 +322,85 @@ def test_registry_failure_does_not_reveal_the_filesystem(
     assert "games.json" not in detail
 
 
-# --- ask: model available ---
+# --- ask: retrieval ---
 
 
-def test_ask_streams_tokens_from_model(client: TestClient) -> None:
+def test_ask_without_retrieval_extra_refuses(client: TestClient) -> None:
+    with client.stream("POST", "/ask", json=_ask_body()) as response:
+        events = _frames("".join(response.iter_text()))
+    notices = [e for e in events if e["type"] == "notice"]
+    assert notices[0]["code"] == "retrieval_not_ready"
+    assert events[-1]["groundedness"] == "insufficient_evidence"
+    assert not any(e["type"] == "token" for e in events)
+
+
+def _hold_retrieval_load(app: FastAPI, _reranker_id: str) -> None:
+    app.state.retrieval_stack = None
+    app.state.retrieval_loading = True
+
+
+@pytest.mark.live_retrieval
+def test_health_responds_while_retrieval_is_loading(
+    storage: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("rag_engine.main.schedule_retrieval_load", _hold_retrieval_load)
+    app = create_app()
+    app.dependency_overrides[get_settings] = lambda: Settings(storage_dir=storage)
+    with TestClient(app) as client, patch(_HEALTH_TAGS_PATCH, _mock_tags(_ALL_TAGS)):
+        response = client.get("/health")
+    payload = response.json()
+    assert response.status_code == 200
+    assert payload["status"] == "ok"
+    assert payload["components"]["retrieval_loading"] is True
+    assert payload["components"]["reranker"] is False
+
+
+@pytest.mark.live_retrieval
+def test_ask_while_loading_emits_retrieval_loading(
+    storage: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("rag_engine.main.schedule_retrieval_load", _hold_retrieval_load)
+    app = create_app()
+    app.dependency_overrides[get_settings] = lambda: Settings(storage_dir=storage)
+    with (
+        TestClient(app) as client,
+        client.stream("POST", "/ask", json=_ask_body()) as response,
+    ):
+        events = _frames("".join(response.iter_text()))
+    notices = [event for event in events if event["type"] == "notice"]
+    assert notices[0]["code"] == "retrieval_loading"
+    assert events[-1]["groundedness"] == "insufficient_evidence"
+    assert not any(event["type"] == "token" for event in events)
+
+
+def test_ask_streams_tokens_from_retrieved_sources(client: TestClient) -> None:
+    _attach_index(client, _seed_chunk())
     with (
         patch(_TAGS_PATCH, _mock_tags(_ALL_TAGS)),
         patch(_GEN_PATCH, _fake_generate),
+        patch("rag_engine.routers.ask.OllamaEmbedder", _FakeOllamaEmbedder),
         client.stream("POST", "/ask", json=_ask_body()) as response,
     ):
         assert response.status_code == 200
         events = _frames("".join(response.iter_text()))
 
     kinds = [e["type"] for e in events]
-    assert "sources" in kinds
-    assert "token" in kinds
+    assert kinds.index("sources") < kinds.index("token")
+    sources = _source_rows(events)
+    assert sources[0]["gameId"] == "azul"
+    assert str(sources[0]["imageUrl"]).startswith("/static/assets/")
     assert events[-1]["type"] == "done"
-    assert events[-1]["groundedness"] == "partial"
+    assert events[-1]["groundedness"] == "grounded"
 
 
 def test_ask_sends_generating_status_between_sources_and_tokens(
     client: TestClient,
 ) -> None:
+    _attach_index(client, _seed_chunk())
     with (
         patch(_TAGS_PATCH, _mock_tags(_ALL_TAGS)),
         patch(_GEN_PATCH, _fake_generate),
+        patch("rag_engine.routers.ask.OllamaEmbedder", _FakeOllamaEmbedder),
         client.stream("POST", "/ask", json=_ask_body()) as response,
     ):
         events = _frames("".join(response.iter_text()))
@@ -295,12 +416,45 @@ def test_ask_sends_generating_status_between_sources_and_tokens(
     assert all(ti > gen_indices[0] for ti in token_indices)
 
 
+def test_ask_does_not_call_the_model_when_index_is_empty(client: TestClient) -> None:
+    _attach_index(client)
+    generate = AsyncMock(side_effect=AssertionError("generate_stream must not run"))
+    with (
+        patch(_TAGS_PATCH, _mock_tags(_ALL_TAGS)),
+        patch(_GEN_PATCH, generate),
+        client.stream("POST", "/ask", json=_ask_body()) as response,
+    ):
+        events = _frames("".join(response.iter_text()))
+    assert events[-1]["groundedness"] == "insufficient_evidence"
+    notices = [e for e in events if e["type"] == "notice"]
+    assert notices[0]["code"] == "engine_not_indexed"
+    generate.assert_not_called()
+
+
+def test_ask_does_not_return_another_game(client: TestClient) -> None:
+    _attach_index(
+        client,
+        _seed_chunk(game_id="azul"),
+        _seed_chunk(game_id="brass", text="Flip a canal tile."),
+    )
+    with (
+        patch(_TAGS_PATCH, _mock_tags(_ALL_TAGS)),
+        patch(_GEN_PATCH, _fake_generate),
+        patch("rag_engine.routers.ask.OllamaEmbedder", _FakeOllamaEmbedder),
+        client.stream("POST", "/ask", json=_ask_body()) as response,
+    ):
+        events = _frames("".join(response.iter_text()))
+    sources = _source_rows(events)
+    assert all(source["gameId"] == "azul" for source in sources)
+
+
 # --- ask: model not available ---
 
 
 def test_ask_falls_back_when_ollama_unreachable(
     client: TestClient,
 ) -> None:
+    _attach_index(client, _seed_chunk())
     with (
         patch(
             _TAGS_PATCH,
@@ -312,13 +466,15 @@ def test_ask_falls_back_when_ollama_unreachable(
 
     done = events[-1]
     assert done["groundedness"] == "insufficient_evidence"
-    notices = [e for e in events if e["type"] == "notice"]
-    assert notices[0]["code"] == "engine_not_indexed"
+    errors = [e for e in events if e["type"] == "error"]
+    assert errors[0]["code"] == "engine_unreachable"
+    assert not any(e["type"] == "notice" for e in events)
 
 
 def test_ask_falls_back_when_model_missing(
     client: TestClient,
 ) -> None:
+    _attach_index(client, _seed_chunk())
     with (
         patch(_TAGS_PATCH, _mock_tags({"bge-m3"})),
         client.stream("POST", "/ask", json=_ask_body()) as response,
@@ -327,6 +483,8 @@ def test_ask_falls_back_when_model_missing(
 
     done = events[-1]
     assert done["groundedness"] == "insufficient_evidence"
+    errors = [e for e in events if e["type"] == "error"]
+    assert errors[0]["code"] == "model_missing"
 
 
 # --- ask: validation ---
@@ -357,6 +515,8 @@ def test_ask_rejects_a_game_id_that_is_not_a_slug(
 def test_ask_returns_insufficient_evidence_on_generation_error(
     client: TestClient,
 ) -> None:
+    _attach_index(client, _seed_chunk())
+
     async def _failing_generate(
         *_args: object,
         **_kwargs: object,
@@ -367,6 +527,7 @@ def test_ask_returns_insufficient_evidence_on_generation_error(
     with (
         patch(_TAGS_PATCH, _mock_tags(_ALL_TAGS)),
         patch(_GEN_PATCH, _failing_generate),
+        patch("rag_engine.routers.ask.OllamaEmbedder", _FakeOllamaEmbedder),
         client.stream("POST", "/ask", json=_ask_body()) as response,
     ):
         events = _frames("".join(response.iter_text()))
@@ -387,6 +548,7 @@ def test_ask_returns_insufficient_evidence_on_generation_error(
 def test_two_requests_do_not_generate_in_parallel(
     client: TestClient,
 ) -> None:
+    _attach_index(client, _seed_chunk())
     call_log: list[tuple[str, float]] = []
 
     async def _slow_generate(
@@ -401,6 +563,7 @@ def test_two_requests_do_not_generate_in_parallel(
     with (
         patch(_TAGS_PATCH, _mock_tags(_ALL_TAGS)),
         patch(_GEN_PATCH, _slow_generate),
+        patch("rag_engine.routers.ask.OllamaEmbedder", _FakeOllamaEmbedder),
     ):
         import concurrent.futures
 

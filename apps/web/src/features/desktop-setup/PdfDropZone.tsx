@@ -18,6 +18,7 @@ import {
 } from '@mantine/core';
 import { type DragEvent, useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useEngineReadiness } from '@/features/engine-readiness/useEngineReadiness';
 import { GAMES_CHANGED_EVENT } from '@/lib/desktop-bridge';
 
 type ImportMode = 'create' | 'attach';
@@ -35,6 +36,7 @@ type ImportFeedback =
   | { kind: 'limit_exceeded' }
   | { kind: 'page_image_too_large' }
   | { kind: 'ingest_failed' }
+  | { kind: 'index_failed' }
   | { kind: 'ingest_busy' }
   | { kind: 'success'; gameId: string; documentTitle: string; attached: boolean };
 
@@ -70,6 +72,7 @@ export function PdfDropZone() {
   const [feedback, setFeedback] = useState<ImportFeedback>({ kind: 'idle' });
   const [dragging, setDragging] = useState(false);
   const [busy, setBusy] = useState(false);
+  const enginePhase = useEngineReadiness();
   const gameIdRef = useRef<HTMLInputElement>(null);
   const documentTitleRef = useRef<HTMLInputElement>(null);
   const resetFileRef = useRef<() => void>(null);
@@ -95,7 +98,7 @@ export function PdfDropZone() {
           setGames(payload);
         }
       } catch {
-        if (!cancelled) {
+        if (!cancelled && enginePhase === 'offline') {
           setGames([]);
         }
       }
@@ -106,11 +109,20 @@ export function PdfDropZone() {
       void loadGames();
     };
     window.addEventListener(GAMES_CHANGED_EVENT, onGamesChanged);
+    const retry =
+      enginePhase === 'ready'
+        ? null
+        : window.setInterval(() => {
+            void loadGames();
+          }, 1_000);
     return () => {
       cancelled = true;
       window.removeEventListener(GAMES_CHANGED_EVENT, onGamesChanged);
+      if (retry !== null) {
+        window.clearInterval(retry);
+      }
     };
-  }, []);
+  }, [enginePhase]);
 
   const baseGames = (games ?? []).filter((game) => game.baseGameId === null);
 
@@ -225,6 +237,10 @@ export function PdfDropZone() {
         }
         if (code === 'ingest_busy') {
           setFeedback({ kind: 'ingest_busy' });
+          return;
+        }
+        if (code === 'index_failed') {
+          setFeedback({ kind: 'index_failed' });
           return;
         }
         setFeedback({ kind: 'ingest_failed' });
@@ -489,6 +505,11 @@ export function PdfDropZone() {
         {feedback.kind === 'ingest_failed' && (
           <Alert color="red" title={t('pdfImport.error.ingestFailedTitle')} role="alert">
             {t('pdfImport.error.ingestFailedBody')}
+          </Alert>
+        )}
+        {feedback.kind === 'index_failed' && (
+          <Alert color="red" title={t('pdfImport.error.indexFailedTitle')} role="alert">
+            {t('pdfImport.error.indexFailedBody')}
           </Alert>
         )}
         {feedback.kind === 'ingest_busy' && (

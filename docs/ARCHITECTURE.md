@@ -59,7 +59,7 @@ server-side. Optional `expansionIds` may widen the scope only to games whose
 `baseGameId` equals that `gameId`. The metadata filter for the **active game set**
 is applied **before** retrieval, not after. The contract enforces this at the type
 level, and the test `test_ask_rejects_a_question_without_a_game` guards the required
-base id (Stage 2B adds validation for expansions).
+base id (Stage 2A adds validation for expansions).
 
 ### 3.2. No document authority hierarchy
 
@@ -73,7 +73,7 @@ errata`. On a conflict the prompt tells the model to follow the higher-authority
 and to say outright that an errata changed the rule. The order is identical on both sides
 — `test_document_authority_order_matches` guards that. When two documents share the same
 kind (e.g. two rulebooks), prefer the newer `indexedAt` and expose `documentTitle` in
-`sources` (Stage 2B).
+`sources` (Stage 2A).
 
 YouTube transcripts have the **lowest** authority on purpose: they supply style, not
 rules. A youtuber may be wrong, or playing with an old errata.
@@ -418,11 +418,19 @@ a handful of testers; code signing and notarisation wait until distribution is a
 goal. Sharing packaged indexes between users is deliberately unsupported: an index
 contains rulebook text and page renders.
 
+**D16 — Qwen3 must answer, not think, on `/ask`.**
+Qwen3 models produce a hidden reasoning trace by default. The engine only streams
+`message.content`, so that trace is a silent wait of tens of seconds — including on the
+second question. `/api/chat` therefore sets `think: false`. Embed and chat both send
+`keep_alive: 30m` so looking up the question (the embedding model) does not unload the
+answer model before the next turn. Chat uses the profile's `context_tokens` as Ollama
+`num_ctx`; a 32k default window would bloat memory and force a reload.
+
 ---
 
 ## 7. Annex: what changes on a remote server
 
-Nothing in the retrieval path. The index is data — `storage/lancedb` and
+Nothing in the retrieval path. The index is data — `storage/index` and
 `storage/assets` copy across and the assistant knows exactly the same rules, because
 nothing was ever trained (that is the whole point of RAG over fine-tuning). Four things
 do change, and they are the reason this is not a deployment target today.

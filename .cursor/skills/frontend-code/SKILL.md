@@ -58,6 +58,9 @@ type (`as GameSummary[]` only at a trusted JSON boundary after a check).
   an id.
 - **Accessibility:** errors use `role="alert"`; icon-only controls get
   `aria-label` from `t()`.
+- **Players, not programmers.** The people who open the app are board-game
+  players. Status, recovery, and setup stay in the UI. Follow
+  `.cursor/rules/player-first.mdc`.
 
 ## Data and tests
 

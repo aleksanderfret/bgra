@@ -69,6 +69,11 @@ Breaking any of these produces an assistant that sounds right and is wrong.
    `apps/web/src/i18n/locales/<locale>/common.json`, in both `pl` and `en`. The engine
    sends codes (`NoticeEvent.code`, `ErrorEvent.code`), never prose for the screen;
    `ErrorEvent.message` is an English technical detail for the log.
+11. **The product is for board-game players, not programmers.** People who open the
+   app may know nothing about AI, terminals, or software. Every player-facing flow
+   must be simple, automatic, and transparent in the UI. Console, config files, and
+   “run this command” are developer tools, never the way a player uses the app. See
+   `.cursor/rules/player-first.mdc`.
 
 ## Conventions
 

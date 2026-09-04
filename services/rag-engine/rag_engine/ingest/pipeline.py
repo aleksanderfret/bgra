@@ -14,13 +14,16 @@ from rag_engine.ingest.bgg_faq import BggUnavailableError, build_faq_chunks
 from rag_engine.ingest.chunking import chunk_markdown
 from rag_engine.ingest.models import ChunkRecord
 from rag_engine.ingest.pdf import extract_markdown, render_page_pngs
-from rag_engine.ingest.registry import recount_game
+from rag_engine.ingest.registry import load_games, recount_game
+from rag_engine.retrieval.indexer import maybe_index_document
+from rag_engine.settings import get_settings
 from rag_engine.storage_paths import (
     CHUNKS_FILE_NAME,
     MANIFEST_FILE_NAME,
     SOURCE_PDF_NAME,
     assert_doc_key,
     assert_game_id,
+    chunks_path,
     document_dir,
     game_assets_dir,
     slugify_doc_key,
@@ -42,13 +45,36 @@ def write_chunks_jsonl(path: Path, chunks: list[ChunkRecord]) -> None:
     path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
 
 
+def _upgrade_legacy_chunk(chunk: ChunkRecord, *, doc_key: str) -> ChunkRecord:
+    image_url = chunk.image_url
+    if image_url and "/documents/" not in image_url and chunk.page is not None:
+        image_url = (
+            f"/static/assets/{chunk.game_id}/documents/{chunk.document_kind}/"
+            f"{doc_key}/p{chunk.page:02d}.png"
+        )
+    new_id = chunk.id
+    marker = f"{chunk.game_id}:{chunk.document_kind}:{doc_key}:"
+    prefix = f"{chunk.game_id}:{chunk.document_kind}:"
+    if marker not in new_id and new_id.startswith(prefix):
+        new_id = new_id.replace(prefix, marker, 1)
+    return chunk.model_copy(update={"doc_key": doc_key, "id": new_id, "image_url": image_url})
+
+
 def read_chunks_jsonl(path: Path) -> list[ChunkRecord]:
     if not path.is_file():
         return []
+    inferred_doc_key = path.parent.name
     chunks: list[ChunkRecord] = []
     for line in path.read_text(encoding="utf-8").splitlines():
-        if line.strip():
-            chunks.append(ChunkRecord.model_validate_json(line))
+        if not line.strip():
+            continue
+        payload = json.loads(line)
+        if not isinstance(payload, dict):
+            continue
+        if "doc_key" not in payload:
+            payload["doc_key"] = inferred_doc_key
+        chunk = ChunkRecord.model_validate(payload)
+        chunks.append(_upgrade_legacy_chunk(chunk, doc_key=inferred_doc_key))
     return chunks
 
 
@@ -176,30 +202,12 @@ def migrate_legacy_flat_pages(storage_dir: Path, game_id: str) -> bool:
 
     if chunks_file.is_file():
         chunks = read_chunks_jsonl(chunks_file)
-        rewritten: list[ChunkRecord] = []
-        for chunk in chunks:
-            image_url = chunk.image_url
-            if image_url and "/documents/" not in image_url and chunk.page is not None:
-                image_url = (
-                    f"/static/assets/{game_id}/documents/rulebook/main/p{chunk.page:02d}.png"
-                )
-            new_id = chunk.id
-            if ":main:" not in chunk.id:
-                new_id = chunk.id.replace(
-                    f"{game_id}:{chunk.document_kind}:",
-                    f"{game_id}:{chunk.document_kind}:main:",
-                    1,
-                )
-            rewritten.append(
-                chunk.model_copy(
-                    update={
-                        "doc_key": "main",
-                        "document_title": chunk.document_title or "Rulebook",
-                        "image_url": image_url,
-                        "id": new_id,
-                    }
-                )
+        rewritten = [
+            _upgrade_legacy_chunk(chunk, doc_key="main").model_copy(
+                update={"document_title": chunk.document_title or "Rulebook"}
             )
+            for chunk in chunks
+        ]
         write_chunks_jsonl(chunks_file, rewritten)
     if not (main_doc / MANIFEST_FILE_NAME).is_file():
         write_document_manifest(
@@ -269,6 +277,13 @@ def ingest_pdf(
             game_id,
             title=title,
             base_game_id=base_game_id,
+        )
+        _index_written_document(
+            storage_dir,
+            game_id=game_id,
+            kind=kind,
+            doc_key=resolved_doc_key,
+            chunks=chunks,
         )
         _log(f"ingested {len(chunks)} chunk(s) for {game_id}/{resolved_doc_key}", progress)
         return chunks
@@ -373,6 +388,13 @@ def ingest_chunks(
             title=title,
             base_game_id=base_game_id,
         )
+        _index_written_document(
+            storage_dir,
+            game_id=game_id,
+            kind=kind,
+            doc_key=doc_key,
+            chunks=stamped_chunks,
+        )
         _log(f"ingested {len(stamped_chunks)} {kind} chunk(s) for {game_id}", progress)
         return stamped_chunks
     finally:
@@ -382,3 +404,53 @@ def ingest_chunks(
 
 def dump_manifest(chunks: list[ChunkRecord]) -> str:
     return json.dumps([chunk.model_dump() for chunk in chunks], ensure_ascii=False)
+
+
+def _index_written_document(
+    storage_dir: Path,
+    *,
+    game_id: str,
+    kind: DocumentKind,
+    doc_key: str,
+    chunks: list[ChunkRecord],
+) -> None:
+    final_doc = document_dir(storage_dir, game_id, kind, doc_key)
+    manifest = read_document_manifest(final_doc / MANIFEST_FILE_NAME)
+    indexed_at = (
+        manifest["indexedAt"] if manifest else datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    )
+    settings = get_settings()
+    maybe_index_document(
+        storage_dir,
+        game_id=game_id,
+        kind=kind,
+        doc_key=doc_key,
+        chunks=chunks,
+        indexed_at=indexed_at,
+        ollama_url=settings.ollama_url,
+        embedding_model=settings.profile.embedding,
+    )
+
+
+def rebuild_search_index(storage_dir: Path) -> int:
+    """Re-embed every JSONL document. Returns the number of documents indexed."""
+    settings = get_settings()
+    indexed = 0
+    for game in load_games(storage_dir):
+        migrate_legacy_flat_pages(storage_dir, game.game_id)
+        for document in list_game_documents(storage_dir, game.game_id):
+            chunks = read_chunks_jsonl(
+                chunks_path(storage_dir, game.game_id, document.document_kind, document.doc_key)
+            )
+            maybe_index_document(
+                storage_dir,
+                game_id=game.game_id,
+                kind=document.document_kind,
+                doc_key=document.doc_key,
+                chunks=chunks,
+                indexed_at=document.indexed_at,
+                ollama_url=settings.ollama_url,
+                embedding_model=settings.profile.embedding,
+            )
+            indexed += 1
+    return indexed

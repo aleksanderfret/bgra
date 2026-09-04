@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { AppNav } from '@/features/app-nav/AppNav';
 import { ColorSchemeSwitcher } from '@/features/color-scheme/ColorSchemeSwitcher';
 import { DiagnosticsButton } from '@/features/desktop-setup/DiagnosticsButton';
+import { EngineReadinessBanner } from '@/features/engine-readiness/EngineReadinessBanner';
 import { LanguageSwitcher } from '@/features/language-switcher/LanguageSwitcher';
 import { RulesChat } from '@/features/rules-chat/RulesChat';
 import { getTranslation } from '@/i18n/server';
@@ -35,6 +36,7 @@ export default async function Home({ params }: PageProps<'/[locale]'>) {
             <DiagnosticsButton />
           </Group>
         </Group>
+        <EngineReadinessBanner />
         <Stack gap={4}>
           <Title order={1}>{t('home.title')}</Title>
           <Text c="dimmed">{t('home.subtitle')}</Text>
