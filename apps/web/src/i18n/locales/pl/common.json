@@ -116,7 +116,7 @@
   "notice": {
     "unknown": "Silnik zgłosił stan, dla którego nie ma tu jeszcze opisu.",
     "engine_not_indexed": "Nie mam jeszcze przeszukiwalnych dokumentów do gry „{{gameId}}”. Wczytaj PDF instrukcji i zapytaj ponownie.\n\nAktywny profil modeli: {{profile}}.",
-    "retrieval_not_ready": "Ten komputer umie zapisać strony instrukcji, ale wyszukiwanie nie jest jeszcze zainstalowane. W katalogu projektu uruchom: uv sync --extra ingest --extra retrieval",
+    "retrieval_not_ready": "Asystent nie może jeszcze przeszukać twoich instrukcji. Zamknij aplikację i otwórz ją ponownie, a potem zapytaj jeszcze raz.",
     "retrieval_loading": "Wyszukiwanie nadal się uruchamia na tym komputerze. Poczekaj chwilę i zapytaj ponownie."
   },
   "setup": {

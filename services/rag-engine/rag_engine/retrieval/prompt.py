@@ -1,3 +1,5 @@
+from html import escape
+
 from rag_engine.retrieval.types import RetrievedChunk
 
 SYSTEM_PROMPT = (
@@ -25,14 +27,15 @@ def wrap_passages(chunks: list[RetrievedChunk]) -> str:
     blocks: list[str] = []
     for chunk in chunks:
         page = "" if chunk.page is None else str(chunk.page)
+        # PDF text is untrusted; escape so "</source>" cannot close the wrapper.
         blocks.append(
             "<source "
-            f'id="{chunk.id}" '
-            f'kind="{chunk.document_kind}" '
-            f'page="{page}" '
-            f'title="{chunk.document_title}" '
-            f'indexed_at="{chunk.indexed_at}">\n'
-            f"{chunk.text}\n"
+            f'id="{escape(chunk.id, quote=True)}" '
+            f'kind="{escape(str(chunk.document_kind), quote=True)}" '
+            f'page="{escape(page, quote=True)}" '
+            f'title="{escape(chunk.document_title, quote=True)}" '
+            f'indexed_at="{escape(chunk.indexed_at, quote=True)}">\n'
+            f"{escape(chunk.text)}\n"
             "</source>"
         )
     return "\n\n".join(blocks)

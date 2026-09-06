@@ -327,6 +327,8 @@ Rulebooks, FAQs and especially YouTube transcripts are third-party text that end
 inside a prompt. A transcript that says "ignore the previous instructions" is a rule the
 assistant must not follow. So retrieved chunks are wrapped in delimiters and labelled as
 source material, and the system prompt states that nothing inside them can change it.
+Attribute values and passage text are escaped so a page that contains `</source>` or
+quotes cannot break that wrapper.
 
 `DOCUMENT_AUTHORITY` does not help here: it ranks how much a document should be trusted
 about **the rules**, which is a relevance ordering, not a security boundary. An errata is

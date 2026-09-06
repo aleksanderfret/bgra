@@ -25,8 +25,9 @@ here because nothing was built between Stage 2 and that work.
 | [stage-3-retrieval.md](stage-3-retrieval.md) | 3 — answers from the documents, with a page citation | Implemented |
 | [stage-3a-ingest-progress.md](stage-3a-ingest-progress.md) | 3A — smooth percent bar while a PDF is added | Parked until after Stage 3 (and 3B) |
 
-Stage 3B (first-run install gate) is specified in the living roadmap, not as a
-separate implementation plan yet.
+Stage 3B (first-run install gate) and Stage 3F (honest banner when search never
+started) are specified in the living roadmap, not as separate implementation
+plans yet.
 
 ## Not included
 
