@@ -55,4 +55,8 @@ describe('translation catalogues', () => {
       expect(placeholdersOf(value), key).toEqual(referencePlaceholders.get(key));
     }
   });
+
+  it.each(LOCALES)('%s does not tell the player to run a package-manager command', (locale) => {
+    expect(resources[locale].common.notice.retrieval_not_ready).not.toMatch(/uv sync/i);
+  });
 });

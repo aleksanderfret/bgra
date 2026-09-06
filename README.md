@@ -329,6 +329,7 @@ What you can already do, and what is still on the way. The numbered engineering 
 
 **Next at the table**
 
+- [ ] If looking through the rulebooks never started, the screen says so and asking stays off — the app does not pretend it is ready.
 - [ ] Take extra care when the book and an errata disagree; everyday questions stay snappy.
 - [ ] After an update, a game already in your library just works — no dropping the PDF again.
 - [ ] The first time you open the downloaded app, it sets itself up. No terminal.

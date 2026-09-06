@@ -222,8 +222,10 @@ Plan: `docs/archive/stage-3-retrieval.md`.
 - A prompt carrying the `DOCUMENT_AUTHORITY` hierarchy, same-kind newer-document rule, and
   a ban on leaving the context
 - Retrieved chunks are wrapped in delimiters and labelled as source material, with the
-  system prompt stating that nothing inside them changes it (D14). A transcript that says
-  "ignore the previous instructions" is text about a game, not an instruction.
+  system prompt stating that nothing inside them changes it (D14). Attribute values and
+  passage text are escaped so a page that contains `</source>` or quotes cannot close
+  the wrapper. A transcript that says "ignore the previous instructions" is text about
+  a game, not an instruction.
 - The reranker and the index are loaded **once at startup**, not per request. A
   cross-encoder reloaded per question turns a 2 s answer into a 20 s one.
 - The `sources` frame sent **before** the first token
@@ -246,10 +248,10 @@ expansions unticked, expansion passages are not used.
 passages, errata vs rulebook, a near-miss search — may think, without dumping that
 trace as the answer.
 
-Do this **next**, **after Stage 3**, **before 3C / 3B / 3A / 3D**. It only changes
-`/ask`. Catch-up, the install gate, the progress bar, and the chat thread do not
-block it. Default stays `think: false` (D16). Thinking is an exception, not the
-default.
+Do this **next**, **after Stage 3**, **before 3C / 3F / 3B / 3A / 3D**. It only changes
+`/ask`. Catch-up, a failed-search screen, the install gate, the progress bar, and the
+chat thread do not block it. Default stays `think: false` (D16). Thinking is an
+exception, not the default.
 
 - Keep streaming only `message.content`. A think trace is never shown as the ruling.
 - Turn thinking **on** only when a checkable trigger fires, for example: hits from
@@ -269,6 +271,42 @@ player sees a wait notice when thinking runs; `pnpm verify` passes.
 
 ---
 
+## Stage 3F — Say so when search never started
+
+**Goal:** if the engine is up but looking through the rulebooks never became available,
+the player sees that on the screen and cannot ask. The app must not look ready and then
+refuse, and must not pretend the whole assistant failed to start.
+
+Today `/health` still answers after a failed search load (`retrieval_loading` false,
+reranker/index false). The banner hides, Ask is enabled, and the first question comes
+back as `retrieval_not_ready`. Mapping that to “offline” is the wrong product: the
+engine is reachable, the game list can still load, and the orange “close the app”
+banner would lie. Mapping it to endless “preparing” also lies — nothing more is
+loading.
+
+Do this **after Stage 3**. Independent of 3E. 3C is “pages are on disk, index is still
+catching up”; this stage is “search itself never stood up”. Do not wait for 3B: a
+packaged app can hit this when the reranker file is missing or the machine ran out of
+memory, not only when a developer skipped an extra.
+
+- Add a dedicated engine phase (not `ready`, not `starting`, not `offline`) when
+  health is reachable, loading has finished, and the reranker/index flags are false.
+- That phase **disables Ask**. The banner says search did not start, in `en`/`pl`,
+  with an in-app next step (try again / close and reopen). No terminal command, no
+  package-manager line.
+- Keep `offline` for “cannot reach the engine at all”. Keep `starting` only while
+  `retrieval_loading` is true (or 3C catch-up is running).
+- Rulebooks can still list games already on this computer. Import that needs search
+  vectors should use the same honest status, not a silent ready state.
+- `retrieval_not_ready` stays a valid engine notice if a question slips through; the
+  UI copy stays a player recovery, never `uv sync`.
+
+**Acceptance:** health up + loading finished + no reranker → banner visible, Ask
+disabled, not the offline banner, not a preparing banner that never ends; after a
+successful load the phase becomes ready as today; `pnpm verify` passes.
+
+---
+
 ## Stage 3C — Search catch-up for an existing library
 
 **Goal:** a game that is already on the list is never treated as “no rulebook”. If
@@ -285,6 +323,8 @@ needs the embedding model. Stage 3A (new-import percent bar) does not replace th
   `python -m rag_engine.ingest index`). No terminal step for the player.
 - While that rebuild (or the reranker load) is running, the UI keeps the existing
   preparing status. Ask stays disabled or returns a wait notice, not `engine_not_indexed`.
+  If loading has **finished** and search still is not there, that is Stage 3F — not
+  this banner, and not “the assistant did not start”.
 - `engine_not_indexed` only when there is **no** material on disk for the active game
   set. Chunks present + empty index is catch-up, not “import a PDF”.
 - Catch-up also upgrades Stage 2 files (missing `doc_key`, page pictures in the flat
@@ -624,7 +664,9 @@ in the UI; `pnpm verify` passes.
 
 Stages 1 → 2 → 2A → 3 give you **a working rules arbiter over text**, and that is a
 natural stopping point for development. **Stage 3E is the next slice on that
-arbiter:** think only when sources conflict, so easy questions stay fast. Stage 3D
+arbiter:** think only when sources conflict, so easy questions stay fast. Stage 3F
+is the honesty gap on the preparing banner: if search never started, say so and
+keep Ask off — do not reuse “offline” or an endless “preparing”. Stage 3D
 (the scrollable, per-game thread) is what makes that arbiter usable **at the
 table** — you can look back, and sound is optional. Stage 0A–0C (hardening, desktop
 window, release) are already done; they sit under the numbered product stages.

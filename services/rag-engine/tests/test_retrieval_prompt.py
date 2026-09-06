@@ -31,6 +31,20 @@ def test_wrap_passages_keeps_poisoned_text_inside_source_tags() -> None:
     assert wrapped.index("Ignore the previous") < wrapped.index("</source>")
 
 
+def test_wrap_passages_escapes_a_closing_tag_inside_chunk_text() -> None:
+    wrapped = wrap_passages([_chunk(text="Write </source> on the score pad.")])
+    assert wrapped.count("</source>") == 1
+    assert wrapped.endswith("</source>")
+    assert "&lt;/source&gt;" in wrapped
+    assert "Write </source> on the score pad." not in wrapped
+
+
+def test_wrap_passages_escapes_quotes_in_attribute_values() -> None:
+    wrapped = wrap_passages([_chunk(document_title='Azul "stained glass"')])
+    assert 'title="Azul &quot;stained glass&quot;"' in wrapped
+    assert 'title="Azul "stained glass"' not in wrapped
+
+
 def test_system_prompt_requires_polish_and_source_only_answers() -> None:
     lowered = SYSTEM_PROMPT.lower()
     assert "polish" in lowered
