@@ -19,7 +19,7 @@ export interface ProfileRecommendation {
 
 const PROFILE_DISK_GIB: Record<ModelProfileId, number> = {
   'minimal-16gb': 6,
-  'starter-32gb': 12,
+  'starter-32gb': 21,
   'full-64gb': 48,
 };
 

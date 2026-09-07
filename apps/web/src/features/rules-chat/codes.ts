@@ -19,4 +19,5 @@ export const NOTICE_CODES = [
   'retrieval_not_ready',
   'retrieval_loading',
   'checking_sources_carefully',
+  'preparing_assistant',
 ] as const;

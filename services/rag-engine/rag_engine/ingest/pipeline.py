@@ -11,7 +11,7 @@ from pathlib import Path
 
 from rag_engine.contract import DocumentKind, GameDocumentSummary, GameSummary
 from rag_engine.ingest.bgg_faq import BggUnavailableError, build_faq_chunks
-from rag_engine.ingest.chunking import chunk_markdown
+from rag_engine.ingest.chunking import chunk_markdown, clean_heading, split_section_text
 from rag_engine.ingest.models import ChunkRecord
 from rag_engine.ingest.pdf import extract_markdown, render_page_pngs
 from rag_engine.ingest.registry import load_games, recount_game
@@ -430,6 +430,59 @@ def _index_written_document(
         ollama_url=settings.ollama_url,
         embedding_model=settings.profile.embedding,
     )
+
+
+def _resplit_chunks(chunks: list[ChunkRecord]) -> list[ChunkRecord]:
+    resplit: list[ChunkRecord] = []
+    for chunk in chunks:
+        heading = clean_heading(chunk.heading)
+        for index, piece in enumerate(split_section_text(chunk.text)):
+            # Suffixing keeps the first piece addressable under the id already
+            # in the index, and works for page, FAQ and transcript id formats.
+            piece_id = chunk.id if index == 0 else f"{chunk.id}:s{index:02d}"
+            resplit.append(
+                chunk.model_copy(update={"id": piece_id, "text": piece, "heading": heading})
+            )
+    return resplit
+
+
+def resplit_stored_chunks(
+    storage_dir: Path,
+    progress: ProgressCallback | None = None,
+) -> int:
+    """Cut oversized stored chunks down to size and reindex them.
+
+    Documents imported before the size cap keep their text in `chunks.jsonl`,
+    so this never needs the original PDF back. Returns documents rewritten.
+    """
+    settings = get_settings()
+    rewritten = 0
+    for game in load_games(storage_dir):
+        for document in list_game_documents(storage_dir, game.game_id):
+            path = chunks_path(storage_dir, game.game_id, document.document_kind, document.doc_key)
+            chunks = read_chunks_jsonl(path)
+            resplit = _resplit_chunks(chunks)
+            if resplit == chunks:
+                continue
+            write_chunks_jsonl(path, resplit)
+            maybe_index_document(
+                storage_dir,
+                game_id=game.game_id,
+                kind=document.document_kind,
+                doc_key=document.doc_key,
+                chunks=resplit,
+                indexed_at=document.indexed_at,
+                ollama_url=settings.ollama_url,
+                embedding_model=settings.profile.embedding,
+            )
+            recount_game(storage_dir, game.game_id)
+            rewritten += 1
+            _log(
+                f"re-split {game.game_id}/{document.doc_key}: "
+                f"{len(chunks)} -> {len(resplit)} chunk(s)",
+                progress,
+            )
+    return rewritten
 
 
 def rebuild_search_index(storage_dir: Path) -> int:

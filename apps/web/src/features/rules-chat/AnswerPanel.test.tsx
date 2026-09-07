@@ -151,6 +151,21 @@ describe('AnswerPanel', () => {
     expect(screen.queryByText(en.notice.checking_sources_carefully)).not.toBeInTheDocument();
   });
 
+  it('does not show the preparing-assistant wait as a bordered notice under the answer', () => {
+    render(
+      <AnswerPanel
+        state={stateWith({
+          isStreaming: true,
+          stage: 'reranking',
+          notice: { code: 'preparing_assistant', params: {} },
+        })}
+      />,
+    );
+
+    expect(screen.queryByText(pl.notice.preparing_assistant)).not.toBeInTheDocument();
+    expect(screen.queryByText(en.notice.preparing_assistant)).not.toBeInTheDocument();
+  });
+
   it('renders every string in the requested language', () => {
     // The real assertion is that nothing here is hardcoded: the same state in
     // another locale has to come out in that locale's words.

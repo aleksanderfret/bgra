@@ -109,8 +109,20 @@ questions that is not enough, for two reasons:
   question–passage pairs and reorders them. This is the single largest quality gain in
   RAG over technical documents.
 
-Hence three stages: fetch ~40 candidates hybridly → filter through the reranker → keep 6.
-The values live in configuration (`retrieval_candidates`, `retrieval_top_k`).
+Hence three stages: fetch ~15 candidates hybridly → filter through the reranker
+→ keep 6. The values live in configuration (`retrieval_candidates`,
+`retrieval_top_k`, `RERANK_TEXT_CHARS`).
+
+Passage size is part of that quality, not only of latency. Chunking one whole
+heading section per chunk produced passages of up to ~5 000 characters, which
+the reranker only ever saw the first `RERANK_TEXT_CHARS` of — a rule printed
+lower in a long section could not be ranked on its own merit. So sections are
+cut to `CHUNK_TARGET_CHARS` with `CHUNK_OVERLAP_CHARS` of carried text, the
+scoring window covers a whole passage, and every passage names the section it
+came from (`section="…"` in the wrapper) since it may now be one slice of it.
+Documents imported before the cap are re-split from their stored
+`chunks.jsonl` on engine start (`resplit_stored_chunks`) — no PDF needed, and
+no terminal command for the player.
 
 ### 3.5. No relevance threshold and no "I don't know" state
 
@@ -122,6 +134,53 @@ an answer.
 **Resolution:** `min_relevance_score` cuts off weak hits, and `Groundedness`
 (`grounded` / `partial` / `insufficient_evidence`) is part of the contract and a separate
 message in the interface. A lack of coverage is a result, not an error.
+
+That threshold is only as good as the scale it compares against, and for a while
+the scale was wrong: `CrossEncoder.predict` applies the model's own default
+activation (Sigmoid for `bge-reranker-v2-m3`), and `CrossEncoderReranker` applied
+`sigmoid` a second time. Every score landed in 0.50–0.73, so **no passage could
+ever be rejected** and `insufficient_evidence` was unreachable on relevance
+grounds — "how much is a pizza at the station?" was answered from six rulebook
+passages, table of contents included. `as_probability` now normalises once and
+converts only a genuine logit. The prompt roughly halved as a side effect
+(2 550 → 700–1 250 tokens on the same questions), because two passages are
+typically on topic and the other four were noise; the first word arrives in ~3 s
+instead of ~8 s.
+
+Fixing the scale then exposed why a single fixed cut-off cannot work. A
+cross-encoder answers "how fully does this passage settle the question", so its
+scores are not comparable between questions. The same correct passage scored:
+
+| Question | Score of the one right passage |
+| --- | --- |
+| "what does the Trade action do and how many transactions can I make" | 0.77 |
+| "what does the Trade (Handel) action do" | 0.29 |
+| "what does the Handel action do" | 0.13 |
+| "what does the Trade action do" | 0.07 |
+
+Any cut-off high enough to remove noise from the first question refuses the
+last one, which is an ordinary player question. So the filter has two parts
+(`keep_relevant`): `min_relevance_score` is a floor for **the best** passage
+only, low enough to admit a terse question (0.05, against 0.0003 measured for a
+question about something else entirely), and `relevance_share_of_best` decides
+what counts as noise **relative to** that best passage (0.20). Passage counts
+then follow the question: 4 for "how does the game end and who wins", 2 for the
+long Trade question, 1 for the two-word one, 0 for the pizza.
+
+Cross-lingual asking survives this. A Polish question against an English
+rulebook scores 0.73 on the right passage; an English question against a Polish
+rulebook scores roughly half of what the Polish wording of the same question
+gets — enough to rank first, not always enough to clear a fixed cut-off, which
+is one more reason the floor is relative.
+
+Passage count turned out to be a grounding lever, not only a latency one. Given
+a single passage that names the subject but not the detail asked for, the model
+completed the missing rule from its own knowledge of board games (measured 2 of 3
+runs, and 3 of 3 for "how many actions per round"). The system prompt therefore
+carries an explicit instruction to name the missing detail as a fact about the
+rules; that took invention to 0 of 6 runs without changing answers that were
+already well evidenced. It is a mitigation, not a proof — the stage 6 evaluation
+set is what turns this into a regression check.
 
 ### 3.6. No evaluation set — the largest omission in the whole plan
 
@@ -232,13 +291,20 @@ You build on 32 GB and will end up with 64 GB. A profile is a named set of model
 (`starter-32gb`, `full-64gb`) selected with the `BGA_MODEL_PROFILE` variable. Moving to a
 new machine is a one-line change.
 
-**D4 — An MoE model as the main one on the target hardware.**
+**D4 — An MoE model as the main one, on 32 GB as well.**
 For spoken conversation what counts is time to first sound, not a benchmark score.
 Qwen3 30B-A3B activates ~3 billion parameters per token, so it answers fast at a quality
-close to a 30B model. A 70B model would fit in 64 GB but leaves no headroom for the
-context cache, Whisper and TTS at the same time — so instead there is `llm_arbiter`: a
-stronger model invoked purely to settle disputes, where a few extra seconds do not
-matter.
+close to a 30B model. Measured on an M1 Pro / 32 GB against the 14B dense model it
+replaced, same prompt of ~2 550 tokens: reading the prompt 340 vs 92 tokens/s (7.5 s vs
+28 s to the first word), writing 35 vs 11 tokens/s. Its 19.3 GB stays resident next to
+the 0.7 GB embedding model, so a question does not evict the answer model.
+The profile pins the `instruct-2507` build, not plain `30b-a3b`: the latter's Ollama
+template has no thinking switch, so `think: false` is ignored and the reasoning trace
+is streamed as the answer (in English). The `instruct` build never produces a trace,
+which also makes `llm_thinks` false for every shipping profile — see D16.
+A 70B model would fit in 64 GB but leaves no headroom for the context cache, Whisper
+and TTS at the same time — so instead there is `llm_arbiter`: a stronger model invoked
+purely to settle disputes, where a few extra seconds do not matter.
 
 **D5 — Heavy dependencies in optional groups.**
 `uv sync` for the harness takes seconds. You install `ingest`, `retrieval` and `speech`
@@ -340,16 +406,23 @@ the highest authority on rules and still may not issue instructions.
 
 The decisions below are settled and bind the following stages.
 
-**Z1 — Mixed rulebooks: Polish and English, questions always in Polish.**
+**Z1 — Mixed rulebooks: Polish and English, the answer follows the question.**
 Cross-lingual search stops being optional. Consequences:
 
 - `bge-m3` for embeddings and `bge-reranker-v2-m3` for reranking are **required** — both
   are multilingual and search across languages. An anglocentric model is ruled out here,
   because a Polish question would not hit an English passage.
-- The prompt must require an answer in Polish **keeping the original term in
-  parentheses** when the source is English. This is not cosmetic: phase and component
-  names are printed in English on the cards and the board, so "faza zaopatrzenia
-  (Supply Phase)" is useful at the table, and a bare translation is not.
+- The engine picks the answer language from the question (`retrieval/language.py`) and
+  **names it** in the prompt. Asking for "the language of the question" does not work:
+  with a Polish rulebook in the context window the model answered an English question in
+  Polish anyway, in the system block and in the user turn alike. Naming the language
+  wins. The detector compares Polish and English function words, so it does not depend on
+  diacritics, and a tie goes to Polish (Z6). The interface locale is deliberately not
+  used: a player on `/en` may still ask in Polish, and the question is the better signal.
+- Either way the answer keeps the **printed term in parentheses** when it translates a
+  name. This is not cosmetic: phase and component names are printed on the cards and the
+  board, so "faza zaopatrzenia (Supply Phase)" is useful at the table, and a bare
+  translation is not.
 - The evaluation set (stage 6) must contain Polish questions against English rulebooks,
   because that is the hardest case for retrieval.
 
@@ -382,7 +455,8 @@ Polish is the language of the table (Z1), so it stays the default and the fallba
 English UI costs almost nothing once no string is hardcoded, and it makes the second
 locale a permanent test that the discipline in D8 is actually held: a hardcoded string
 shows up immediately as untranslated text on `/en`. The answers themselves remain a
-separate matter — those are governed by Z1 and the prompt, not by the interface locale.
+separate matter — those follow the question's own language (Z1), not the interface
+locale, so a player on `/pl` who types in English gets an English answer.
 
 **Z7 — Streaming is paced for the machine that is also running the model.**
 Tokens arrive faster than a screen can usefully repaint, and the same laptop is busy
@@ -429,11 +503,18 @@ authority-bearing kinds that can disagree, or two booklets of the same kind). Th
 thinking field is never yielded as answer text. Thinking shares the same `num_ctx`
 as the sources and the answer — Stage 3E does not raise the window — so
 `should_think` also refuses when headroom would be too small; on `minimal-16gb`
-that means thinking never runs. Real context-budget work (what to keep, when to
+that means thinking never runs. `ModelProfile.llm_thinks` gates it one level
+higher: an instruct-only model cannot think, and asking anyway would show the
+player `checking_sources_carefully` for a pass that never happens. With the 2507
+instruct builds in D4 that is every profile today; the path stays for the arbiter. Real context-budget work (what to keep, when to
 grow `num_ctx`) stays Stage 9. Embed and chat both send `keep_alive: 30m` so looking
 up the question (the embedding model) does not unload the answer model before the
 next turn. Chat uses the profile's `context_tokens` as Ollama `num_ctx`; a 32k
-default window would bloat memory and force a reload.
+default window would bloat memory and force a reload. Ollama serves one model job
+at a time on the GPU, so `/ask` must not load the chat model in parallel with
+embedding — that queues the search behind a cold wake-up. After sources are sent,
+a short `load_model` probe runs; if it does not finish quickly the engine emits
+`preparing_assistant` and only then moves to `generating`.
 
 ---
 

@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from . import __version__
 from .engines.embed import embed_texts
 from .engines.llm import load_model
+from .ingest.pipeline import resplit_stored_chunks
 from .retrieval.service import try_load
 from .routers import ask, games, health, ingest
 from .settings import Settings, ensure_storage_writable, get_settings
@@ -28,6 +29,21 @@ async def _pin_ollama_weights(settings: Settings) -> None:
         logger.exception("Could not pin Ollama models; the first question may be slow.")
 
 
+async def _resize_oversized_chunks(settings: Settings) -> None:
+    """Bring documents imported before the chunk size cap up to date.
+
+    Runs while the app still reports retrieval as loading, so a question can
+    never hit a document that is half re-indexed.
+    """
+    try:
+        rewritten = await asyncio.to_thread(resplit_stored_chunks, settings.storage_dir)
+    except Exception:
+        logger.exception("Could not re-split oversized chunks; retrying on the next start.")
+        return
+    if rewritten:
+        logger.info("Re-split %d document(s) into smaller passages.", rewritten)
+
+
 async def _warm_retrieval(app: FastAPI, reranker_id: str) -> None:
     settings = get_settings()
     try:
@@ -37,6 +53,8 @@ async def _warm_retrieval(app: FastAPI, reranker_id: str) -> None:
             logger.exception("Failed to load the retrieval stack.")
             app.state.retrieval_stack = None
             return
+        if stack is not None:
+            await _resize_oversized_chunks(settings)
         app.state.retrieval_stack = stack
         if stack is not None:
             await _pin_ollama_weights(settings)

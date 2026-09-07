@@ -1,11 +1,23 @@
 import json
+from itertools import pairwise
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
-from rag_engine.ingest.chunking import chunk_markdown
+from rag_engine.ingest.chunking import (
+    CHUNK_OVERLAP_CHARS,
+    CHUNK_TARGET_CHARS,
+    chunk_markdown,
+    split_section_text,
+)
 from rag_engine.ingest.pdf import PdfLimitError, assert_pdf_limits, extract_markdown
-from rag_engine.ingest.pipeline import ingest_pdf, read_chunks_jsonl
+from rag_engine.ingest.pipeline import (
+    ingest_pdf,
+    read_chunks_jsonl,
+    resplit_stored_chunks,
+    write_chunks_jsonl,
+)
 from rag_engine.ingest.registry import load_games
 from rag_engine.storage_paths import InvalidGameIdError, chunks_path
 
@@ -46,6 +58,76 @@ Play one tile.
     assert chunks[0].image_url == "/static/assets/azul/documents/rulebook/main/p01.png"
     assert chunks[1].id == "azul:rulebook:main:p02:c00"
     assert "Play one tile" in chunks[1].text
+
+
+def test_split_section_text_keeps_a_short_section_whole() -> None:
+    assert split_section_text("Draw four tiles.") == ["Draw four tiles."]
+
+
+def _rule_paragraphs(count: int = 12) -> list[str]:
+    return [f"Rule {index}. " + "word " * 25 for index in range(count)]
+
+
+def test_split_section_text_caps_every_piece() -> None:
+    pieces = split_section_text("\n\n".join(_rule_paragraphs()))
+
+    assert len(pieces) > 1
+    assert all(len(piece) <= CHUNK_TARGET_CHARS for piece in pieces)
+
+
+def test_split_section_text_loses_no_paragraph() -> None:
+    paragraphs = _rule_paragraphs()
+
+    pieces = split_section_text("\n\n".join(paragraphs))
+
+    joined = "\n\n".join(pieces)
+    for paragraph in paragraphs:
+        assert paragraph.strip() in joined
+
+
+def test_split_section_text_overlaps_neighbouring_pieces() -> None:
+    pieces = split_section_text("\n\n".join(_rule_paragraphs()))
+
+    # A rule that straddles a cut must stay readable in at least one piece.
+    for earlier, later in pairwise(pieces):
+        tail = earlier.rsplit("\n\n", maxsplit=1)[-1]
+        assert later.startswith(tail)
+        assert len(tail) <= CHUNK_OVERLAP_CHARS
+
+
+def test_split_section_text_never_cuts_a_word_in_half() -> None:
+    single_paragraph = "word " * 600
+
+    pieces = split_section_text(single_paragraph)
+
+    assert len(pieces) > 1
+    assert all(len(piece) <= CHUNK_TARGET_CHARS for piece in pieces)
+    for piece in pieces:
+        assert piece.split()[0] == "word"
+        assert piece.split()[-1] == "word"
+
+
+def test_chunk_markdown_splits_a_long_section_into_numbered_pieces() -> None:
+    markdown = "----- 4 -----\n# Trading\n" + "\n\n".join(_rule_paragraphs()) + "\n"
+
+    chunks = chunk_markdown(
+        markdown,
+        game_id="azul",
+        kind="rulebook",
+        doc_key="main",
+        document_title="Rulebook",
+    )
+
+    assert len(chunks) > 1
+    assert [chunk.id for chunk in chunks] == [
+        f"azul:rulebook:main:p04:c{index:02d}" for index in range(len(chunks))
+    ]
+    assert all(chunk.heading == "Trading" for chunk in chunks)
+    assert all(chunk.page == 4 for chunk in chunks)
+    assert all(len(chunk.text) <= CHUNK_TARGET_CHARS for chunk in chunks)
+    assert all(
+        chunk.image_url == "/static/assets/azul/documents/rulebook/main/p04.png" for chunk in chunks
+    )
 
 
 def test_ingest_pdf_writes_chunks_pngs_and_registry(tmp_path: Path) -> None:
@@ -177,6 +259,99 @@ def test_read_chunks_jsonl_upgrades_records_without_doc_key(tmp_path: Path) -> N
     assert chunks[0].doc_key == "main"
     assert chunks[0].id == "world-order:rulebook:main:p01:c00"
     assert chunks[0].image_url == ("/static/assets/world-order/documents/rulebook/main/p01.png")
+
+
+def test_chunk_markdown_strips_markdown_emphasis_from_a_heading() -> None:
+    chunks = chunk_markdown(
+        "----- 4 -----\n# **Akcje**\nWymień zasoby.\n",
+        game_id="azul",
+        kind="rulebook",
+        doc_key="main",
+        document_title="Rulebook",
+    )
+
+    assert chunks[0].heading == "Akcje"
+
+
+def _store_one_document(storage: Path, text: str, heading: str = "Trading") -> Path:
+    from rag_engine.ingest.models import ChunkRecord
+    from rag_engine.ingest.pipeline import write_document_manifest
+    from rag_engine.ingest.registry import recount_game
+
+    path = chunks_path(storage, "world-order", "rulebook", "main")
+    write_chunks_jsonl(
+        path,
+        [
+            ChunkRecord(
+                id="world-order:rulebook:main:p04:c00",
+                game_id="world-order",
+                document_kind="rulebook",
+                doc_key="main",
+                document_title="Rulebook",
+                page=4,
+                text=text,
+                heading=heading,
+                image_url="/static/assets/world-order/documents/rulebook/main/p04.png",
+            )
+        ],
+    )
+    write_document_manifest(path.parent / "manifest.json", title="Rulebook", kind="rulebook")
+    recount_game(storage, "world-order", title="World Order")
+    return path
+
+
+def test_resplit_stored_chunks_cuts_an_oversized_chunk_and_reindexes(tmp_path: Path) -> None:
+    storage = tmp_path / "storage"
+    storage.mkdir()
+    path = _store_one_document(storage, "\n\n".join(_rule_paragraphs()))
+
+    with patch("rag_engine.ingest.pipeline.maybe_index_document") as index:
+        rewritten = resplit_stored_chunks(storage)
+
+    assert rewritten == 1
+    chunks = read_chunks_jsonl(path)
+    assert len(chunks) > 1
+    assert chunks[0].id == "world-order:rulebook:main:p04:c00"
+    assert chunks[1].id == "world-order:rulebook:main:p04:c00:s01"
+    assert all(len(chunk.text) <= CHUNK_TARGET_CHARS for chunk in chunks)
+    assert all(chunk.heading == "Trading" for chunk in chunks)
+    assert all(chunk.page == 4 for chunk in chunks)
+    assert index.call_count == 1
+    assert index.call_args.kwargs["chunks"] == chunks
+
+
+def test_resplit_stored_chunks_leaves_documents_already_within_the_cap(tmp_path: Path) -> None:
+    storage = tmp_path / "storage"
+    storage.mkdir()
+    path = _store_one_document(storage, "Trade with any neighbouring state.")
+
+    with patch("rag_engine.ingest.pipeline.maybe_index_document") as index:
+        assert resplit_stored_chunks(storage) == 0
+
+    assert [chunk.id for chunk in read_chunks_jsonl(path)] == ["world-order:rulebook:main:p04:c00"]
+    index.assert_not_called()
+
+
+def test_resplit_stored_chunks_cleans_a_markdown_heading(tmp_path: Path) -> None:
+    storage = tmp_path / "storage"
+    storage.mkdir()
+    path = _store_one_document(storage, "Trade with a neighbour.", heading="**Handluj**")
+
+    with patch("rag_engine.ingest.pipeline.maybe_index_document") as index:
+        assert resplit_stored_chunks(storage) == 1
+
+    assert read_chunks_jsonl(path)[0].heading == "Handluj"
+    assert index.call_count == 1
+
+
+def test_resplit_stored_chunks_is_idempotent(tmp_path: Path) -> None:
+    storage = tmp_path / "storage"
+    storage.mkdir()
+    _store_one_document(storage, "\n\n".join(_rule_paragraphs()))
+
+    with patch("rag_engine.ingest.pipeline.maybe_index_document"):
+        assert resplit_stored_chunks(storage) == 1
+        assert resplit_stored_chunks(storage) == 0
 
 
 def test_bad_game_id_writes_nothing(tmp_path: Path) -> None:

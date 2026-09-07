@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import AsyncIterator
+from contextlib import suppress
 from typing import Annotated
 from uuid import uuid4
 
@@ -28,6 +29,7 @@ from rag_engine.engines.llm import (
     OllamaUnreachableError,
     generate_stream,
     installed_ollama_tags,
+    load_model,
 )
 from rag_engine.ingest.registry import active_game_ids, validate_expansion_ids
 from rag_engine.retrieval.pipeline import retrieve
@@ -36,7 +38,7 @@ from rag_engine.retrieval.service import RetrievalStack
 from rag_engine.retrieval.sources import to_retrieved_source
 from rag_engine.retrieval.think import should_think
 from rag_engine.settings import Settings, get_settings
-from rag_engine.sse import SSE_HEADERS, SSE_MEDIA_TYPE, encode_event
+from rag_engine.sse import SSE_HEADERS, SSE_MEDIA_TYPE, encode_comment, encode_event
 
 logger = logging.getLogger(__name__)
 
@@ -106,10 +108,14 @@ async def _stream_answer(
 
     generation_failed = False
     await _generation_semaphore.acquire()
+    warm_task: asyncio.Task[None] | None = None
     try:
         if await http_request.is_disconnected():
             return
         yield encode_event(StatusEvent(stage="reranking"))
+        # Do not load the chat model in parallel with retrieve. Ollama runs one
+        # GPU job at a time, so a cold chat load would block embedding and delay
+        # sources by the full wake-up — and can make the *next* question slow too.
         hits = await retrieve(
             question=payload.question,
             game_ids=game_ids,
@@ -119,6 +125,7 @@ async def _stream_answer(
             candidates=settings.retrieval_candidates,
             top_k=settings.retrieval_top_k,
             min_relevance_score=settings.min_relevance_score,
+            relevance_share_of_best=settings.relevance_share_of_best,
         )
         if not hits:
             yield encode_event(SourcesEvent(sources=[]))
@@ -128,12 +135,31 @@ async def _stream_answer(
             return
 
         yield encode_event(SourcesEvent(sources=[to_retrieved_source(hit) for hit in hits]))
+        yield encode_comment("sources")
         if await http_request.is_disconnected():
             return
-        think = should_think(hits, settings.min_relevance_score, settings.profile.context_tokens)
+        think = settings.profile.llm_thinks and should_think(
+            hits, settings.min_relevance_score, settings.profile.context_tokens
+        )
+        warm_task = asyncio.create_task(
+            load_model(
+                settings.ollama_url,
+                settings.profile.llm,
+                context_tokens=settings.profile.context_tokens,
+            )
+        )
+        # When the chat model is already resident, load_model returns almost
+        # immediately. Only tell the player we are preparing if it takes a beat.
+        try:
+            await asyncio.wait_for(asyncio.shield(warm_task), timeout=0.2)
+        except TimeoutError:
+            yield encode_event(NoticeEvent(code="preparing_assistant", params={}))
+            yield encode_comment("preparing")
+        await warm_task
         if think:
             yield encode_event(NoticeEvent(code="checking_sources_carefully", params={}))
         yield encode_event(StatusEvent(stage="generating"))
+        yield encode_comment("generating")
         messages = build_messages(payload.question, hits)
         async for text in generate_stream(
             settings.ollama_url,
@@ -168,6 +194,10 @@ async def _stream_answer(
             )
         )
     finally:
+        if warm_task is not None and not warm_task.done():
+            warm_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await warm_task
         _generation_semaphore.release()
 
     groundedness: Groundedness = "insufficient_evidence" if generation_failed else "grounded"

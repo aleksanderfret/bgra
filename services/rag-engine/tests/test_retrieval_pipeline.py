@@ -1,7 +1,12 @@
 from dataclasses import dataclass, field
 
-from rag_engine.retrieval.pipeline import retrieve
+from rag_engine.retrieval.pipeline import keep_relevant, retrieve
 from rag_engine.retrieval.types import RetrievedChunk
+
+# The shipped defaults, spelled out: reading them from `Settings` would make
+# these assertions depend on whoever's `.env` is on disk.
+_FLOOR = 0.05
+_SHARE = 0.20
 
 _AZUL = RetrievedChunk(
     id="azul:rulebook:main:p03:c00",
@@ -26,6 +31,20 @@ _BRASS = RetrievedChunk(
     page=1,
     text="Flip a canal tile.",
     heading="Canal",
+    image_url=None,
+    indexed_at="2026-01-01T00:00:00Z",
+    score=0.0,
+)
+
+_SECOND = RetrievedChunk(
+    id="azul:rulebook:main:p09:c00",
+    game_id="azul",
+    document_kind="rulebook",
+    doc_key="main",
+    document_title="Azul",
+    page=9,
+    text="Table of contents.",
+    heading="Contents",
     image_url=None,
     indexed_at="2026-01-01T00:00:00Z",
     score=0.0,
@@ -124,23 +143,42 @@ async def test_retrieve_drops_other_games_even_if_index_leaks() -> None:
         ),
         candidates=40,
         top_k=6,
-        min_relevance_score=0.35,
+        min_relevance_score=_FLOOR,
+        relevance_share_of_best=_SHARE,
     )
     assert [hit.game_id for hit in hits] == ["azul"]
 
 
-async def test_retrieve_returns_empty_when_all_scores_below_threshold() -> None:
+async def test_retrieve_returns_empty_when_the_best_passage_is_off_topic() -> None:
     hits = await retrieve(
-        question="Ile kafelków?",
+        question="Ile kosztuje pizza?",
         game_ids=["azul"],
         embedder=FakeEmbedder(),
         index=FakeIndex(vector_hits=[_AZUL], text_hits=[]),
-        reranker=FakeReranker({_AZUL.id: 0.1}),
+        reranker=FakeReranker({_AZUL.id: 0.0003}),
         candidates=40,
         top_k=6,
-        min_relevance_score=0.35,
+        min_relevance_score=_FLOOR,
+        relevance_share_of_best=_SHARE,
     )
     assert hits == []
+
+
+async def test_retrieve_keeps_a_modest_best_hit_for_a_short_question() -> None:
+    # A short question scores low even on the right passage, so an absolute
+    # cut-off would answer "not in the rules" to "what does Trade do?".
+    hits = await retrieve(
+        question="Co daje akcja Handel?",
+        game_ids=["azul"],
+        embedder=FakeEmbedder(),
+        index=FakeIndex(vector_hits=[_AZUL, _SECOND], text_hits=[]),
+        reranker=FakeReranker({_AZUL.id: 0.13, _SECOND.id: 0.013}),
+        candidates=40,
+        top_k=6,
+        min_relevance_score=_FLOOR,
+        relevance_share_of_best=_SHARE,
+    )
+    assert [hit.id for hit in hits] == [_AZUL.id]
 
 
 async def test_retrieve_includes_expansion_when_in_game_set() -> None:
@@ -152,7 +190,8 @@ async def test_retrieve_includes_expansion_when_in_game_set() -> None:
         reranker=FakeReranker({_AZUL.id: 0.4, _EXPANSION.id: 0.9}),
         candidates=40,
         top_k=6,
-        min_relevance_score=0.35,
+        min_relevance_score=_FLOOR,
+        relevance_share_of_best=_SHARE,
     )
     assert {hit.game_id for hit in hits} == {"azul", "azul-crystal"}
 
@@ -166,6 +205,31 @@ async def test_retrieve_excludes_expansion_when_not_in_game_set() -> None:
         reranker=FakeReranker({_AZUL.id: 0.4, _EXPANSION.id: 0.99}),
         candidates=40,
         top_k=6,
-        min_relevance_score=0.35,
+        min_relevance_score=_FLOOR,
+        relevance_share_of_best=_SHARE,
     )
     assert [hit.game_id for hit in hits] == ["azul"]
+
+
+def _kept(*scores: float) -> list[float]:
+    passages = [_AZUL.model_copy(update={"id": f"c{index}"}) for index in range(len(scores))]
+    kept = keep_relevant(
+        list(zip(passages, scores, strict=True)),
+        floor=_FLOOR,
+        share_of_best=_SHARE,
+    )
+    return [chunk.score for chunk in kept]
+
+
+def test_keep_relevant_uses_the_scores_measured_on_a_real_rulebook() -> None:
+    # "how does the game end and who wins" — the whole ending, four passages.
+    assert _kept(0.957, 0.653, 0.348, 0.240, 0.102) == [0.957, 0.653, 0.348, 0.240]
+    # The same question asked in two words keeps its one good passage.
+    assert _kept(0.126, 0.014, 0.013) == [0.126]
+    # A question about something else entirely keeps nothing.
+    assert _kept(0.0003, 0.0002, 0.0001) == []
+
+
+def test_keep_relevant_survives_a_reranker_that_scores_everything_zero() -> None:
+    assert _kept(0.0, 0.0) == []
+    assert keep_relevant([], floor=_FLOOR, share_of_best=_SHARE) == []

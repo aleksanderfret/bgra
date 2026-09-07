@@ -185,6 +185,15 @@ describe('streamingStatusKey', () => {
     expect(streamingStatusKey(state)).toBe('notice.checking_sources_carefully');
   });
 
+  it('prefers the preparing-assistant notice while waiting for the first token', () => {
+    const state: AnswerState = {
+      ...startAnswer(),
+      stage: 'reranking',
+      notice: { code: 'preparing_assistant', params: {} },
+    };
+    expect(streamingStatusKey(state)).toBe('notice.preparing_assistant');
+  });
+
   it('falls back to the pipeline stage once answer text has started', () => {
     const state: AnswerState = {
       ...startAnswer(),
@@ -210,7 +219,8 @@ describe('isBlockingNotice', () => {
     expect(isBlockingNotice('retrieval_not_ready')).toBe(true);
   });
 
-  it('does not treat the careful-check wait as a blocking notice', () => {
+  it('does not treat wait notices as blocking', () => {
     expect(isBlockingNotice('checking_sources_carefully')).toBe(false);
+    expect(isBlockingNotice('preparing_assistant')).toBe(false);
   });
 });

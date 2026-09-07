@@ -15,11 +15,13 @@ from rag_engine.main import create_app
 from rag_engine.retrieval.memory import MemoryIndex
 from rag_engine.retrieval.service import RetrievalStack
 from rag_engine.retrieval.types import RetrievedChunk
-from rag_engine.settings import Settings, get_settings
+from rag_engine.settings import ModelProfile, Settings, get_settings
 
-_ALL_TAGS = {"qwen3:14b", "bge-m3"}
+_CHAT_TAG = Settings().profile.llm
+_ALL_TAGS = {_CHAT_TAG, "bge-m3"}
 _TAGS_PATCH = "rag_engine.routers.ask.installed_ollama_tags"
 _GEN_PATCH = "rag_engine.routers.ask.generate_stream"
+_LOAD_PATCH = "rag_engine.routers.ask.load_model"
 _HEALTH_TAGS_PATCH = "rag_engine.routers.health.installed_ollama_tags"
 
 
@@ -38,6 +40,33 @@ def client(storage: Path) -> Iterator[TestClient]:
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
+
+
+class _ThinkingModelSettings(Settings):
+    """Settings whose chat model has a thinking pass.
+
+    Every shipping profile answers with an instruct-only build, so the thinking
+    path would otherwise be untestable through the API.
+    """
+
+    @property
+    def profile(self) -> ModelProfile:
+        return super().profile.model_copy(update={"llm_thinks": True})
+
+
+@pytest.fixture
+def thinking_client(storage: Path) -> Iterator[TestClient]:
+    app = create_app()
+    app.dependency_overrides[get_settings] = lambda: _ThinkingModelSettings(storage_dir=storage)
+    with TestClient(app) as test_client:
+        yield test_client
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture(autouse=True)
+def _chat_model_already_warm() -> Iterator[AsyncMock]:
+    with patch(_LOAD_PATCH, new_callable=AsyncMock) as load:
+        yield load
 
 
 def _frames(raw: str) -> list[dict[str, object]]:
@@ -227,7 +256,7 @@ def test_health_reports_degraded_with_missing_model(
 
     payload = response.json()
     assert payload["status"] == "degraded"
-    assert "qwen3:14b" in payload["missingModels"]
+    assert _CHAT_TAG in payload["missingModels"]
 
 
 def test_health_reports_degraded_when_ollama_unreachable(
@@ -417,6 +446,58 @@ def test_ask_sends_generating_status_between_sources_and_tokens(
     assert all(ti > gen_indices[0] for ti in token_indices)
 
 
+def test_ask_notices_when_chat_model_still_warming(
+    client: TestClient,
+    _chat_model_already_warm: AsyncMock,
+) -> None:
+    async def _slow_load(*_args: object, **_kwargs: object) -> None:
+        await asyncio.sleep(0.5)
+
+    _chat_model_already_warm.side_effect = _slow_load
+
+    _attach_index(client, _seed_chunk())
+    with (
+        patch(_TAGS_PATCH, _mock_tags(_ALL_TAGS)),
+        patch(_GEN_PATCH, _fake_generate),
+        patch("rag_engine.routers.ask.OllamaEmbedder", _FakeOllamaEmbedder),
+        client.stream("POST", "/ask", json=_ask_body()) as response,
+    ):
+        events = _frames("".join(response.iter_text()))
+
+    kinds = [event["type"] for event in events]
+    sources_idx = kinds.index("sources")
+    notice_idx = next(
+        i
+        for i, event in enumerate(events)
+        if event.get("type") == "notice" and event.get("code") == "preparing_assistant"
+    )
+    gen_idx = next(
+        i
+        for i, event in enumerate(events)
+        if event.get("type") == "status" and event.get("stage") == "generating"
+    )
+    token_idx = kinds.index("token")
+    assert sources_idx < notice_idx < gen_idx < token_idx
+
+
+def test_ask_skips_preparing_notice_when_chat_model_is_already_warm(
+    client: TestClient,
+) -> None:
+    _attach_index(client, _seed_chunk())
+    with (
+        patch(_TAGS_PATCH, _mock_tags(_ALL_TAGS)),
+        patch(_GEN_PATCH, _fake_generate),
+        patch("rag_engine.routers.ask.OllamaEmbedder", _FakeOllamaEmbedder),
+        client.stream("POST", "/ask", json=_ask_body()) as response,
+    ):
+        events = _frames("".join(response.iter_text()))
+
+    assert not any(
+        event.get("type") == "notice" and event.get("code") == "preparing_assistant"
+        for event in events
+    )
+
+
 def _record_generate(bucket: list[bool]) -> Callable[..., AsyncIterator[str]]:
     async def _gen(*_args: object, **kwargs: object) -> AsyncIterator[str]:
         bucket.append(bool(kwargs.get("think", False)))
@@ -445,9 +526,7 @@ def test_ask_keeps_thinking_off_for_a_simple_rulebook_hit(
     )
 
 
-def test_ask_enables_thinking_when_rulebook_and_errata_conflict(
-    client: TestClient,
-) -> None:
+def _attach_conflicting_sources(client: TestClient) -> None:
     _attach_index(
         client,
         _seed_chunk(document_kind="rulebook", doc_key="main", page=3),
@@ -458,12 +537,18 @@ def test_ask_enables_thinking_when_rulebook_and_errata_conflict(
             text="Errata: the player with the fewest tiles starts.",
         ),
     )
+
+
+def test_ask_enables_thinking_when_rulebook_and_errata_conflict(
+    thinking_client: TestClient,
+) -> None:
+    _attach_conflicting_sources(thinking_client)
     think_flags: list[bool] = []
     with (
         patch(_TAGS_PATCH, _mock_tags(_ALL_TAGS)),
         patch(_GEN_PATCH, _record_generate(think_flags)),
         patch("rag_engine.routers.ask.OllamaEmbedder", _FakeOllamaEmbedder),
-        client.stream("POST", "/ask", json=_ask_body()) as response,
+        thinking_client.stream("POST", "/ask", json=_ask_body()) as response,
     ):
         events = _frames("".join(response.iter_text()))
 
@@ -479,6 +564,26 @@ def test_ask_enables_thinking_when_rulebook_and_errata_conflict(
     assert sources_idx < notice_idx < token_idx
     assert events[-1]["type"] == "done"
     assert events[-1]["groundedness"] == "grounded"
+
+
+def test_ask_keeps_thinking_off_on_a_conflict_when_the_model_cannot_think(
+    client: TestClient,
+) -> None:
+    _attach_conflicting_sources(client)
+    think_flags: list[bool] = []
+    with (
+        patch(_TAGS_PATCH, _mock_tags(_ALL_TAGS)),
+        patch(_GEN_PATCH, _record_generate(think_flags)),
+        patch("rag_engine.routers.ask.OllamaEmbedder", _FakeOllamaEmbedder),
+        client.stream("POST", "/ask", json=_ask_body()) as response,
+    ):
+        events = _frames("".join(response.iter_text()))
+
+    assert think_flags == [False]
+    assert not any(
+        event.get("type") == "notice" and event.get("code") == "checking_sources_carefully"
+        for event in events
+    )
 
 
 def test_ask_does_not_call_the_model_when_index_is_empty(client: TestClient) -> None:

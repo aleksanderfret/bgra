@@ -109,18 +109,28 @@ export function selectVisibleFigures(state: AnswerState): VisibleFigure[] {
   });
 }
 
+/** Notices that describe a wait, so the status line says them instead of the stage. */
+const WAIT_NOTICES = ['checking_sources_carefully', 'preparing_assistant'] as const;
+
+type WaitNotice = (typeof WAIT_NOTICES)[number];
+
+function waitNoticeOf(state: AnswerState): WaitNotice | undefined {
+  return WAIT_NOTICES.find((code) => code === state.notice?.code);
+}
+
 export function streamingStatusKey(
   state: AnswerState,
-): 'notice.checking_sources_carefully' | `stage.${PipelineStage}` | null {
+): `notice.${WaitNotice}` | `stage.${PipelineStage}` | null {
   if (!state.isStreaming || state.stage === 'idle') {
     return null;
   }
-  if (state.text.length === 0 && state.notice?.code === 'checking_sources_carefully') {
-    return 'notice.checking_sources_carefully';
+  const waiting = waitNoticeOf(state);
+  if (state.text.length === 0 && waiting !== undefined) {
+    return `notice.${waiting}`;
   }
   return `stage.${state.stage}`;
 }
 
 export function isBlockingNotice(code: string): boolean {
-  return code !== 'checking_sources_carefully';
+  return !WAIT_NOTICES.some((wait) => wait === code);
 }

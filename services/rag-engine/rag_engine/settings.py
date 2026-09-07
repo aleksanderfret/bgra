@@ -21,6 +21,9 @@ CHUNK_BUDGET_TOKENS = 600
 class ModelProfile(BaseModel):
     label: str
     llm: str
+    #: False for instruct-only builds. Asking them to think is a no-op, so /ask
+    #: must not promise the player a careful re-read that never happens.
+    llm_thinks: bool
     #: Stronger model used only to settle a dispute; a few extra seconds are fine.
     llm_arbiter: str | None
     #: Must be multilingual: Polish questions against English rulebooks.
@@ -41,6 +44,7 @@ PROFILES: dict[str, ModelProfile] = {
     "minimal-16gb": ModelProfile(
         label="16 GB unified memory or ~10 GB VRAM",
         llm="qwen3:8b",
+        llm_thinks=True,
         llm_arbiter=None,
         embedding="bge-m3",
         reranker="BAAI/bge-reranker-v2-m3",
@@ -51,9 +55,14 @@ PROFILES: dict[str, ModelProfile] = {
         retrieval_top_k=3,
         approx_disk_gb=6.0,
     ),
+    # A 3B-active MoE reads the prompt ~3.5x faster than the 14B dense model it
+    # replaced, which is what the player feels before the first word. The `2507`
+    # instruct build, not plain `30b-a3b`: that one has no thinking switch in its
+    # Ollama template, so its reasoning trace lands in the answer itself.
     "starter-32gb": ModelProfile(
         label="M1/M2 Pro, 32 GB unified memory",
-        llm="qwen3:14b",
+        llm="qwen3:30b-a3b-instruct-2507-q4_K_M",
+        llm_thinks=False,
         llm_arbiter=None,
         embedding="bge-m3",
         reranker="BAAI/bge-reranker-v2-m3",
@@ -62,12 +71,12 @@ PROFILES: dict[str, ModelProfile] = {
         tts_voice="pl_PL-bass-high",
         context_tokens=8192,
         retrieval_top_k=6,
-        approx_disk_gb=12.0,
+        approx_disk_gb=21.0,
     ),
-    # MoE: ~3B active params/token, so it answers at small-model speed.
     "full-64gb": ModelProfile(
         label="M4/M5 Pro or Max, 64 GB unified memory",
-        llm="qwen3:30b-a3b",
+        llm="qwen3:30b-a3b-instruct-2507-q4_K_M",
+        llm_thinks=False,
         llm_arbiter="qwen3:32b",
         embedding="bge-m3",
         reranker="BAAI/bge-reranker-v2-m3",
@@ -103,10 +112,22 @@ class Settings(BaseSettings):
 
     storage_dir: Path = SERVICE_ROOT / "storage"
 
-    retrieval_candidates: int = Field(default=40, ge=1)
+    #: Hybrid search keeps this many candidates for the cross-encoder. Lower
+    #: values cut ranking latency; the answer still uses retrieval_top_k passages.
+    retrieval_candidates: int = Field(default=15, ge=1)
 
-    #: Below this, answer `insufficient_evidence` instead of guessing.
-    min_relevance_score: float = 0.35
+    #: When even the best passage scores below this, answer
+    #: `insufficient_evidence` instead of guessing. Only has to catch a question
+    #: about something else entirely — those measured at 0.0003, while a short
+    #: but perfectly answerable question can score 0.07. Which of the remaining
+    #: passages are noise is `relevance_share_of_best`, not this.
+    min_relevance_score: float = 0.05
+
+    #: Keep a passage while it scores at least this share of the best passage for
+    #: the same question. Fewer passages is not automatically better: with only
+    #: the two best ones the model was measured inventing a rule ("Army markers
+    #: are Influence cubes") instead of admitting the rulebook is silent.
+    relevance_share_of_best: float = Field(default=0.20, gt=0.0, le=1.0)
 
     @property
     def profile(self) -> ModelProfile:
