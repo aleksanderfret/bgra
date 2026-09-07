@@ -17,6 +17,7 @@ from rag_engine.contract import (
     Groundedness,
     HealthReport,
     PipelineStage,
+    RetrievalReloadResponse,
     RetrievedSource,
 )
 from rag_engine.settings import SERVICE_ROOT
@@ -134,5 +135,12 @@ def test_game_document_summary_fields_match() -> None:
 def test_health_report_fields_match() -> None:
     ts_fields = _interface_fields(_source(), "HealthReport")
     python_fields = {to_camel(name) for name in HealthReport.model_fields}
+
+    assert ts_fields == python_fields
+
+
+def test_retrieval_reload_response_fields_match() -> None:
+    ts_fields = _interface_fields(_source(), "RetrievalReloadResponse")
+    python_fields = {to_camel(name) for name in RetrievalReloadResponse.model_fields}
 
     assert ts_fields == python_fields

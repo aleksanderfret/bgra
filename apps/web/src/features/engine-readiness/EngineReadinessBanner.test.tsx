@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import en from '@/i18n/locales/en/common.json';
-import { render, screen, waitFor } from '@/test-utils';
+import { render, screen, userEvent, waitFor } from '@/test-utils';
 import { EngineReadinessBanner } from './EngineReadinessBanner';
 
 afterEach(() => {
@@ -33,7 +33,7 @@ describe('EngineReadinessBanner', () => {
     expect(await screen.findByRole('status')).toHaveTextContent(en.engineReadiness.starting.title);
   });
 
-  it('hides once health reports that loading has finished', async () => {
+  it('hides once health reports that search is ready', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({
@@ -48,5 +48,34 @@ describe('EngineReadinessBanner', () => {
       expect(screen.queryByRole('status')).not.toBeInTheDocument();
     });
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('explains when search never started and offers try again', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ components: { retrieval_loading: false, reranker: false } }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<EngineReadinessBanner />, 'en');
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(en.engineReadiness.searchUnavailable.title);
+    expect(alert).toHaveTextContent(en.engineReadiness.searchUnavailable.body);
+    expect(screen.queryByText(/pnpm|uv/i)).not.toBeInTheDocument();
+
+    await userEvent.click(
+      screen.getByRole('button', { name: en.engineReadiness.searchUnavailable.retry }),
+    );
+
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.some(
+          (call) =>
+            String(call[0]).includes('/api/engine/retrieval/reload') &&
+            (call[1] as RequestInit | undefined)?.method === 'POST',
+        ),
+      ).toBe(true);
+    });
   });
 });

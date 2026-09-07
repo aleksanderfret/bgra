@@ -269,7 +269,7 @@ player sees a wait notice when thinking runs; `pnpm verify` passes.
 
 ---
 
-## Stage 3F — Say so when search never started
+## Stage 3F — Say so when search never started ✅ **complete**
 
 **Goal:** if the engine is up but looking through the rulebooks never became available,
 the player sees that on the screen and cannot ask. The app must not look ready and then
@@ -286,6 +286,8 @@ Do this **after Stage 3**. Independent of 3E. 3C is “pages are on disk, index 
 catching up”; this stage is “search itself never stood up”. Do not wait for 3B: a
 packaged app can hit this when the reranker file is missing or the machine ran out of
 memory, not only when a developer skipped an extra.
+
+Plan: `docs/archive/stage-3f-search-unavailable.md`.
 
 - Add a dedicated engine phase (not `ready`, not `starting`, not `offline`) when
   health is reachable, loading has finished, and the reranker/index flags are false.
@@ -662,9 +664,10 @@ in the UI; `pnpm verify` passes.
 
 Stages 1 → 2 → 2A → 3 give you **a working rules arbiter over text**, and that is a
 natural stopping point for development. **Stage 3E is done:** think only when
-sources conflict or barely clear the cutoff, so easy questions stay fast. Stage 3F
-is the honesty gap on the preparing banner: if search never started, say so and
-keep Ask off — do not reuse “offline” or an endless “preparing”. Stage 3D
+sources conflict or barely clear the cutoff, so easy questions stay fast. **Stage 3F
+is done:** if search never started, the UI says so and keeps Ask (and PDF import)
+off — not “offline”, not an endless “preparing”; Try again re-runs the load in-app.
+Stage 3D
 (the scrollable, per-game thread) is what makes that arbiter usable **at the
 table** — you can look back, and sound is optional. Stage 0A–0C (hardening, desktop
 window, release) are already done; they sit under the numbered product stages.

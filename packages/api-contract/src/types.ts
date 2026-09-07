@@ -118,3 +118,7 @@ export interface HealthReport {
   models: Record<string, string>;
   missingModels: string[];
 }
+
+export interface RetrievalReloadResponse {
+  started: boolean;
+}

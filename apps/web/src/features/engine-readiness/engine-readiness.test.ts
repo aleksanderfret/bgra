@@ -22,7 +22,7 @@ describe('phaseFromPoll', () => {
     ).toBe('starting');
   });
 
-  it('is ready once health answers and loading has finished', () => {
+  it('is ready once health answers, loading finished, and the reranker is up', () => {
     expect(
       phaseFromPoll({
         health: { components: { retrieval_loading: false, reranker: true } },
@@ -30,6 +30,36 @@ describe('phaseFromPoll', () => {
         offlineAfterMs: 20_000,
       }),
     ).toBe('ready');
+  });
+
+  it('is search_unavailable when loading finished but the reranker never came up', () => {
+    expect(
+      phaseFromPoll({
+        health: { components: { retrieval_loading: false, reranker: false } },
+        failedForMs: 0,
+        offlineAfterMs: 20_000,
+      }),
+    ).toBe('search_unavailable');
+  });
+
+  it('is search_unavailable when the reranker key is missing', () => {
+    expect(
+      phaseFromPoll({
+        health: { components: { retrieval_loading: false } },
+        failedForMs: 0,
+        offlineAfterMs: 20_000,
+      }),
+    ).toBe('search_unavailable');
+  });
+
+  it('prefers starting over search_unavailable while loading is still true', () => {
+    expect(
+      phaseFromPoll({
+        health: { components: { retrieval_loading: true, reranker: false } },
+        failedForMs: 0,
+        offlineAfterMs: 20_000,
+      }),
+    ).toBe('starting');
   });
 
   it('is starting when health cannot be reached yet', () => {

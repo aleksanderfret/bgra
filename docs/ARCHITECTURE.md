@@ -365,6 +365,12 @@ stops generation instead of leaving the model running on the GPU for an answer n
 will read. The streaming route has no deadline — a long answer is normal — while `/games`
 and `/health` get 10 seconds, because a stalled one of those is a bug, not patience.
 
+The UI maps `/health` to four phases: `starting` (search still loading, or the engine
+not reachable yet), `ready` (reranker up), `search_unavailable` (engine up but search
+never stood up — not the same as offline), and `offline` (health unreachable long
+enough). Ask and PDF import require `ready`. `POST /retrieval/reload` lets the player
+retry the search load in-app.
+
 **D12 — `gameId` is a slug on both sides.**
 It is simultaneously the retrieval filter (invariant 1) and a directory name under
 `storage/assets`, which makes it the one value where a validation gap becomes path

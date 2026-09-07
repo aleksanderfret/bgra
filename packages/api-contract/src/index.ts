@@ -18,5 +18,6 @@ export {
   isDocKey,
   isGameId,
   type PipelineStage,
+  type RetrievalReloadResponse,
   type RetrievedSource,
 } from './types';

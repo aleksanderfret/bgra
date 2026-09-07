@@ -21,6 +21,11 @@
       "title": "Preparing the assistant",
       "body": "Loading search on this computer. The first time can take a few minutes. You can look around; questions about the rules will wait until this finishes."
     },
+    "searchUnavailable": {
+      "title": "Could not look through the rulebooks",
+      "body": "The assistant is running, but search did not start on this computer. Try again. If that does not help, close the app and open it again.",
+      "retry": "Try again"
+    },
     "offline": {
       "title": "The assistant did not start",
       "body": "Close the app and open it again."

@@ -1,6 +1,6 @@
 export const ENGINE_OFFLINE_AFTER_MS = 20_000;
 
-export type EnginePhase = 'starting' | 'ready' | 'offline';
+export type EnginePhase = 'starting' | 'ready' | 'search_unavailable' | 'offline';
 
 export interface EngineHealthSnapshot {
   components: Record<string, boolean>;
@@ -20,14 +20,14 @@ export function phaseFromPoll(options: {
   offlineAfterMs: number;
 }): EnginePhase {
   const { health, failedForMs, offlineAfterMs } = options;
-  if (health !== null && health.components.retrieval_loading === true) {
+  if (health === null) {
+    return failedForMs >= offlineAfterMs ? 'offline' : 'starting';
+  }
+  if (health.components.retrieval_loading === true) {
     return 'starting';
   }
-  if (health !== null) {
+  if (health.components.reranker === true) {
     return 'ready';
   }
-  if (failedForMs >= offlineAfterMs) {
-    return 'offline';
-  }
-  return 'starting';
+  return 'search_unavailable';
 }

@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
 
-from ..contract import HealthReport
+from ..contract import HealthReport, RetrievalReloadResponse
 from ..engines.llm import OllamaUnreachableError, installed_ollama_tags
 from ..pull_models import ollama_fields
 from ..settings import Settings, get_settings
@@ -10,6 +10,22 @@ from ..settings import Settings, get_settings
 router = APIRouter(tags=["system"])
 
 PROBE_TIMEOUT_SECONDS = 1.0
+
+
+@router.post("/retrieval/reload")
+async def reload_retrieval(
+    request: Request,
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> RetrievalReloadResponse:
+    if bool(getattr(request.app.state, "retrieval_loading", False)):
+        return RetrievalReloadResponse(started=False)
+    if getattr(request.app.state, "retrieval_stack", None) is not None:
+        return RetrievalReloadResponse(started=False)
+    # Lazy import: main mounts this router at import time.
+    from ..main import schedule_retrieval_load
+
+    schedule_retrieval_load(request.app, settings.profile.reranker)
+    return RetrievalReloadResponse(started=True)
 
 
 @router.get("/health")

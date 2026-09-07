@@ -149,3 +149,7 @@ class HealthReport(WireModel):
     components: dict[str, bool]
     models: dict[str, str]
     missing_models: list[str] = Field(default_factory=list)
+
+
+class RetrievalReloadResponse(WireModel):
+    started: bool

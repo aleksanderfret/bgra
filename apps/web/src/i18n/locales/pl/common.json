@@ -21,6 +21,11 @@
       "title": "Przygotowuję asystenta",
       "body": "Wczytuję wyszukiwanie na tym komputerze. Za pierwszym razem może to potrwać kilka minut. Możesz się rozglądać; pytania o zasady poczekają, aż to się skończy."
     },
+    "searchUnavailable": {
+      "title": "Nie udało się przeszukać instrukcji",
+      "body": "Asystent działa, ale wyszukiwanie nie uruchomiło się na tym komputerze. Spróbuj ponownie. Jeśli to nie pomoże, zamknij aplikację i otwórz ją jeszcze raz.",
+      "retry": "Spróbuj ponownie"
+    },
     "offline": {
       "title": "Asystent się nie uruchomił",
       "body": "Zamknij aplikację i otwórz ją ponownie."

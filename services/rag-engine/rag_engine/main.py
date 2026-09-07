@@ -44,38 +44,55 @@ async def _resize_oversized_chunks(settings: Settings) -> None:
         logger.info("Re-split %d document(s) into smaller passages.", rewritten)
 
 
-async def _warm_retrieval(app: FastAPI, reranker_id: str) -> None:
+def _is_current_generation(app: FastAPI, generation: int) -> bool:
+    return int(getattr(app.state, "retrieval_load_generation", 0)) == generation
+
+
+async def _warm_retrieval(app: FastAPI, reranker_id: str, generation: int) -> None:
     settings = get_settings()
     try:
         try:
             stack = await asyncio.to_thread(try_load, reranker_id)
         except Exception:
             logger.exception("Failed to load the retrieval stack.")
-            app.state.retrieval_stack = None
+            if _is_current_generation(app, generation):
+                app.state.retrieval_stack = None
             return
         if stack is not None:
             await _resize_oversized_chunks(settings)
+        if not _is_current_generation(app, generation):
+            return
         app.state.retrieval_stack = stack
         if stack is not None:
             await _pin_ollama_weights(settings)
     finally:
-        app.state.retrieval_loading = False
+        if _is_current_generation(app, generation):
+            app.state.retrieval_loading = False
 
 
 def schedule_retrieval_load(app: FastAPI, reranker_id: str) -> asyncio.Task[None] | None:
+    previous = getattr(app.state, "retrieval_load_task", None)
+    if previous is not None and not previous.done():
+        previous.cancel()
+
+    generation = int(getattr(app.state, "retrieval_load_generation", 0)) + 1
+    app.state.retrieval_load_generation = generation
     app.state.retrieval_stack = None
     app.state.retrieval_loading = True
-    return asyncio.get_running_loop().create_task(_warm_retrieval(app, reranker_id))
+    task = asyncio.get_running_loop().create_task(_warm_retrieval(app, reranker_id, generation))
+    app.state.retrieval_load_task = task
+    return task
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     # Serve /health and /games immediately; CrossEncoder load can take minutes.
-    task = schedule_retrieval_load(app, settings.profile.reranker)
+    schedule_retrieval_load(app, settings.profile.reranker)
     try:
         yield
     finally:
+        task = getattr(app.state, "retrieval_load_task", None)
         if task is not None:
             task.cancel()
             with suppress(asyncio.CancelledError):

@@ -134,4 +134,48 @@ describe('RulesChat', () => {
       expect(body.expansionIds).toEqual(['azul-crystal']);
     });
   });
+
+  it('keeps Ask disabled when search never started', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(async (input: RequestInfo) => {
+        const url = String(input);
+        if (url.includes('/health')) {
+          return {
+            ok: true,
+            json: async () => ({ components: { retrieval_loading: false, reranker: false } }),
+          };
+        }
+        if (url.includes('/games')) {
+          return {
+            ok: true,
+            json: async () => [
+              {
+                gameId: 'azul',
+                title: 'Azul',
+                chunkCount: 1,
+                documentKinds: ['rulebook'],
+                indexedAt: '2026-01-01T00:00:00Z',
+                baseGameId: null,
+                documents: [],
+              },
+            ],
+          };
+        }
+        throw new Error(`Unexpected fetch: ${url}`);
+      }),
+    );
+
+    render(<RulesChat />, 'en');
+
+    const gameCombobox = await screen.findByRole('combobox');
+    await userEvent.click(gameCombobox);
+    await userEvent.click(await screen.findByRole('option', { name: 'Azul' }));
+    await userEvent.type(
+      screen.getByLabelText(en.rulesChat.question.label),
+      'How many tiles do I draw?',
+    );
+
+    expect(screen.getByRole('button', { name: en.rulesChat.submit })).toBeDisabled();
+  });
 });

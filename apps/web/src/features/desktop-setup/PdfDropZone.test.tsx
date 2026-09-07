@@ -3,6 +3,28 @@ import en from '@/i18n/locales/en/common.json';
 import { render, screen, userEvent, waitFor } from '@/test-utils';
 import { PdfDropZone } from './PdfDropZone';
 
+const readyHealth = { components: { retrieval_loading: false, reranker: true } };
+const failedSearchHealth = { components: { retrieval_loading: false, reranker: false } };
+
+function stubEngineFetch(
+  handler: (url: string) => { ok: boolean; json: () => Promise<unknown> } | null,
+): ReturnType<typeof vi.fn> {
+  return vi.fn().mockImplementation(async (input: RequestInfo) => {
+    const url = String(input);
+    if (url.includes('/health')) {
+      return { ok: true, json: async () => readyHealth };
+    }
+    if (url.includes('/games')) {
+      return { ok: true, json: async () => [] };
+    }
+    const custom = handler(url);
+    if (custom !== null) {
+      return custom;
+    }
+    return { ok: true, json: async () => ({}) };
+  });
+}
+
 describe('PdfDropZone', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -11,10 +33,7 @@ describe('PdfDropZone', () => {
   it('exposes fieldsets, mode helper, and a keyboard path to choose a file', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => [],
-      }),
+      stubEngineFetch(() => null),
     );
 
     render(<PdfDropZone />, 'en');
@@ -26,18 +45,44 @@ describe('PdfDropZone', () => {
     expect(screen.getByRole('group', { name: en.pdfImport.newGame.legend })).toBeInTheDocument();
     expect(screen.getByRole('group', { name: en.pdfImport.drop.legend })).toBeInTheDocument();
 
-    const choose = screen.getByRole('button', { name: en.pdfImport.drop.chooseFile });
+    const choose = await screen.findByRole('button', { name: en.pdfImport.drop.chooseFile });
+    await waitFor(() => {
+      expect(choose).toBeEnabled();
+    });
     expect(choose).toHaveAttribute('type', 'button');
   });
 
-  it('rejects an invalid game id before uploading and focuses the field', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => [],
+  it('disables choosing a file when search never started', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(async (input: RequestInfo) => {
+        const url = String(input);
+        if (url.includes('/health')) {
+          return { ok: true, json: async () => failedSearchHealth };
+        }
+        if (url.includes('/games')) {
+          return { ok: true, json: async () => [] };
+        }
+        throw new Error(`Unexpected fetch: ${url}`);
+      }),
+    );
+
+    render(<PdfDropZone />, 'en');
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: en.pdfImport.drop.chooseFile })).toBeDisabled();
     });
+  });
+
+  it('rejects an invalid game id before uploading and focuses the field', async () => {
+    const fetchMock = stubEngineFetch(() => null);
     vi.stubGlobal('fetch', fetchMock);
 
     render(<PdfDropZone />, 'en');
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: en.pdfImport.drop.chooseFile })).toBeEnabled();
+    });
 
     await userEvent.type(
       screen.getByRole('textbox', { name: new RegExp(en.pdfImport.gameId.label) }),
@@ -65,19 +110,22 @@ describe('PdfDropZone', () => {
   });
 
   it('uploads the PDF through the engine proxy and reports success as a status', async () => {
-    const fetchMock = vi.fn().mockImplementation(async (input: RequestInfo) => {
-      const url = String(input);
-      if (url.includes('/games')) {
-        return { ok: true, json: async () => [] };
+    const fetchMock = stubEngineFetch((url) => {
+      if (url.includes('/ingest/pdf')) {
+        return {
+          ok: true,
+          json: async () => ({ gameId: 'azul', title: 'Azul', chunkCount: 2 }),
+        };
       }
-      return {
-        ok: true,
-        json: async () => ({ gameId: 'azul', title: 'Azul', chunkCount: 2 }),
-      };
+      return null;
     });
     vi.stubGlobal('fetch', fetchMock);
 
     render(<PdfDropZone />, 'en');
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: en.pdfImport.drop.chooseFile })).toBeEnabled();
+    });
 
     await userEvent.type(
       screen.getByRole('textbox', { name: new RegExp(en.pdfImport.gameId.label) }),
@@ -104,18 +152,22 @@ describe('PdfDropZone', () => {
   it('announces a failed import as an alert', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockImplementation(async (input: RequestInfo) => {
-        if (String(input).includes('/games')) {
-          return { ok: true, json: async () => [] };
+      stubEngineFetch((url) => {
+        if (url.includes('/ingest/pdf')) {
+          return {
+            ok: false,
+            json: async () => ({ type: 'error', code: 'ingest_failed', message: 'boom' }),
+          };
         }
-        return {
-          ok: false,
-          json: async () => ({ type: 'error', code: 'ingest_failed', message: 'boom' }),
-        };
+        return null;
       }),
     );
 
     render(<PdfDropZone />, 'en');
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: en.pdfImport.drop.chooseFile })).toBeEnabled();
+    });
 
     await userEvent.type(
       screen.getByRole('textbox', { name: new RegExp(en.pdfImport.gameId.label) }),
@@ -134,18 +186,22 @@ describe('PdfDropZone', () => {
   it('announces a busy engine as an alert', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockImplementation(async (input: RequestInfo) => {
-        if (String(input).includes('/games')) {
-          return { ok: true, json: async () => [] };
+      stubEngineFetch((url) => {
+        if (url.includes('/ingest/pdf')) {
+          return {
+            ok: false,
+            json: async () => ({ type: 'error', code: 'ingest_busy', message: 'busy' }),
+          };
         }
-        return {
-          ok: false,
-          json: async () => ({ type: 'error', code: 'ingest_busy', message: 'busy' }),
-        };
+        return null;
       }),
     );
 
     render(<PdfDropZone />, 'en');
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: en.pdfImport.drop.chooseFile })).toBeEnabled();
+    });
 
     await userEvent.type(
       screen.getByRole('textbox', { name: new RegExp(en.pdfImport.gameId.label) }),
@@ -164,18 +220,22 @@ describe('PdfDropZone', () => {
   it('announces a search-index failure as an alert', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockImplementation(async (input: RequestInfo) => {
-        if (String(input).includes('/games')) {
-          return { ok: true, json: async () => [] };
+      stubEngineFetch((url) => {
+        if (url.includes('/ingest/pdf')) {
+          return {
+            ok: false,
+            json: async () => ({ type: 'error', code: 'index_failed', message: 'embed down' }),
+          };
         }
-        return {
-          ok: false,
-          json: async () => ({ type: 'error', code: 'index_failed', message: 'embed down' }),
-        };
+        return null;
       }),
     );
 
     render(<PdfDropZone />, 'en');
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: en.pdfImport.drop.chooseFile })).toBeEnabled();
+    });
 
     await userEvent.type(
       screen.getByRole('textbox', { name: new RegExp(en.pdfImport.gameId.label) }),

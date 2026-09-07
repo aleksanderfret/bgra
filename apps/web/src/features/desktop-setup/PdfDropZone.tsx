@@ -125,9 +125,11 @@ export function PdfDropZone() {
   }, [enginePhase]);
 
   const baseGames = (games ?? []).filter((game) => game.baseGameId === null);
+  const importAllowed = enginePhase === 'ready';
+  const controlsDisabled = busy || !importAllowed;
 
   const handleFile = (file: File | null): void => {
-    if (file === null) {
+    if (file === null || !importAllowed) {
       return;
     }
 
@@ -264,7 +266,7 @@ export function PdfDropZone() {
   const onDrop = (event: DragEvent<HTMLDivElement>): void => {
     event.preventDefault();
     setDragging(false);
-    if (busy) {
+    if (controlsDisabled) {
       return;
     }
 
@@ -308,7 +310,7 @@ export function PdfDropZone() {
                 { value: 'create', label: t('pdfImport.howAdding.create') },
                 { value: 'attach', label: t('pdfImport.howAdding.attach') },
               ]}
-              disabled={busy}
+              disabled={controlsDisabled}
               fullWidth
             />
           </Stack>
@@ -326,7 +328,7 @@ export function PdfDropZone() {
                 onChange={(event) => setGameId(event.currentTarget.value)}
                 error={gameIdError}
                 required
-                disabled={busy}
+                disabled={controlsDisabled}
               />
               <TextInput
                 label={t('pdfImport.gameTitle.label')}
@@ -334,7 +336,7 @@ export function PdfDropZone() {
                 placeholder={t('pdfImport.gameTitle.placeholder')}
                 value={gameTitle}
                 onChange={(event) => setGameTitle(event.currentTarget.value)}
-                disabled={busy}
+                disabled={controlsDisabled}
               />
               <Select
                 label={t('pdfImport.baseGame.label')}
@@ -343,7 +345,7 @@ export function PdfDropZone() {
                 data={baseGames.map((game) => ({ value: game.gameId, label: game.title }))}
                 value={baseGameId}
                 onChange={setBaseGameId}
-                disabled={busy || games === null}
+                disabled={controlsDisabled || games === null}
                 clearable
                 searchable
               />
@@ -354,14 +356,14 @@ export function PdfDropZone() {
                 placeholder={t('pdfImport.documentTitle.placeholder')}
                 value={documentTitle}
                 onChange={(event) => setDocumentTitle(event.currentTarget.value)}
-                disabled={busy}
+                disabled={controlsDisabled}
               />
               <Checkbox
                 label={t('pdfImport.communityFaq.label')}
                 description={t('pdfImport.communityFaq.description')}
                 checked={fetchCommunityFaq}
                 onChange={(event) => setFetchCommunityFaq(event.currentTarget.checked)}
-                disabled={busy}
+                disabled={controlsDisabled}
               />
             </Stack>
           </Fieldset>
@@ -379,7 +381,7 @@ export function PdfDropZone() {
                 data={(games ?? []).map((game) => ({ value: game.gameId, label: game.title }))}
                 value={attachGameId}
                 onChange={setAttachGameId}
-                disabled={busy || games === null || games.length === 0}
+                disabled={controlsDisabled || games === null || games.length === 0}
                 searchable
                 error={
                   feedback.kind === 'unknown_game'
@@ -396,7 +398,7 @@ export function PdfDropZone() {
                 onChange={(event) => setDocumentTitle(event.currentTarget.value)}
                 error={documentTitleError}
                 required
-                disabled={busy}
+                disabled={controlsDisabled}
               />
             </Stack>
           </Fieldset>
@@ -411,14 +413,14 @@ export function PdfDropZone() {
             aria-describedby={dropHintId}
             onDragOver={(event) => {
               event.preventDefault();
-              if (!busy) {
+              if (!controlsDisabled) {
                 setDragging(true);
               }
             }}
             onDragLeave={() => setDragging(false)}
             onDrop={onDrop}
             bg={dragging ? 'var(--mantine-color-teal-light)' : undefined}
-            style={{ minHeight: 120, cursor: busy ? 'wait' : 'copy' }}
+            style={{ minHeight: 120, cursor: controlsDisabled ? 'not-allowed' : 'copy' }}
           >
             <Stack gap="sm">
               <Text id={dropTitleId} fw={600}>
@@ -437,12 +439,19 @@ export function PdfDropZone() {
                 <FileButton
                   resetRef={resetFileRef}
                   accept="application/pdf,.pdf"
-                  disabled={busy}
+                  disabled={controlsDisabled}
                   onChange={handleFile}
                   inputProps={{ 'aria-label': t('pdfImport.drop.chooseFile') }}
                 >
                   {(props) => (
-                    <Button {...props} type="button" variant="light" size="sm" loading={busy}>
+                    <Button
+                      {...props}
+                      type="button"
+                      variant="light"
+                      size="sm"
+                      loading={busy}
+                      disabled={controlsDisabled}
+                    >
                       {t('pdfImport.drop.chooseFile')}
                     </Button>
                   )}
