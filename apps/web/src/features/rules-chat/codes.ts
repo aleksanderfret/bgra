@@ -18,4 +18,5 @@ export const NOTICE_CODES = [
   'engine_not_indexed',
   'retrieval_not_ready',
   'retrieval_loading',
+  'checking_sources_carefully',
 ] as const;

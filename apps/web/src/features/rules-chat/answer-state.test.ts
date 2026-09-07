@@ -1,10 +1,13 @@
 import type { AssistantEvent, RetrievedSource } from '@bga/api-contract';
 import { describe, expect, it } from 'vitest';
 import {
+  type AnswerState,
   initialAnswerState,
+  isBlockingNotice,
   reduceAssistantEvent,
   selectVisibleFigures,
   startAnswer,
+  streamingStatusKey,
 } from './answer-state';
 
 const source = (overrides: Partial<RetrievedSource> = {}): RetrievedSource => ({
@@ -165,5 +168,49 @@ describe('reduceAssistantEvent', () => {
       isStreaming: true,
       stage: 'retrieving',
     });
+  });
+});
+
+describe('streamingStatusKey', () => {
+  it('returns null when not streaming', () => {
+    expect(streamingStatusKey(initialAnswerState)).toBeNull();
+  });
+
+  it('prefers the careful-check notice while waiting for the first token', () => {
+    const state: AnswerState = {
+      ...startAnswer(),
+      stage: 'generating',
+      notice: { code: 'checking_sources_carefully', params: {} },
+    };
+    expect(streamingStatusKey(state)).toBe('notice.checking_sources_carefully');
+  });
+
+  it('falls back to the pipeline stage once answer text has started', () => {
+    const state: AnswerState = {
+      ...startAnswer(),
+      stage: 'generating',
+      text: 'Dobierasz',
+      notice: { code: 'checking_sources_carefully', params: {} },
+    };
+    expect(streamingStatusKey(state)).toBe('stage.generating');
+  });
+
+  it('uses the ordinary stage key without the careful-check notice', () => {
+    const state: AnswerState = {
+      ...startAnswer(),
+      stage: 'reranking',
+    };
+    expect(streamingStatusKey(state)).toBe('stage.reranking');
+  });
+});
+
+describe('isBlockingNotice', () => {
+  it('treats readiness notices as blocking', () => {
+    expect(isBlockingNotice('engine_not_indexed')).toBe(true);
+    expect(isBlockingNotice('retrieval_not_ready')).toBe(true);
+  });
+
+  it('does not treat the careful-check wait as a blocking notice', () => {
+    expect(isBlockingNotice('checking_sources_carefully')).toBe(false);
   });
 });

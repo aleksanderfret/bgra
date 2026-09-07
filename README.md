@@ -239,7 +239,9 @@ What this does:
 - Optional `--fetch-community-faq` loads **text** from BoardGameGeek’s official XML API only (never Files / HTML scraping). If the network is down, the PDF import still succeeds.
 
 **Important:** after ingest, Ask answers from your documents and cites the page (Stage 3).
-Install search tools once:
+Install search tools once — or just use `pnpm dev` / `pnpm verify`: locally they
+already sync both `ingest` and `retrieval` into the engine environment. CI still
+skips retrieval so it does not download the heavy ranking wheels.
 
 ```bash
 cd services/rag-engine
@@ -330,7 +332,7 @@ What you can already do, and what is still on the way. The numbered engineering 
 **Next at the table**
 
 - [ ] If looking through the rulebooks never started, the screen says so and asking stays off — the app does not pretend it is ready.
-- [ ] Take extra care when the book and an errata disagree; everyday questions stay snappy.
+- [x] Take extra care when the book and an errata disagree; everyday questions stay snappy.
 - [ ] After an update, a game already in your library just works — no dropping the PDF again.
 - [ ] The first time you open the downloaded app, it sets itself up. No terminal.
 - [ ] Watch a real progress bar while a rulebook is being added.

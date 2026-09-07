@@ -4,8 +4,8 @@
   "private": true,
   "description": "Turborepo wrapper around the Python engine; every script delegates to uv",
   "scripts": {
-    "dev": "uv run uvicorn rag_engine.main:app --reload --port 8000",
-    "build": "uv sync --extra ingest",
+    "dev": "node ./scripts/sync-venv.mjs && uv run uvicorn rag_engine.main:app --reload --port 8000",
+    "build": "node ./scripts/sync-venv.mjs",
     "test": "uv run python -m pytest -q",
     "typecheck": "uv run python -m mypy",
     "lint": "uv run ruff check . && uv run ruff format --check .",

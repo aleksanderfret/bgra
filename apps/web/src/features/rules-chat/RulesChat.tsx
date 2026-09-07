@@ -17,6 +17,7 @@ import { useTranslation } from 'react-i18next';
 import { useEngineReadiness } from '@/features/engine-readiness/useEngineReadiness';
 import { GAMES_CHANGED_EVENT } from '@/lib/desktop-bridge';
 import { AnswerPanel } from './AnswerPanel';
+import { streamingStatusKey } from './answer-state';
 import { useAskStream } from './useAskStream';
 
 const MODES: readonly AnswerMode[] = ['teach', 'arbitrate'];
@@ -127,6 +128,8 @@ export function RulesChat() {
     }
   };
 
+  const statusKey = streamingStatusKey(state);
+
   return (
     <form onSubmit={onSubmit} aria-label={t('rulesChat.formLabel')}>
       <Stack gap="lg">
@@ -205,7 +208,7 @@ export function RulesChat() {
             </Button>
           )}
           <Text size="sm" c="dimmed" role="status" aria-live="polite">
-            {state.isStreaming && state.stage !== 'idle' ? t(`stage.${state.stage}`) : ''}
+            {statusKey !== null ? t(statusKey) : ''}
           </Text>
         </Group>
 

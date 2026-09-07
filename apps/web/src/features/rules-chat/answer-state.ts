@@ -108,3 +108,19 @@ export function selectVisibleFigures(state: AnswerState): VisibleFigure[] {
     return src === null ? [] : [{ source, src }];
   });
 }
+
+export function streamingStatusKey(
+  state: AnswerState,
+): 'notice.checking_sources_carefully' | `stage.${PipelineStage}` | null {
+  if (!state.isStreaming || state.stage === 'idle') {
+    return null;
+  }
+  if (state.text.length === 0 && state.notice?.code === 'checking_sources_carefully') {
+    return 'notice.checking_sources_carefully';
+  }
+  return `stage.${state.stage}`;
+}
+
+export function isBlockingNotice(code: string): boolean {
+  return code !== 'checking_sources_carefully';
+}

@@ -1,6 +1,6 @@
 import asyncio
 import json
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Callable, Iterator
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
@@ -9,7 +9,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from rag_engine.contract import GameSummary
+from rag_engine.contract import DocumentKind, GameSummary
 from rag_engine.engines.llm import OllamaUnreachableError
 from rag_engine.main import create_app
 from rag_engine.retrieval.memory import MemoryIndex
@@ -77,19 +77,20 @@ class _FakeOllamaEmbedder:
 def _seed_chunk(
     *,
     game_id: str = "azul",
+    document_kind: DocumentKind = "rulebook",
     doc_key: str = "main",
     page: int = 3,
     text: str = "Gracz z największą liczbą kafelków zaczyna.",
 ) -> RetrievedChunk:
     return RetrievedChunk(
-        id=f"{game_id}:rulebook:{doc_key}:p{page:02d}:c00",
+        id=f"{game_id}:{document_kind}:{doc_key}:p{page:02d}:c00",
         game_id=game_id,
-        document_kind="rulebook",
+        document_kind=document_kind,
         doc_key=doc_key,
         document_title=game_id,
         page=page,
         text=text,
-        image_url=f"/static/assets/{game_id}/documents/rulebook/{doc_key}/p{page:02d}.png",
+        image_url=(f"/static/assets/{game_id}/documents/{document_kind}/{doc_key}/p{page:02d}.png"),
         indexed_at="2026-01-01T00:00:00Z",
         vector=[0.1, 0.2],
         score=0.9,
@@ -414,6 +415,70 @@ def test_ask_sends_generating_status_between_sources_and_tokens(
     assert gen_indices[0] > sources_idx
     token_indices = [i for i, k in enumerate(kinds) if k == "token"]
     assert all(ti > gen_indices[0] for ti in token_indices)
+
+
+def _record_generate(bucket: list[bool]) -> Callable[..., AsyncIterator[str]]:
+    async def _gen(*_args: object, **kwargs: object) -> AsyncIterator[str]:
+        bucket.append(bool(kwargs.get("think", False)))
+        yield "Ok"
+
+    return _gen
+
+
+def test_ask_keeps_thinking_off_for_a_simple_rulebook_hit(
+    client: TestClient,
+) -> None:
+    _attach_index(client, _seed_chunk())
+    think_flags: list[bool] = []
+    with (
+        patch(_TAGS_PATCH, _mock_tags(_ALL_TAGS)),
+        patch(_GEN_PATCH, _record_generate(think_flags)),
+        patch("rag_engine.routers.ask.OllamaEmbedder", _FakeOllamaEmbedder),
+        client.stream("POST", "/ask", json=_ask_body()) as response,
+    ):
+        events = _frames("".join(response.iter_text()))
+
+    assert think_flags == [False]
+    assert not any(
+        event.get("type") == "notice" and event.get("code") == "checking_sources_carefully"
+        for event in events
+    )
+
+
+def test_ask_enables_thinking_when_rulebook_and_errata_conflict(
+    client: TestClient,
+) -> None:
+    _attach_index(
+        client,
+        _seed_chunk(document_kind="rulebook", doc_key="main", page=3),
+        _seed_chunk(
+            document_kind="errata",
+            doc_key="errata",
+            page=1,
+            text="Errata: the player with the fewest tiles starts.",
+        ),
+    )
+    think_flags: list[bool] = []
+    with (
+        patch(_TAGS_PATCH, _mock_tags(_ALL_TAGS)),
+        patch(_GEN_PATCH, _record_generate(think_flags)),
+        patch("rag_engine.routers.ask.OllamaEmbedder", _FakeOllamaEmbedder),
+        client.stream("POST", "/ask", json=_ask_body()) as response,
+    ):
+        events = _frames("".join(response.iter_text()))
+
+    assert think_flags == [True]
+    kinds = [event["type"] for event in events]
+    sources_idx = kinds.index("sources")
+    notice_idx = next(
+        i
+        for i, event in enumerate(events)
+        if event.get("type") == "notice" and event.get("code") == "checking_sources_carefully"
+    )
+    token_idx = kinds.index("token")
+    assert sources_idx < notice_idx < token_idx
+    assert events[-1]["type"] == "done"
+    assert events[-1]["groundedness"] == "grounded"
 
 
 def test_ask_does_not_call_the_model_when_index_is_empty(client: TestClient) -> None:

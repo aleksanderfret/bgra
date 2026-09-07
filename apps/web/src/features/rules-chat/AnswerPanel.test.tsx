@@ -136,6 +136,21 @@ describe('AnswerPanel', () => {
     ).toBeInTheDocument();
   });
 
+  it('does not show the careful-check wait as a bordered notice under the answer', () => {
+    render(
+      <AnswerPanel
+        state={stateWith({
+          isStreaming: true,
+          stage: 'generating',
+          notice: { code: 'checking_sources_carefully', params: {} },
+        })}
+      />,
+    );
+
+    expect(screen.queryByText(pl.notice.checking_sources_carefully)).not.toBeInTheDocument();
+    expect(screen.queryByText(en.notice.checking_sources_carefully)).not.toBeInTheDocument();
+  });
+
   it('renders every string in the requested language', () => {
     // The real assertion is that nothing here is hardcoded: the same state in
     // another locale has to come out in that locale's words.

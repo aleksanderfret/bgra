@@ -60,6 +60,67 @@ async def test_generate_stream_skips_thinking_and_keeps_the_model_loaded() -> No
 
 
 @pytest.mark.asyncio
+async def test_generate_stream_can_enable_thinking() -> None:
+    stream = _ChatStream(
+        [
+            json.dumps({"message": {"content": "Ok"}, "done": True}),
+        ]
+    )
+    mock_client = AsyncMock()
+    mock_client.__aenter__.return_value = mock_client
+    mock_client.stream = MagicMock(return_value=stream)
+
+    with patch("rag_engine.engines.llm.httpx.AsyncClient", return_value=mock_client):
+        tokens = [
+            token
+            async for token in generate_stream(
+                "http://127.0.0.1:11434",
+                "qwen3:14b",
+                [{"role": "user", "content": "q"}],
+                context_tokens=8192,
+                think=True,
+            )
+        ]
+
+    assert tokens == ["Ok"]
+    _args, kwargs = mock_client.stream.call_args
+    payload = json.loads(kwargs["content"])
+    assert payload["think"] is True
+
+
+@pytest.mark.asyncio
+async def test_generate_stream_does_not_yield_thinking_field() -> None:
+    stream = _ChatStream(
+        [
+            json.dumps(
+                {
+                    "message": {"content": "", "thinking": "secret chain"},
+                    "done": False,
+                }
+            ),
+            json.dumps({"message": {"content": "Draw one."}, "done": True}),
+        ]
+    )
+    mock_client = AsyncMock()
+    mock_client.__aenter__.return_value = mock_client
+    mock_client.stream = MagicMock(return_value=stream)
+
+    with patch("rag_engine.engines.llm.httpx.AsyncClient", return_value=mock_client):
+        tokens = [
+            token
+            async for token in generate_stream(
+                "http://127.0.0.1:11434",
+                "qwen3:14b",
+                [{"role": "user", "content": "q"}],
+                context_tokens=8192,
+                think=True,
+            )
+        ]
+
+    assert tokens == ["Draw one."]
+
+
+@pytest.mark.asyncio
 async def test_load_model_posts_generate_without_a_prompt() -> None:
     response = httpx.Response(
         200,

@@ -34,6 +34,7 @@ from rag_engine.retrieval.pipeline import retrieve
 from rag_engine.retrieval.prompt import build_messages
 from rag_engine.retrieval.service import RetrievalStack
 from rag_engine.retrieval.sources import to_retrieved_source
+from rag_engine.retrieval.think import should_think
 from rag_engine.settings import Settings, get_settings
 from rag_engine.sse import SSE_HEADERS, SSE_MEDIA_TYPE, encode_event
 
@@ -129,6 +130,9 @@ async def _stream_answer(
         yield encode_event(SourcesEvent(sources=[to_retrieved_source(hit) for hit in hits]))
         if await http_request.is_disconnected():
             return
+        think = should_think(hits, settings.min_relevance_score, settings.profile.context_tokens)
+        if think:
+            yield encode_event(NoticeEvent(code="checking_sources_carefully", params={}))
         yield encode_event(StatusEvent(stage="generating"))
         messages = build_messages(payload.question, hits)
         async for text in generate_stream(
@@ -136,6 +140,7 @@ async def _stream_answer(
             settings.profile.llm,
             messages,
             context_tokens=settings.profile.context_tokens,
+            think=think,
         ):
             if await http_request.is_disconnected():
                 return

@@ -24,6 +24,7 @@ here because nothing was built between Stage 2 and that work.
 | [stage-2a-multi-doc-expansions.md](stage-2a-multi-doc-expansions.md) | 2A — several PDFs per game; expansions as linked games | Implemented |
 | [stage-3-retrieval.md](stage-3-retrieval.md) | 3 — answers from the documents, with a page citation | Implemented |
 | [stage-3a-ingest-progress.md](stage-3a-ingest-progress.md) | 3A — smooth percent bar while a PDF is added | Parked until after Stage 3 (and 3B) |
+| [stage-3e-adaptive-thinking.md](stage-3e-adaptive-thinking.md) | 3E — think only when hits conflict or barely clear the cutoff | Implemented |
 
 Stage 3B (first-run install gate) and Stage 3F (honest banner when search never
 started) are specified in the living roadmap, not as separate implementation

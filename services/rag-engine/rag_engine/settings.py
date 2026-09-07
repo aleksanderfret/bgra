@@ -13,9 +13,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 SERVICE_ROOT = Path(__file__).resolve().parent.parent
 
 # Reserved for the system prompt and the user's question when sizing retrieval.
-_PROMPT_RESERVE_TOKENS = 1_500
+PROMPT_RESERVE_TOKENS = 1_500
 # Upper bound used only for the budget check — real chunks are shorter.
-_CHUNK_BUDGET_TOKENS = 600
+CHUNK_BUDGET_TOKENS = 600
 
 
 class ModelProfile(BaseModel):
@@ -83,7 +83,7 @@ PROFILES: dict[str, ModelProfile] = {
 
 def profile_context_budget_ok(profile: ModelProfile) -> bool:
     """True when the profile's top_k passages fit inside its context window."""
-    needed = _PROMPT_RESERVE_TOKENS + profile.retrieval_top_k * _CHUNK_BUDGET_TOKENS
+    needed = PROMPT_RESERVE_TOKENS + profile.retrieval_top_k * CHUNK_BUDGET_TOKENS
     return needed <= profile.context_tokens
 
 

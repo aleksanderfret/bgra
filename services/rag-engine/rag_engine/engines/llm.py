@@ -87,6 +87,7 @@ async def generate_stream(
     messages: list[dict[str, str]],
     *,
     context_tokens: int,
+    think: bool = False,
     timeout_seconds: float = 300.0,
 ) -> AsyncIterator[str]:
     url = f"{ollama_url.rstrip('/')}/api/chat"
@@ -97,7 +98,7 @@ async def generate_stream(
             "model": model,
             "messages": messages,
             "stream": True,
-            "think": False,
+            "think": think,
             "keep_alive": OLLAMA_KEEP_ALIVE,
             "options": _chat_options(context_tokens),
         }

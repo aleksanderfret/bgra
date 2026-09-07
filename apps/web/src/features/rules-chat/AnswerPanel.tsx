@@ -2,7 +2,7 @@
 
 import { Alert, Badge, Box, Image, Paper, Stack, Text, Title } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
-import { type AnswerState, selectVisibleFigures } from './answer-state';
+import { type AnswerState, isBlockingNotice, selectVisibleFigures } from './answer-state';
 
 export interface AnswerPanelProps {
   state: AnswerState;
@@ -41,7 +41,7 @@ export function AnswerPanel({ state }: AnswerPanelProps) {
         </Alert>
       )}
 
-      {state.notice !== null && (
+      {state.notice !== null && isBlockingNotice(state.notice.code) && (
         <Paper withBorder p="md" radius="md">
           <Text style={{ whiteSpace: 'pre-wrap' }}>
             {t(`notice.${state.notice.code}`, {

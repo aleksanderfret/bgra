@@ -420,13 +420,20 @@ a handful of testers; code signing and notarisation wait until distribution is a
 goal. Sharing packaged indexes between users is deliberately unsupported: an index
 contains rulebook text and page renders.
 
-**D16 — Qwen3 must answer, not think, on `/ask`.**
-Qwen3 models produce a hidden reasoning trace by default. The engine only streams
-`message.content`, so that trace is a silent wait of tens of seconds — including on the
-second question. `/api/chat` therefore sets `think: false`. Embed and chat both send
-`keep_alive: 30m` so looking up the question (the embedding model) does not unload the
-answer model before the next turn. Chat uses the profile's `context_tokens` as Ollama
-`num_ctx`; a 32k default window would bloat memory and force a reload.
+**D16 — Qwen3 must answer, not think, on `/ask` — by default.**
+Qwen3 models produce a hidden reasoning trace when thinking is left on. The engine
+only streams `message.content`, so that trace is a silent wait of tens of seconds —
+including on the second question. `/api/chat` therefore sets `think: false` unless
+`should_think` decides the surviving hits need the extra pass (near-miss scores,
+authority-bearing kinds that can disagree, or two booklets of the same kind). The
+thinking field is never yielded as answer text. Thinking shares the same `num_ctx`
+as the sources and the answer — Stage 3E does not raise the window — so
+`should_think` also refuses when headroom would be too small; on `minimal-16gb`
+that means thinking never runs. Real context-budget work (what to keep, when to
+grow `num_ctx`) stays Stage 9. Embed and chat both send `keep_alive: 30m` so looking
+up the question (the embedding model) does not unload the answer model before the
+next turn. Chat uses the profile's `context_tokens` as Ollama `num_ctx`; a 32k
+default window would bloat memory and force a reload.
 
 ---
 

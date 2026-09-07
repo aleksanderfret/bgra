@@ -242,28 +242,26 @@ expansions unticked, expansion passages are not used.
 
 ---
 
-## Stage 3E — Think only when the sources need it
+## Stage 3E — Think only when the sources need it ✅ **complete**
 
 **Goal:** simple questions stay fast (no hidden reasoning). Hard ones — conflicting
 passages, errata vs rulebook, a near-miss search — may think, without dumping that
 trace as the answer.
 
-Do this **next**, **after Stage 3**, **before 3C / 3F / 3B / 3A / 3D**. It only changes
-`/ask`. Catch-up, a failed-search screen, the install gate, the progress bar, and the
-chat thread do not block it. Default stays `think: false` (D16). Thinking is an
-exception, not the default.
+Plan: `docs/archive/stage-3e-adaptive-thinking.md`.
 
 - Keep streaming only `message.content`. A think trace is never shown as the ruling.
-- Turn thinking **on** only when a checkable trigger fires, for example: hits from
-  different `documentKind` that can disagree; two passages that contradict on the
-  same topic; scores close to `min_relevance_score`. Plain “how many cards do I
-  draw?” with one clear hit stays `think: false`.
-- If thinking will take a while, the engine sends a **notice code** and the UI says
-  so in `en`/`pl` (e.g. working through a conflict). No silent wait, no “open a
-  terminal”.
+- Turn thinking **on** only when a checkable trigger fires: hits from different
+  authority-bearing `documentKind`s; two booklets of the same kind (grouped by
+  `(gameId, docKey)`); scores close to `min_relevance_score`. Plain “how many cards
+  do I draw?” with one clear hit stays `think: false`.
+- A context-headroom guard refuses thinking when the profile's `num_ctx` cannot
+  fit sources plus a thinking trace (`minimal-16gb` never thinks).
+- When thinking runs, the engine sends notice code `checking_sources_carefully`;
+  the status line shows the wait in `en`/`pl`. The bordered notice paper stays for
+  readiness failures only.
 - Tests pin the request JSON: `think` is false on the simple fixture, true on the
-  conflict fixture. Do not wait for Stage 6 to ship this; Stage 6 later measures
-  whether adaptive thinking beats always-off.
+  conflict fixture.
 
 **Acceptance:** a single-source rules question still answers without a think payload;
 a fixture with rulebook vs errata sends `think: true` and still cites the page; the
@@ -663,8 +661,8 @@ in the UI; `pnpm verify` passes.
 ## The order, if you want results fastest
 
 Stages 1 → 2 → 2A → 3 give you **a working rules arbiter over text**, and that is a
-natural stopping point for development. **Stage 3E is the next slice on that
-arbiter:** think only when sources conflict, so easy questions stay fast. Stage 3F
+natural stopping point for development. **Stage 3E is done:** think only when
+sources conflict or barely clear the cutoff, so easy questions stay fast. Stage 3F
 is the honesty gap on the preparing banner: if search never started, say so and
 keep Ask off — do not reuse “offline” or an endless “preparing”. Stage 3D
 (the scrollable, per-game thread) is what makes that arbiter usable **at the
