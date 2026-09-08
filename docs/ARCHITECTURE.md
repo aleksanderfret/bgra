@@ -122,7 +122,13 @@ scoring window covers a whole passage, and every passage names the section it
 came from (`section="…"` in the wrapper) since it may now be one slice of it.
 Documents imported before the cap are re-split from their stored
 `chunks.jsonl` on engine start (`resplit_stored_chunks`) — no PDF needed, and
-no terminal command for the player.
+no terminal command for the player. After the reranker loads and while
+`retrieval_loading` is still true, `ensure_search_index` rebuilds search
+vectors for any game whose on-disk chunks outnumber the LanceDB rows; Stage 2
+flat layouts are migrated in the same pass. If embed fails, Ask with material
+on disk emits `search_catch_up_needed` (close and reopen) instead of telling
+the player to import the PDF again — `engine_not_indexed` is only for a game
+with nothing on disk.
 
 ### 3.5. No relevance threshold and no "I don't know" state
 

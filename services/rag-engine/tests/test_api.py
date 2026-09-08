@@ -601,6 +601,61 @@ def test_ask_does_not_call_the_model_when_index_is_empty(client: TestClient) -> 
     generate.assert_not_called()
 
 
+def test_ask_with_chunks_on_disk_but_empty_index_is_catch_up_not_import(
+    client: TestClient, storage: Path
+) -> None:
+    from rag_engine.ingest.models import ChunkRecord
+    from rag_engine.ingest.pipeline import write_chunks_jsonl, write_document_manifest
+    from rag_engine.ingest.registry import upsert_game
+    from rag_engine.storage_paths import CHUNKS_FILE_NAME, MANIFEST_FILE_NAME, document_dir
+
+    doc = document_dir(storage, "azul", "rulebook", "main")
+    doc.mkdir(parents=True, exist_ok=True)
+    write_chunks_jsonl(
+        doc / CHUNKS_FILE_NAME,
+        [
+            ChunkRecord(
+                id="azul:rulebook:main:p01:c00",
+                game_id="azul",
+                document_kind="rulebook",
+                doc_key="main",
+                document_title="Rulebook",
+                page=1,
+                text="Gracz z największą liczbą kafelków zaczyna.",
+                heading="Setup",
+            )
+        ],
+    )
+    write_document_manifest(
+        doc / MANIFEST_FILE_NAME,
+        title="Rulebook",
+        kind="rulebook",
+        indexed_at="2026-01-01T00:00:00Z",
+    )
+    upsert_game(
+        storage,
+        game_id="azul",
+        title="Azul",
+        chunk_count=1,
+        document_kinds=["rulebook"],
+        documents=[],
+    )
+
+    _attach_index(client)
+    generate = AsyncMock(side_effect=AssertionError("generate_stream must not run"))
+    with (
+        patch(_TAGS_PATCH, _mock_tags(_ALL_TAGS)),
+        patch(_GEN_PATCH, generate),
+        client.stream("POST", "/ask", json=_ask_body()) as response,
+    ):
+        events = _frames("".join(response.iter_text()))
+    assert events[-1]["groundedness"] == "insufficient_evidence"
+    notices = [e for e in events if e["type"] == "notice"]
+    assert notices[0]["code"] == "search_catch_up_needed"
+    assert notices[0]["params"] == {"gameId": "azul"}
+    generate.assert_not_called()
+
+
 def test_ask_does_not_return_another_game(client: TestClient) -> None:
     _attach_index(
         client,

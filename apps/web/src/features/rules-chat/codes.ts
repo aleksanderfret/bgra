@@ -16,6 +16,7 @@ export const ERROR_CODES = [
 
 export const NOTICE_CODES = [
   'engine_not_indexed',
+  'search_catch_up_needed',
   'retrieval_not_ready',
   'retrieval_loading',
   'checking_sources_carefully',

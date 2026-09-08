@@ -121,6 +121,7 @@
   "notice": {
     "unknown": "Silnik zgłosił stan, dla którego nie ma tu jeszcze opisu.",
     "engine_not_indexed": "Nie mam jeszcze przeszukiwalnych dokumentów do gry „{{gameId}}”. Wczytaj PDF instrukcji i zapytaj ponownie.\n\nAktywny profil modeli: {{profile}}.",
+    "search_catch_up_needed": "Zasady gry „{{gameId}}” są już na tym komputerze, ale wyszukiwanie nie jest jeszcze gotowe. Zamknij aplikację i otwórz ją ponownie, a potem zapytaj jeszcze raz.",
     "retrieval_not_ready": "Asystent nie może jeszcze przeszukać twoich instrukcji. Zamknij aplikację i otwórz ją ponownie, a potem zapytaj jeszcze raz.",
     "retrieval_loading": "Wyszukiwanie nadal się uruchamia na tym komputerze. Poczekaj chwilę i zapytaj ponownie.",
     "checking_sources_carefully": "Sprawdzam dokładnie te strony, zanim odpowiem…",

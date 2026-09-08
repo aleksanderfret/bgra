@@ -216,6 +216,7 @@ describe('streamingStatusKey', () => {
 describe('isBlockingNotice', () => {
   it('treats readiness notices as blocking', () => {
     expect(isBlockingNotice('engine_not_indexed')).toBe(true);
+    expect(isBlockingNotice('search_catch_up_needed')).toBe(true);
     expect(isBlockingNotice('retrieval_not_ready')).toBe(true);
   });
 

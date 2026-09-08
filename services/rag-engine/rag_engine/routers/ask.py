@@ -31,6 +31,7 @@ from rag_engine.engines.llm import (
     installed_ollama_tags,
     load_model,
 )
+from rag_engine.ingest.pipeline import active_set_has_chunks
 from rag_engine.ingest.registry import active_game_ids, validate_expansion_ids
 from rag_engine.retrieval.pipeline import player_facing_hits, retrieve
 from rag_engine.retrieval.prompt import build_messages
@@ -96,12 +97,13 @@ async def _stream_answer(
     game_ids = active_game_ids(payload.game_id, payload.expansion_ids)
     index = stack.open_index(settings.storage_dir)
     if index.count_for_games(game_ids) == 0:
-        yield encode_event(
-            NoticeEvent(
-                code="engine_not_indexed",
-                params={"gameId": payload.game_id, "profile": settings.model_profile},
-            )
-        )
+        if active_set_has_chunks(settings.storage_dir, game_ids):
+            code = "search_catch_up_needed"
+            params: dict[str, str] = {"gameId": payload.game_id}
+        else:
+            code = "engine_not_indexed"
+            params = {"gameId": payload.game_id, "profile": settings.model_profile}
+        yield encode_event(NoticeEvent(code=code, params=params))
         yield encode_event(SourcesEvent(sources=[]))
         yield encode_event(DoneEvent(answer_id=uuid4().hex, groundedness="insufficient_evidence"))
         return

@@ -307,7 +307,7 @@ successful load the phase becomes ready as today; `pnpm verify` passes.
 
 ---
 
-## Stage 3C — Search catch-up for an existing library
+## Stage 3C — Search catch-up for an existing library ✅ **complete**
 
 **Goal:** a game that is already on the list is never treated as “no rulebook”. If
 the pages are on disk but search is empty or still starting, the player sees a wait
@@ -318,6 +318,8 @@ are already there). On a packaged install it must run **after 3B**, because catc
 needs the embedding model. Stage 3A (new-import percent bar) does not replace this:
 3A is the next PDF; 3C is yesterday’s library.
 
+Plan: `docs/archive/stage-3c-search-catch-up.md`.
+
 - On engine start, if `games.json` lists documents with chunks on disk but the search
   index has no rows for that game, **rebuild the index automatically** (same work as
   `python -m rag_engine.ingest index`). No terminal step for the player.
@@ -326,11 +328,11 @@ needs the embedding model. Stage 3A (new-import percent bar) does not replace th
   If loading has **finished** and search still is not there, that is Stage 3F — not
   this banner, and not “the assistant did not start”.
 - `engine_not_indexed` only when there is **no** material on disk for the active game
-  set. Chunks present + empty index is catch-up, not “import a PDF”.
+  set. Chunks present + empty index is catch-up (`search_catch_up_needed`), not “import a PDF”.
 - Catch-up also upgrades Stage 2 files (missing `doc_key`, page pictures in the flat
   game folder) so an old import becomes searchable without dropping the PDF again.
-- Failure to embed (Ollama down) is an in-app recovery (“start the assistant again”),
-  never a command to paste.
+- Failure to embed (Ollama down) is an in-app recovery (“close the app and open it
+  again”), never a command to paste.
 
 **Acceptance:** a library like World Order — on the list, chunks on disk, empty index —
 becomes searchable after one normal app start, without importing the PDF again; Ask

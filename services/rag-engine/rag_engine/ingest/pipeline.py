@@ -191,6 +191,11 @@ def count_chunks_for_game(storage_dir: Path, game_id: str) -> int:
     return sum(doc.chunk_count for doc in list_game_documents(storage_dir, game_id))
 
 
+def active_set_has_chunks(storage_dir: Path, game_ids: list[str]) -> bool:
+    """True when any game in the active set has chunk JSONL on disk (read-only)."""
+    return any(count_chunks_for_game(storage_dir, game_id) > 0 for game_id in game_ids)
+
+
 def list_document_kinds(storage_dir: Path, game_id: str) -> list[DocumentKind]:
     return sorted({doc.document_kind for doc in list_game_documents(storage_dir, game_id)})
 
@@ -748,7 +753,11 @@ def ensure_search_index(
 
     Covers the case where a PDF was saved but embedding failed mid-import, so
     Ask would otherwise search an incomplete library until someone re-imports.
+    Uses on-disk chunk counts (not a stale ``games.json`` count) and migrates
+    Stage 2 flat layouts before deciding to skip. One failed embed does not
+    stop the rest of the library.
     """
+    from rag_engine.retrieval.indexer import IndexingError
     from rag_engine.retrieval.service import open_chunk_index
 
     index = open_chunk_index(storage_dir)
@@ -757,30 +766,40 @@ def ensure_search_index(
     settings = get_settings()
     fixed = 0
     for game in load_games(storage_dir):
-        if game.chunk_count == 0:
-            continue
         migrate_legacy_flat_pages(storage_dir, game.game_id)
+        on_disk = count_chunks_for_game(storage_dir, game.game_id)
+        if on_disk == 0:
+            continue
+        if on_disk != game.chunk_count:
+            recount_game(storage_dir, game.game_id)
         indexed_rows = index.count_for_games([game.game_id])
-        if indexed_rows >= game.chunk_count:
+        if indexed_rows >= on_disk:
             continue
         for document in list_game_documents(storage_dir, game.game_id):
             chunks = read_chunks_jsonl(
                 chunks_path(storage_dir, game.game_id, document.document_kind, document.doc_key)
             )
-            maybe_index_document(
-                storage_dir,
-                game_id=game.game_id,
-                kind=document.document_kind,
-                doc_key=document.doc_key,
-                chunks=chunks,
-                indexed_at=document.indexed_at,
-                ollama_url=settings.ollama_url,
-                embedding_model=settings.profile.embedding,
-            )
+            try:
+                maybe_index_document(
+                    storage_dir,
+                    game_id=game.game_id,
+                    kind=document.document_kind,
+                    doc_key=document.doc_key,
+                    chunks=chunks,
+                    indexed_at=document.indexed_at,
+                    ollama_url=settings.ollama_url,
+                    embedding_model=settings.profile.embedding,
+                )
+            except IndexingError as error:
+                _log(
+                    f"search catch-up failed {game.game_id}/{document.doc_key}: {error}",
+                    progress,
+                )
+                continue
             fixed += 1
             _log(
                 f"search catch-up {game.game_id}/{document.doc_key}: "
-                f"{indexed_rows} indexed rows, {game.chunk_count} on disk",
+                f"{indexed_rows} indexed rows, {on_disk} on disk",
                 progress,
             )
     return fixed

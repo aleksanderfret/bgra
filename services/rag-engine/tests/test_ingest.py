@@ -399,6 +399,118 @@ def test_ensure_search_index_skips_when_search_already_matches(tmp_path: Path) -
     index.assert_not_called()
 
 
+def test_ensure_search_index_migrates_before_skipping_zero_registry_count(
+    tmp_path: Path,
+) -> None:
+    from rag_engine.ingest.models import ChunkRecord
+    from rag_engine.ingest.pipeline import write_document_manifest
+    from rag_engine.ingest.registry import upsert_game
+    from rag_engine.storage_paths import MANIFEST_FILE_NAME
+
+    storage = tmp_path / "storage"
+    storage.mkdir()
+    path = chunks_path(storage, "world-order", "rulebook", "main")
+    write_chunks_jsonl(
+        path,
+        [
+            ChunkRecord(
+                id="world-order:rulebook:main:p04:c00",
+                game_id="world-order",
+                document_kind="rulebook",
+                doc_key="main",
+                document_title="Rulebook",
+                page=4,
+                text="Trade with any neighbouring state.",
+                heading="Trading",
+                image_url="/static/assets/world-order/documents/rulebook/main/p04.png",
+            )
+        ],
+    )
+    write_document_manifest(path.parent / MANIFEST_FILE_NAME, title="Rulebook", kind="rulebook")
+    upsert_game(
+        storage,
+        game_id="world-order",
+        title="World Order",
+        chunk_count=0,
+        document_kinds=["rulebook"],
+        documents=[],
+    )
+
+    class FakeIndex:
+        def count_for_games(self, _game_ids: list[str]) -> int:
+            return 0
+
+    with (
+        patch("rag_engine.retrieval.service.open_chunk_index", return_value=FakeIndex()),
+        patch("rag_engine.ingest.pipeline.maybe_index_document") as index,
+    ):
+        assert ensure_search_index(storage) == 1
+
+    assert index.call_count == 1
+    assert index.call_args.kwargs["game_id"] == "world-order"
+    assert load_games(storage)[0].chunk_count == 1
+
+
+def test_ensure_search_index_continues_after_one_document_indexing_error(
+    tmp_path: Path,
+) -> None:
+    from rag_engine.ingest.models import ChunkRecord
+    from rag_engine.ingest.pipeline import write_document_manifest
+    from rag_engine.ingest.registry import recount_game
+    from rag_engine.retrieval.indexer import IndexingError
+    from rag_engine.storage_paths import MANIFEST_FILE_NAME
+
+    storage = tmp_path / "storage"
+    storage.mkdir()
+    for doc_key, page in (("main", 1), ("handbook", 2)):
+        path = chunks_path(storage, "world-order", "rulebook", doc_key)
+        write_chunks_jsonl(
+            path,
+            [
+                ChunkRecord(
+                    id=f"world-order:rulebook:{doc_key}:p{page:02d}:c00",
+                    game_id="world-order",
+                    document_kind="rulebook",
+                    doc_key=doc_key,
+                    document_title=doc_key,
+                    page=page,
+                    text=f"Body for {doc_key}.",
+                    heading=doc_key.title(),
+                )
+            ],
+        )
+        write_document_manifest(
+            path.parent / MANIFEST_FILE_NAME,
+            title=doc_key,
+            kind="rulebook",
+        )
+    recount_game(storage, "world-order", title="World Order")
+
+    class FakeIndex:
+        def count_for_games(self, _game_ids: list[str]) -> int:
+            return 0
+
+    calls: list[str] = []
+
+    def _index_side_effect(*_args: object, **kwargs: object) -> None:
+        doc_key = str(kwargs["doc_key"])
+        calls.append(doc_key)
+        if doc_key == "handbook":
+            raise IndexingError("ollama down")
+
+    with (
+        patch("rag_engine.retrieval.service.open_chunk_index", return_value=FakeIndex()),
+        patch(
+            "rag_engine.ingest.pipeline.maybe_index_document",
+            side_effect=_index_side_effect,
+        ),
+    ):
+        assert ensure_search_index(storage) == 1
+
+    assert calls == ["handbook", "main"] or calls == ["main", "handbook"]
+    assert "main" in calls and "handbook" in calls
+
+
 def test_bad_game_id_writes_nothing(tmp_path: Path) -> None:
     storage = tmp_path / "storage"
     storage.mkdir()

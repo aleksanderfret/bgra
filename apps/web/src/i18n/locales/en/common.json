@@ -121,6 +121,7 @@
   "notice": {
     "unknown": "The engine reported a state that has no description here yet.",
     "engine_not_indexed": "There are no searchable documents for “{{gameId}}” yet. Import a rulebook PDF, then ask again.\n\nActive model profile: {{profile}}.",
+    "search_catch_up_needed": "The rules for “{{gameId}}” are already on this computer, but search is not ready yet. Close the app and open it again, then ask once more.",
     "retrieval_not_ready": "The assistant cannot look through your rulebooks yet. Close the app and open it again, then ask once more.",
     "retrieval_loading": "Search is still starting on this computer. Wait a moment, then ask again.",
     "checking_sources_carefully": "Checking these pages carefully before answering…",

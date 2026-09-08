@@ -58,6 +58,7 @@ describe('translation catalogues', () => {
 
   it.each(LOCALES)('%s does not tell the player to run a package-manager command', (locale) => {
     expect(resources[locale].common.notice.retrieval_not_ready).not.toMatch(/uv sync/i);
+    expect(resources[locale].common.notice.search_catch_up_needed).not.toMatch(/uv|pnpm|ollama/i);
     const searchUnavailable = resources[locale].common.engineReadiness.searchUnavailable;
     expect(searchUnavailable.title).not.toMatch(/uv|pnpm|ollama/i);
     expect(searchUnavailable.body).not.toMatch(/uv|pnpm|ollama/i);
