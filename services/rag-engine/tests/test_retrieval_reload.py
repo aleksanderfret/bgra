@@ -149,3 +149,23 @@ async def test_schedule_bumps_generation_and_sets_loading(
     assert application.state.retrieval_load_generation == 1
     assert application.state.retrieval_loading is False
     assert application.state.retrieval_stack is None
+
+
+@pytest.mark.asyncio
+async def test_layout_ingest_flag_is_on_only_while_re_reading(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from rag_engine.main import _ensure_layout_ingest
+
+    application = FastAPI()
+    application.state.layout_ingest = False
+    seen: list[bool] = []
+
+    def _record(_storage: Path) -> int:
+        seen.append(bool(application.state.layout_ingest))
+        return 1
+
+    monkeypatch.setattr("rag_engine.main.ensure_layout_ingest", _record)
+    await _ensure_layout_ingest(application, Settings())
+    assert seen == [True]
+    assert application.state.layout_ingest is False

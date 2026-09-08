@@ -25,6 +25,25 @@ describe('EngineReadinessBanner', () => {
     expect(screen.queryByText(/pnpm/)).not.toBeInTheDocument();
   });
 
+  it('says rulebooks are being read again while layout ingest is running', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          components: { retrieval_loading: true, layout_ingest: true, reranker: false },
+        }),
+      }),
+    );
+
+    render(<EngineReadinessBanner />, 'en');
+
+    const status = await screen.findByRole('status');
+    expect(status).toHaveTextContent(en.engineReadiness.readingLayout.title);
+    expect(status).toHaveTextContent(en.engineReadiness.readingLayout.body);
+    expect(screen.queryByText(en.engineReadiness.starting.title)).not.toBeInTheDocument();
+  });
+
   it('says the assistant is preparing when the engine is not reachable yet', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('ETIMEDOUT')));
 

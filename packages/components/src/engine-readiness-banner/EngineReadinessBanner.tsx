@@ -25,6 +25,14 @@ export const EngineReadinessBanner: FC = () => {
     return null;
   }
 
+  if (phase === 'reading_layout') {
+    return (
+      <Alert color="blue" title={t('engineReadiness.readingLayout.title')} role="status">
+        {t('engineReadiness.readingLayout.body')}
+      </Alert>
+    );
+  }
+
   if (phase === 'starting') {
     return (
       <Alert color="blue" title={t('engineReadiness.starting.title')} role="status">

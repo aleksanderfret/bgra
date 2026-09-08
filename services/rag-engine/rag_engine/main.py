@@ -63,12 +63,15 @@ async def _ensure_section_maps(settings: Settings) -> None:
         logger.info("Built section catalogues for %d document(s).", rewritten)
 
 
-async def _ensure_layout_ingest(settings: Settings) -> None:
+async def _ensure_layout_ingest(app: FastAPI, settings: Settings) -> None:
+    app.state.layout_ingest = True
     try:
         rewritten = await asyncio.to_thread(ensure_layout_ingest, settings.storage_dir)
     except Exception:
         logger.exception("Could not re-read PDF page layout; retrying on the next start.")
         return
+    finally:
+        app.state.layout_ingest = False
     if rewritten:
         logger.info("Re-read page layout for %d document(s).", rewritten)
 
@@ -100,7 +103,7 @@ async def _warm_retrieval(app: FastAPI, reranker_id: str, generation: int) -> No
         if stack is not None:
             await _resize_oversized_chunks(settings)
             await _ensure_section_maps(settings)
-            await _ensure_layout_ingest(settings)
+            await _ensure_layout_ingest(app, settings)
             await _ensure_search_index(settings)
         if not _is_current_generation(app, generation):
             return
@@ -121,6 +124,7 @@ def schedule_retrieval_load(app: FastAPI, reranker_id: str) -> asyncio.Task[None
     app.state.retrieval_load_generation = generation
     app.state.retrieval_stack = None
     app.state.retrieval_loading = True
+    app.state.layout_ingest = False
     task = asyncio.get_running_loop().create_task(_warm_retrieval(app, reranker_id, generation))
     app.state.retrieval_load_task = task
     return task
@@ -135,6 +139,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     if os.environ.get("BGA_SKIP_RETRIEVAL_WARM") == "1":
         app.state.retrieval_stack = None
         app.state.retrieval_loading = False
+        app.state.layout_ingest = False
         logger.info("Skipping retrieval warm-up (BGA_SKIP_RETRIEVAL_WARM=1).")
     else:
         # Serve /health and /games immediately; CrossEncoder load can take minutes.

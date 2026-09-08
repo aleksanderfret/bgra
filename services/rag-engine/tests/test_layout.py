@@ -96,3 +96,39 @@ def test_through_the_ages_handbook_page_order() -> None:
         if section.page == 13 and section.heading.casefold() in {"przykład", "przykład."}
     ]
     assert orphan_examples == []
+
+
+def _tiny_rulebook(path: Path) -> Path:
+    import pymupdf
+
+    document = pymupdf.open()  # type: ignore[no-untyped-call,unused-ignore]
+    page = document.new_page()
+    page.insert_text((72, 72), "# Setup\n\nDraw tiles.")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    document.save(path)  # type: ignore[no-untyped-call,unused-ignore]
+    document.close()  # type: ignore[no-untyped-call,unused-ignore]
+    return path
+
+
+def test_extract_pdf_chunks_falls_back_when_layout_exceeds_time_budget(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from rag_engine.ingest.layout import LayoutTimeoutError, extract_pdf_chunks
+
+    pdf = _tiny_rulebook(tmp_path / "demo.pdf")
+
+    def _timeout(_pdf_path: Path, *, deadline: float | None = None) -> list[object]:
+        raise LayoutTimeoutError("budget")
+
+    monkeypatch.setattr("rag_engine.ingest.layout.extract_layout_sections", _timeout)
+    chunks, reader = extract_pdf_chunks(
+        pdf,
+        game_id="azul",
+        kind="rulebook",
+        doc_key="main",
+        document_title="Rulebook",
+        time_budget_seconds=1.0,
+    )
+
+    assert reader == "pymupdf4llm"
+    assert any(chunk.text for chunk in chunks)

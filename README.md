@@ -328,14 +328,15 @@ What you can already do, and what is still on the way. The numbered engineering 
 - [x] Add your own rulebook PDF, or a teaching video.
 - [x] Keep extra booklets and expansions with the base game, not as a jumble.
 - [x] Get an answer from those files, with the page so everyone at the table can check.
+- [x] If looking through the rulebooks never started, the screen says so and asking stays off — the app does not pretend it is ready.
+- [x] Take extra care when the book and an errata disagree; everyday questions stay snappy.
+- [x] A question asking for a whole list ("every action", "every phase") gets the whole list, not just the first few matches.
+- [x] After an update, a game already in your library just works — no dropping the PDF again.
+- [x] The first time you open the downloaded app, it sets itself up. No terminal.
+- [x] Read busy pages (two columns, side boxes) without losing the note next to the rule.
 
 **Next at the table**
 
-- [x] If looking through the rulebooks never started, the screen says so and asking stays off — the app does not pretend it is ready.
-- [x] Take extra care when the book and an errata disagree; everyday questions stay snappy.
-- [ ] A question asking for a whole list ("every action", "every phase") gets the whole list, not just the first few matches.
-- [ ] After an update, a game already in your library just works — no dropping the PDF again.
-- [ ] The first time you open the downloaded app, it sets itself up. No terminal.
 - [ ] Watch a real progress bar while a rulebook is being added.
 - [ ] Scroll back through earlier questions for that game.
 - [ ] Learn a new game step by step, not only settle a fight mid-session.
@@ -344,7 +345,6 @@ What you can already do, and what is still on the way. The numbered engineering 
 **Later**
 
 - [ ] Keep a set of real questions so we can tell if answers got better or worse.
-- [ ] Find out whether busy pages (two columns, side boxes) make us miss a rule.
 - [ ] Show the diagram that matters, not only the whole page.
 - [ ] If your files are silent, offer an optional look online — never by itself.
 - [ ] In a long chat, still answer from this question’s pages, not leftover talk.

@@ -231,7 +231,9 @@ Regression fixtures are handbook pages 3, 9 and 13. `pymupdf4llm` remains the
 fallback on timeout or extract failure — and a fallback does **not** stamp
 `ingestLayoutVersion`, so the next engine start retries layout. Documents with
 `source.pdf` migrate once via `ingestLayoutVersion` on the manifest when layout
-succeeds.
+succeeds. While that remigration runs, `/health` sets `layout_ingest` and the
+banner says the rulebooks are being read again — not the generic “preparing”
+copy.
 
 ### 3.6. No evaluation set — the largest omission in the whole plan
 

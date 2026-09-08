@@ -382,7 +382,17 @@ def test_health_responds_while_retrieval_is_loading(
     assert response.status_code == 200
     assert payload["status"] == "ok"
     assert payload["components"]["retrieval_loading"] is True
+    assert payload["components"]["layout_ingest"] is False
     assert payload["components"]["reranker"] is False
+
+
+def test_health_reports_layout_ingest_while_re_reading_pdfs(client: TestClient) -> None:
+    app = client.app
+    assert isinstance(app, FastAPI)
+    app.state.layout_ingest = True
+    with patch(_HEALTH_TAGS_PATCH, _mock_tags(_ALL_TAGS)):
+        payload = client.get("/health").json()
+    assert payload["components"]["layout_ingest"] is True
 
 
 @pytest.mark.live_retrieval

@@ -12,6 +12,7 @@ def skip_search_index(request: pytest.FixtureRequest, monkeypatch: pytest.Monkey
 def _skip_retrieval_load(app: FastAPI, _reranker_id: str) -> None:
     app.state.retrieval_stack = None
     app.state.retrieval_loading = False
+    app.state.layout_ingest = False
 
 
 @pytest.fixture(autouse=True)

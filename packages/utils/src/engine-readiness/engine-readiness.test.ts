@@ -62,6 +62,18 @@ describe('phaseFromPoll', () => {
     ).toBe('starting');
   });
 
+  it('is reading_layout while old PDFs are being re-read, even if search is still loading', () => {
+    expect(
+      phaseFromPoll({
+        health: {
+          components: { retrieval_loading: true, layout_ingest: true, reranker: false },
+        },
+        failedForMs: 0,
+        offlineAfterMs: 20_000,
+      }),
+    ).toBe('reading_layout');
+  });
+
   it('is starting when health cannot be reached yet', () => {
     expect(
       phaseFromPoll({

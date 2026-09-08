@@ -49,6 +49,7 @@ async def read_health(
     stack = getattr(request.app.state, "retrieval_stack", None)
     retrieval_ready = stack is not None
     retrieval_loading = bool(getattr(request.app.state, "retrieval_loading", False))
+    layout_ingest = bool(getattr(request.app.state, "layout_ingest", False))
     storage_ok = settings.storage_dir.is_dir()
     components = {
         "ollama": ollama_up,
@@ -56,6 +57,7 @@ async def read_health(
         "index": retrieval_ready,
         "reranker": retrieval_ready,
         "retrieval_loading": retrieval_loading,
+        "layout_ingest": layout_ingest,
     }
     models: dict[str, str] = {
         "profile": settings.model_profile,

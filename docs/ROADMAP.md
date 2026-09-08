@@ -481,19 +481,16 @@ full answer is still readable; past chat is not in the search index as FAQ;
 
 ---
 
-## Stage 3G — Rulebook import understanding (section coverage and page layout gate)
+## Stage 3G — Rulebook import understanding (section coverage and page layout gate) ✅ **complete**
 
 **Goal:** a question that asks for a whole list ("list every action") gets the whole
 list, not just the first few passages the reranker kept. Also settle whether page
 layout (columns, boxes, examples) is a second, separate loss before building a reader
 for it.
 
-Do this **after Stage 3E and 3F** (the relevance-score fix that made
-`insufficient_evidence` reachable again also surfaced this: fewer, sharper passages
-means a list spread across many headings can lose coverage) and **before Stage 4**.
-This stage runs Stage 6A's measurement gate now instead of waiting for Stage 6; see the
-note there. A full Cursor plan exists for this stage; archive it to
-`docs/archive/stage-3g-rulebook-import-understanding.md` once work starts.
+Done after Stage 3E and 3F, before Stage 4. Plan:
+`docs/archive/stage-3g-rulebook-import-understanding.md`. This stage ran Stage 6A's
+measurement gate instead of waiting for Stage 6.
 
 **Phase 0 — measure before building** (blocks Phase 2 only, not Phase 1):
 
@@ -780,6 +777,8 @@ natural stopping point for development. **Stage 3E is done:** think only when
 sources conflict or barely clear the cutoff, so easy questions stay fast. **Stage 3F
 is done:** if search never started, the UI says so and keeps Ask (and PDF import)
 off — not “offline”, not an endless “preparing”; Try again re-runs the load in-app.
+**Stage 3G is done:** list questions keep every named section, and dense pages are
+re-read once with a layout-aware importer; the banner says so while that runs.
 Stage 3D
 (the scrollable, per-game thread) is what makes that arbiter usable **at the
 table** — you can look back, and sound is optional. Stage 0A–0C (hardening, desktop
