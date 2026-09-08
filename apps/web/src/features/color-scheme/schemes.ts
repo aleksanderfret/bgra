@@ -8,6 +8,5 @@ export const COLOR_SCHEMES = [
 
 export type ColorSchemePreference = (typeof COLOR_SCHEMES)[number];
 
-export function isColorScheme(value: string): value is ColorSchemePreference {
-  return (COLOR_SCHEMES as readonly string[]).includes(value);
-}
+export const isColorScheme = (value: string): value is ColorSchemePreference =>
+  COLOR_SCHEMES.some((scheme) => scheme === value);

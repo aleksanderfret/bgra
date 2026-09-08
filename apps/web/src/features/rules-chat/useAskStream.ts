@@ -24,7 +24,7 @@ export interface UseAskStream {
  * typing. */
 const TOKEN_FLUSH_MS = 50;
 
-export function useAskStream(): UseAskStream {
+export const useAskStream = (): UseAskStream => {
   const [state, setState] = useState<AnswerState>(initialAnswerState);
   const abortRef = useRef<AbortController | null>(null);
   const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -128,4 +128,4 @@ export function useAskStream(): UseAskStream {
   }, [stopFlushing]);
 
   return { state, ask, cancel };
-}
+};

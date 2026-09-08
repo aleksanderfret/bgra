@@ -6,6 +6,16 @@ import type {
 } from '@bga/api-contract';
 import { engineAssetUrl } from '@/lib/engine-proxy';
 
+export interface AnswerNotice {
+  code: string;
+  params: Record<string, string>;
+}
+
+export interface AnswerError {
+  code: string;
+  message: string;
+}
+
 export interface AnswerState {
   stage: PipelineStage | 'idle';
   isStreaming: boolean;
@@ -14,8 +24,8 @@ export interface AnswerState {
   text: string;
   figureIds: string[];
   groundedness: Groundedness | null;
-  notice: { code: string; params: Record<string, string> } | null;
-  error: { code: string; message: string } | null;
+  notice: AnswerNotice | null;
+  error: AnswerError | null;
   rejectedFigureCount: number;
 }
 
@@ -32,16 +42,16 @@ export const initialAnswerState: AnswerState = {
   rejectedFigureCount: 0,
 };
 
-export function startAnswer(): AnswerState {
+export const startAnswer = (): AnswerState => {
   return { ...initialAnswerState, isStreaming: true, stage: 'retrieving' };
-}
+};
 
 /**
  * A figure is shown only when its id is in `sources`, that source has an
  * image, and the image resolves to a path on this origin. Anything else is
  * counted in `rejectedFigureCount` and discarded.
  */
-export function reduceAssistantEvent(state: AnswerState, event: AssistantEvent): AnswerState {
+export const reduceAssistantEvent = (state: AnswerState, event: AssistantEvent): AnswerState => {
   switch (event.type) {
     case 'status':
       return { ...state, stage: event.stage };
@@ -90,7 +100,7 @@ export function reduceAssistantEvent(state: AnswerState, event: AssistantEvent):
     default:
       return state;
   }
-}
+};
 
 export interface VisibleFigure {
   source: RetrievedSource;
@@ -98,7 +108,7 @@ export interface VisibleFigure {
   src: string;
 }
 
-export function selectVisibleFigures(state: AnswerState): VisibleFigure[] {
+export const selectVisibleFigures = (state: AnswerState): VisibleFigure[] => {
   return state.figureIds.flatMap((id) => {
     const source = state.sources.find((candidate) => candidate.id === id);
     if (source === undefined || source.imageUrl === null) {
@@ -107,20 +117,20 @@ export function selectVisibleFigures(state: AnswerState): VisibleFigure[] {
     const src = engineAssetUrl(source.imageUrl);
     return src === null ? [] : [{ source, src }];
   });
-}
+};
 
 /** Notices that describe a wait, so the status line says them instead of the stage. */
 const WAIT_NOTICES = ['checking_sources_carefully', 'preparing_assistant'] as const;
 
 type WaitNotice = (typeof WAIT_NOTICES)[number];
 
-function waitNoticeOf(state: AnswerState): WaitNotice | undefined {
+const waitNoticeOf = (state: AnswerState): WaitNotice | undefined => {
   return WAIT_NOTICES.find((code) => code === state.notice?.code);
-}
+};
 
-export function streamingStatusKey(
+export const streamingStatusKey = (
   state: AnswerState,
-): `notice.${WaitNotice}` | `stage.${PipelineStage}` | null {
+): `notice.${WaitNotice}` | `stage.${PipelineStage}` | null => {
   if (!state.isStreaming || state.stage === 'idle') {
     return null;
   }
@@ -129,8 +139,8 @@ export function streamingStatusKey(
     return `notice.${waiting}`;
   }
   return `stage.${state.stage}`;
-}
+};
 
-export function isBlockingNotice(code: string): boolean {
+export const isBlockingNotice = (code: string): boolean => {
   return !WAIT_NOTICES.some((wait) => wait === code);
-}
+};

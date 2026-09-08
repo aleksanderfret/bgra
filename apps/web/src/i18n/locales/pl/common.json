@@ -38,6 +38,9 @@
   "preferences": {
     "label": "Ustawienia wyświetlania"
   },
+  "ui": {
+    "missingValue": "—"
+  },
   "language": {
     "label": "Język interfejsu",
     "pl": "Polski",

@@ -2,29 +2,38 @@
 
 import { SegmentedControl, Stack, Text } from '@mantine/core';
 import { usePathname, useRouter } from 'next/navigation';
-import { useId } from 'react';
+import { type FC, useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { localeFromPathname } from '@/i18n/routing';
 import { DEFAULT_LOCALE } from '@/i18n/settings';
 
 export type AppView = 'assistant' | 'rulebooks';
 
-function viewFromPathname(pathname: string): AppView {
+const viewFromPathname = (pathname: string): AppView => {
   const segments = pathname.split('/').filter(Boolean);
   return segments[1] === 'rulebooks' ? 'rulebooks' : 'assistant';
-}
+};
 
-function pathForView(locale: string, view: AppView): string {
+const pathForView = (locale: string, view: AppView): string => {
   return view === 'rulebooks' ? `/${locale}/rulebooks` : `/${locale}`;
-}
+};
 
-export function AppNav() {
+export const AppNav: FC = () => {
   const { t } = useTranslation();
   const labelId = useId();
   const router = useRouter();
   const pathname = usePathname();
   const locale = localeFromPathname(pathname) ?? DEFAULT_LOCALE;
   const active = viewFromPathname(pathname);
+
+  const handleViewChange = (value: string): void => {
+    if (value === 'assistant' || value === 'rulebooks') {
+      const next = pathForView(locale, value);
+      if (next !== pathname) {
+        router.push(next);
+      }
+    }
+  };
 
   return (
     <Stack gap={4} component="nav" aria-labelledby={labelId}>
@@ -35,14 +44,7 @@ export function AppNav() {
         size="sm"
         aria-labelledby={labelId}
         value={active}
-        onChange={(value) => {
-          if (value === 'assistant' || value === 'rulebooks') {
-            const next = pathForView(locale, value);
-            if (next !== pathname) {
-              router.push(next);
-            }
-          }
-        }}
+        onChange={handleViewChange}
         data={[
           { value: 'assistant', label: t('appNav.assistant') },
           { value: 'rulebooks', label: t('appNav.rulebooks') },
@@ -50,4 +52,4 @@ export function AppNav() {
       />
     </Stack>
   );
-}
+};

@@ -4,9 +4,9 @@ import pl from '@/i18n/locales/pl/common.json';
 import { render, screen, userEvent, waitFor } from '@/test-utils';
 import { RulesChat } from './RulesChat';
 
-function withEngineOffline(): void {
+const withEngineOffline = (): void => {
   vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('ECONNREFUSED'));
-}
+};
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -125,13 +125,35 @@ describe('RulesChat', () => {
       if (askCall === undefined) {
         throw new Error('expected /ask fetch');
       }
-      const init = askCall[1] as RequestInit;
-      const body = JSON.parse(String(init.body)) as {
+      interface AskBody {
         gameId: string;
         expansionIds?: string[];
+      }
+      const isAskBody = (value: unknown): value is AskBody => {
+        if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+          return false;
+        }
+        if (!('gameId' in value) || typeof value.gameId !== 'string') {
+          return false;
+        }
+        if ('expansionIds' in value && value.expansionIds !== undefined) {
+          return (
+            Array.isArray(value.expansionIds) &&
+            value.expansionIds.every((id) => typeof id === 'string')
+          );
+        }
+        return true;
       };
-      expect(body.gameId).toBe('azul');
-      expect(body.expansionIds).toEqual(['azul-crystal']);
+      const init = askCall[1];
+      const rawBody =
+        typeof init === 'object' && init !== null && 'body' in init ? init.body : undefined;
+      const parsed: unknown = JSON.parse(String(rawBody));
+      expect(isAskBody(parsed)).toBe(true);
+      if (!isAskBody(parsed)) {
+        return;
+      }
+      expect(parsed.gameId).toBe('azul');
+      expect(parsed.expansionIds).toEqual(['azul-crystal']);
     });
   });
 

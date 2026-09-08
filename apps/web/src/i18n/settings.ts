@@ -10,6 +10,5 @@ export const DEFAULT_LOCALE: Locale = 'pl';
 
 export const NAMESPACE = 'common';
 
-export function isLocale(value: string): value is Locale {
-  return (LOCALES as readonly string[]).includes(value);
-}
+export const isLocale = (value: string): value is Locale =>
+  LOCALES.some((locale) => locale === value);

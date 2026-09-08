@@ -16,10 +16,21 @@ import {
   TextInput,
   Title,
 } from '@mantine/core';
-import { type DragEvent, useEffect, useId, useRef, useState } from 'react';
+import {
+  type ChangeEvent,
+  type DragEvent,
+  type FC,
+  type ReactElement,
+  type SubmitEvent,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEngineReadiness } from '@/features/engine-readiness/useEngineReadiness';
 import { GAMES_CHANGED_EVENT } from '@/lib/desktop-bridge';
+import { isGameSummaryList } from '@/lib/game-summary';
 
 type ImportMode = 'create' | 'attach';
 
@@ -41,23 +52,31 @@ type ImportFeedback =
   | { kind: 'ingest_busy' }
   | { kind: 'success'; gameId: string; documentTitle: string; attached: boolean };
 
-type EngineErrorBody = { type?: string; code?: string };
-
-function engineErrorCode(payload: unknown): string | null {
-  if (typeof payload !== 'object' || payload === null) {
-    return null;
-  }
-  const body = payload as EngineErrorBody;
-  if (body.type === 'error' && typeof body.code === 'string') {
-    return body.code;
-  }
-  return null;
+interface EngineErrorEvent {
+  type: 'error';
+  code: string;
 }
+
+interface FileButtonRenderProps {
+  onClick: () => void;
+}
+
+const isEngineErrorEvent = (value: unknown): value is EngineErrorEvent => {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return false;
+  }
+  return (
+    'type' in value && value.type === 'error' && 'code' in value && typeof value.code === 'string'
+  );
+};
+
+const engineErrorCode = (payload: unknown): string | null =>
+  isEngineErrorEvent(payload) ? payload.code : null;
 
 const isImportMode = (value: string): value is ImportMode =>
   value === 'create' || value === 'attach';
 
-export function PdfDropZone() {
+export const PdfDropZone: FC = () => {
   const { t } = useTranslation();
   const headingId = useId();
   const dropTitleId = useId();
@@ -94,8 +113,8 @@ export function PdfDropZone() {
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}`);
         }
-        const payload = (await response.json()) as GameSummary[];
-        if (!cancelled) {
+        const payload: unknown = await response.json();
+        if (!cancelled && isGameSummaryList(payload)) {
           setGames(payload);
         }
       } catch {
@@ -330,8 +349,59 @@ export function PdfDropZone() {
       ? t('pdfImport.error.invalidDocumentTitleBody')
       : undefined;
 
+  const handleFormSubmit = (event: SubmitEvent<HTMLFormElement>): void => {
+    event.preventDefault();
+  };
+
+  const handleModeChange = (value: string): void => {
+    if (isImportMode(value)) {
+      setMode(value);
+      setFeedback({ kind: 'idle' });
+    }
+  };
+
+  const handleGameIdChange = (event: ChangeEvent<HTMLInputElement>): void => {
+    setGameId(event.currentTarget.value);
+  };
+
+  const handleGameTitleChange = (event: ChangeEvent<HTMLInputElement>): void => {
+    setGameTitle(event.currentTarget.value);
+  };
+
+  const handleDocumentTitleChange = (event: ChangeEvent<HTMLInputElement>): void => {
+    setDocumentTitle(event.currentTarget.value);
+  };
+
+  const handleCommunityFaqChange = (event: ChangeEvent<HTMLInputElement>): void => {
+    setFetchCommunityFaq(event.currentTarget.checked);
+  };
+
+  const handleDragOver = (event: DragEvent<HTMLDivElement>): void => {
+    event.preventDefault();
+    if (!controlsDisabled) {
+      setDragging(true);
+    }
+  };
+
+  const handleDragLeave = (): void => {
+    setDragging(false);
+  };
+
+  const renderChooseFileButton = (props: FileButtonRenderProps): ReactElement => (
+    <Button
+      {...props}
+      type="button"
+      variant="light"
+      size="sm"
+      loading={busy}
+      disabled={controlsDisabled}
+    >
+      {t('pdfImport.drop.chooseFile')}
+    </Button>
+  );
+
   return (
-    <form aria-labelledby={headingId} aria-busy={busy} onSubmit={(event) => event.preventDefault()}>
+    <form aria-labelledby={headingId} aria-busy={busy} onSubmit={handleFormSubmit}>
       <Stack gap="md">
         <Stack gap={4}>
           <Title order={2} id={headingId}>
@@ -347,12 +417,7 @@ export function PdfDropZone() {
             <Text size="sm">{t('pdfImport.howAdding.helper')}</Text>
             <SegmentedControl
               value={mode}
-              onChange={(value) => {
-                if (isImportMode(value)) {
-                  setMode(value);
-                  setFeedback({ kind: 'idle' });
-                }
-              }}
+              onChange={handleModeChange}
               data={[
                 { value: 'create', label: t('pdfImport.howAdding.create') },
                 { value: 'attach', label: t('pdfImport.howAdding.attach') },
@@ -372,7 +437,7 @@ export function PdfDropZone() {
                 description={t('pdfImport.gameId.description')}
                 placeholder={t('pdfImport.gameId.placeholder')}
                 value={gameId}
-                onChange={(event) => setGameId(event.currentTarget.value)}
+                onChange={handleGameIdChange}
                 error={gameIdError}
                 required
                 disabled={controlsDisabled}
@@ -382,7 +447,7 @@ export function PdfDropZone() {
                 description={t('pdfImport.gameTitle.description')}
                 placeholder={t('pdfImport.gameTitle.placeholder')}
                 value={gameTitle}
-                onChange={(event) => setGameTitle(event.currentTarget.value)}
+                onChange={handleGameTitleChange}
                 disabled={controlsDisabled}
               />
               <Select
@@ -402,14 +467,14 @@ export function PdfDropZone() {
                 description={t('pdfImport.documentTitle.description')}
                 placeholder={t('pdfImport.documentTitle.placeholder')}
                 value={documentTitle}
-                onChange={(event) => setDocumentTitle(event.currentTarget.value)}
+                onChange={handleDocumentTitleChange}
                 disabled={controlsDisabled}
               />
               <Checkbox
                 label={t('pdfImport.communityFaq.label')}
                 description={t('pdfImport.communityFaq.description')}
                 checked={fetchCommunityFaq}
-                onChange={(event) => setFetchCommunityFaq(event.currentTarget.checked)}
+                onChange={handleCommunityFaqChange}
                 disabled={controlsDisabled}
               />
             </Stack>
@@ -442,7 +507,7 @@ export function PdfDropZone() {
                 description={t('pdfImport.documentTitle.requiredAttach')}
                 placeholder={t('pdfImport.documentTitle.placeholder')}
                 value={documentTitle}
-                onChange={(event) => setDocumentTitle(event.currentTarget.value)}
+                onChange={handleDocumentTitleChange}
                 error={documentTitleError}
                 required
                 disabled={controlsDisabled}
@@ -458,13 +523,8 @@ export function PdfDropZone() {
             radius="md"
             aria-labelledby={dropTitleId}
             aria-describedby={dropHintId}
-            onDragOver={(event) => {
-              event.preventDefault();
-              if (!controlsDisabled) {
-                setDragging(true);
-              }
-            }}
-            onDragLeave={() => setDragging(false)}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
             onDrop={onDrop}
             bg={dragging ? 'var(--mantine-color-teal-light)' : undefined}
             style={{ minHeight: 120, cursor: controlsDisabled ? 'not-allowed' : 'copy' }}
@@ -490,18 +550,7 @@ export function PdfDropZone() {
                   onChange={handleFile}
                   inputProps={{ 'aria-label': t('pdfImport.drop.chooseFile') }}
                 >
-                  {(props) => (
-                    <Button
-                      {...props}
-                      type="button"
-                      variant="light"
-                      size="sm"
-                      loading={busy}
-                      disabled={controlsDisabled}
-                    >
-                      {t('pdfImport.drop.chooseFile')}
-                    </Button>
-                  )}
+                  {renderChooseFileButton}
                 </FileButton>
               </Group>
             </Stack>
@@ -598,4 +647,4 @@ export function PdfDropZone() {
       </Stack>
     </form>
   );
-}
+};

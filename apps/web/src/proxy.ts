@@ -13,7 +13,7 @@ export const config = {
   matcher: ['/((?!api|_next|.*\\..*).*)'],
 };
 
-export function proxy(request: NextRequest): NextResponse {
+export const proxy = (request: NextRequest): NextResponse => {
   const { pathname } = request.nextUrl;
 
   if (localeFromPathname(pathname) !== null) {
@@ -24,4 +24,4 @@ export function proxy(request: NextRequest): NextResponse {
   target.pathname = prefixLocale(pathname, DEFAULT_LOCALE);
 
   return NextResponse.redirect(target);
-}
+};

@@ -1,8 +1,13 @@
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { type FC, type ReactNode, useEffect, useState } from 'react';
 import { getDesktopApi } from '@/lib/desktop-bridge';
+
+interface DesktopGateProps {
+  locale: string;
+  children: ReactNode;
+}
 
 /**
  * Keeps packaged desktop on /setup until the gate passes.
@@ -11,7 +16,7 @@ import { getDesktopApi } from '@/lib/desktop-bridge';
  * `window.bgaDesktop` is absent (SSR) and false in Electron caused a hydration
  * mismatch that left the setup page mounted twice.
  */
-export function DesktopGate({ locale, children }: { locale: string; children: React.ReactNode }) {
+export const DesktopGate: FC<DesktopGateProps> = ({ locale, children }) => {
   const router = useRouter();
   const pathname = usePathname();
   const [ready, setReady] = useState(false);
@@ -42,4 +47,4 @@ export function DesktopGate({ locale, children }: { locale: string; children: Re
     return null;
   }
   return children;
-}
+};

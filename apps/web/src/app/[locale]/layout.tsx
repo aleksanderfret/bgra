@@ -11,15 +11,19 @@ import { I18nProvider } from '@/i18n/I18nProvider';
 import { getTranslation } from '@/i18n/server';
 import { isLocale, LOCALES } from '@/i18n/settings';
 
+interface LocaleRouteParams {
+  locale: string;
+}
+
 interface LocaleParams {
-  params: Promise<{ locale: string }>;
+  params: Promise<LocaleRouteParams>;
 }
 
-export function generateStaticParams(): { locale: string }[] {
+export const generateStaticParams = (): LocaleRouteParams[] => {
   return LOCALES.map((locale) => ({ locale }));
-}
+};
 
-export async function generateMetadata({ params }: LocaleParams): Promise<Metadata> {
+export const generateMetadata = async ({ params }: LocaleParams): Promise<Metadata> => {
   const { locale } = await params;
   const t = getTranslation(isLocale(locale) ? locale : 'pl');
 
@@ -27,7 +31,7 @@ export async function generateMetadata({ params }: LocaleParams): Promise<Metada
     title: t('metadata.title'),
     description: t('metadata.description'),
   };
-}
+};
 
 export default async function RootLayout({ children, params }: LayoutProps<'/[locale]'>) {
   const { locale } = await params;

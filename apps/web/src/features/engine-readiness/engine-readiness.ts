@@ -6,19 +6,24 @@ export interface EngineHealthSnapshot {
   components: Record<string, boolean>;
 }
 
-export function isEngineHealthSnapshot(value: unknown): value is EngineHealthSnapshot {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    return false;
-  }
-  const components = (value as { components?: unknown }).components;
-  return typeof components === 'object' && components !== null && !Array.isArray(components);
-}
-
-export function phaseFromPoll(options: {
+export interface PhaseFromPollOptions {
   health: EngineHealthSnapshot | null;
   failedForMs: number;
   offlineAfterMs: number;
-}): EnginePhase {
+}
+
+export const isEngineHealthSnapshot = (value: unknown): value is EngineHealthSnapshot => {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return false;
+  }
+  if (!('components' in value)) {
+    return false;
+  }
+  const { components } = value;
+  return typeof components === 'object' && components !== null && !Array.isArray(components);
+};
+
+export const phaseFromPoll = (options: PhaseFromPollOptions): EnginePhase => {
   const { health, failedForMs, offlineAfterMs } = options;
   if (health === null) {
     return failedForMs >= offlineAfterMs ? 'offline' : 'starting';
@@ -30,4 +35,4 @@ export function phaseFromPoll(options: {
     return 'ready';
   }
   return 'search_unavailable';
-}
+};

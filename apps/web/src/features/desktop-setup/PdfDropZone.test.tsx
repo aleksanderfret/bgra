@@ -6,9 +6,14 @@ import { PdfDropZone } from './PdfDropZone';
 const readyHealth = { components: { retrieval_loading: false, reranker: true } };
 const failedSearchHealth = { components: { retrieval_loading: false, reranker: false } };
 
-function stubEngineFetch(
-  handler: (url: string) => { ok: boolean; json: () => Promise<unknown> } | null,
-): ReturnType<typeof vi.fn> {
+interface StubFetchResponse {
+  ok: boolean;
+  json: () => Promise<unknown>;
+}
+
+const stubEngineFetch = (
+  handler: (url: string) => StubFetchResponse | null,
+): ReturnType<typeof vi.fn> => {
   return vi.fn().mockImplementation(async (input: RequestInfo) => {
     const url = String(input);
     if (url.includes('/health')) {
@@ -23,7 +28,7 @@ function stubEngineFetch(
     }
     return { ok: true, json: async () => ({}) };
   });
-}
+};
 
 describe('PdfDropZone', () => {
   afterEach(() => {

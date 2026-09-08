@@ -2,14 +2,14 @@
 
 import { Alert, Button, Group, List, Stack, Text } from '@mantine/core';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { type FC, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DEFAULT_LOCALE, isLocale } from '@/i18n/settings';
 import { type DesktopSetupState, getDesktopApi, type RuntimeProgress } from '@/lib/desktop-bridge';
 
 type Translate = ReturnType<typeof useTranslation>['t'];
 
-function runtimeErrorMessage(t: Translate, code: string): string {
+const runtimeErrorMessage = (t: Translate, code: string): string => {
   switch (code) {
     case 'download_failed':
       return t('setup.runtime.error.download_failed');
@@ -22,9 +22,9 @@ function runtimeErrorMessage(t: Translate, code: string): string {
     default:
       return t('setup.runtime.error.runtime_failed');
   }
-}
+};
 
-export function SetupPanel() {
+export const SetupPanel: FC = () => {
   const { t, i18n } = useTranslation();
   const router = useRouter();
   const locale = isLocale(i18n.language) ? i18n.language : DEFAULT_LOCALE;
@@ -82,6 +82,7 @@ export function SetupPanel() {
   const reason = state.recommendation?.reason ?? 'starter';
   const warningReason = reason === 'insufficient_memory' || reason === 'insufficient_disk';
   const platform = state.machine?.platform;
+  const missingValue = t('ui.missingValue');
   const stageMessage = (() => {
     if (progress === null) {
       return null;
@@ -100,13 +101,52 @@ export function SetupPanel() {
     }
   })();
 
+  const handleOpenDownloadPage = (): void => {
+    void api?.openExternalHttps(state.ollamaDownloadUrl);
+  };
+
+  const handleContinue = (): void => {
+    if (api === null) {
+      return;
+    }
+    void api.markSetupComplete().then(() => {
+      router.push(`/${locale}`);
+    });
+  };
+
+  const handleEnsureRuntime = (): void => {
+    if (api === null) {
+      return;
+    }
+    setBusy(true);
+    setErrorCode(null);
+    void api
+      .ensureRuntime()
+      .then(() => api.markSetupComplete())
+      .then(() => {
+        router.push(`/${locale}`);
+      })
+      .catch(() => {
+        /* progress event carries the error code */
+      })
+      .finally(() => {
+        setBusy(false);
+      });
+  };
+
+  const handleSaveDiagnostics = (): void => {
+    void api?.saveDiagnostics().then((result) => {
+      setDiagnosticsPath(result.path);
+    });
+  };
+
   return (
     <Stack gap="lg">
       <Alert color="gray" title={t('setup.hardware.title')}>
         <List spacing="xs" size="sm">
           <List.Item>
             {t('setup.hardware.memory', {
-              gib: state.machine?.totalMemoryGiB ?? '—',
+              gib: state.machine?.totalMemoryGiB ?? missingValue,
             })}
           </List.Item>
           {state.machine?.gpuMemoryGiB != null && (
@@ -114,12 +154,12 @@ export function SetupPanel() {
           )}
           <List.Item>
             {t('setup.hardware.disk', {
-              gib: state.machine?.freeDiskGiB ?? '—',
+              gib: state.machine?.freeDiskGiB ?? missingValue,
             })}
           </List.Item>
           <List.Item>
             {t('setup.hardware.platform', {
-              platform: state.machine?.platform ?? '—',
+              platform: state.machine?.platform ?? missingValue,
             })}
           </List.Item>
         </List>
@@ -143,12 +183,12 @@ export function SetupPanel() {
           <List.Item>{t('setup.runtime.needsOllama')}</List.Item>
           <List.Item>
             {t('setup.runtime.needsChatModel', {
-              model: state.healthModels.llm || '—',
+              model: state.healthModels.llm || missingValue,
             })}
           </List.Item>
           <List.Item>
             {t('setup.runtime.needsEmbeddingModel', {
-              model: state.healthModels.embedding || '—',
+              model: state.healthModels.embedding || missingValue,
             })}
           </List.Item>
         </List>
@@ -180,13 +220,7 @@ export function SetupPanel() {
       {errorCode !== null ? (
         <Alert color="red" title={t('setup.runtime.errorTitle')}>
           <Text size="sm">{runtimeErrorMessage(t, errorCode)}</Text>
-          <Button
-            mt="sm"
-            variant="light"
-            onClick={() => {
-              void api?.openExternalHttps(state.ollamaDownloadUrl);
-            }}
-          >
+          <Button mt="sm" variant="light" onClick={handleOpenDownloadPage}>
             {t('setup.runtime.openDownloadPage')}
           </Button>
         </Alert>
@@ -200,46 +234,11 @@ export function SetupPanel() {
 
       <Group>
         {state.askReady ? (
-          <Button
-            type="button"
-            variant="filled"
-            disabled={busy}
-            onClick={() => {
-              if (api === null) {
-                return;
-              }
-              void api.markSetupComplete().then(() => {
-                router.push(`/${locale}`);
-              });
-            }}
-          >
+          <Button type="button" variant="filled" disabled={busy} onClick={handleContinue}>
             {t('setup.continue')}
           </Button>
         ) : (
-          <Button
-            type="button"
-            loading={busy}
-            disabled={busy}
-            onClick={() => {
-              if (api === null) {
-                return;
-              }
-              setBusy(true);
-              setErrorCode(null);
-              void api
-                .ensureRuntime()
-                .then(() => api.markSetupComplete())
-                .then(() => {
-                  router.push(`/${locale}`);
-                })
-                .catch(() => {
-                  /* progress event carries the error code */
-                })
-                .finally(() => {
-                  setBusy(false);
-                });
-            }}
-          >
+          <Button type="button" loading={busy} disabled={busy} onClick={handleEnsureRuntime}>
             {t('setup.runtime.primaryAction')}
           </Button>
         )}
@@ -251,15 +250,7 @@ export function SetupPanel() {
       </Group>
 
       <Group>
-        <Button
-          type="button"
-          variant="default"
-          onClick={() => {
-            void api?.saveDiagnostics().then((result) => {
-              setDiagnosticsPath(result.path);
-            });
-          }}
-        >
+        <Button type="button" variant="default" onClick={handleSaveDiagnostics}>
           {t('setup.diagnostics.save')}
         </Button>
         {diagnosticsPath !== null ? (
@@ -270,4 +261,4 @@ export function SetupPanel() {
       </Group>
     </Stack>
   );
-}
+};

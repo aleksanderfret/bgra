@@ -12,20 +12,50 @@ import {
   Text,
   Textarea,
 } from '@mantine/core';
-import { type FormEvent, type KeyboardEvent, useEffect, useId, useState } from 'react';
+import {
+  type ChangeEvent,
+  type FC,
+  type KeyboardEvent,
+  type SubmitEvent,
+  useEffect,
+  useId,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEngineReadiness } from '@/features/engine-readiness/useEngineReadiness';
 import { GAMES_CHANGED_EVENT } from '@/lib/desktop-bridge';
+import { isGameSummaryList } from '@/lib/game-summary';
 import { AnswerPanel } from './AnswerPanel';
 import { streamingStatusKey } from './answer-state';
 import { useAskStream } from './useAskStream';
 
 const MODES: readonly AnswerMode[] = ['teach', 'arbitrate'];
 
-const isAnswerMode = (value: string): value is AnswerMode =>
-  (MODES as readonly string[]).includes(value);
+const isAnswerMode = (value: string): value is AnswerMode => MODES.some((mode) => mode === value);
 
-export function RulesChat() {
+interface ExpansionCheckboxProps {
+  expansionId: string;
+  title: string;
+  checked: boolean;
+  disabled: boolean;
+  onToggle: (expansionId: string, checked: boolean) => void;
+}
+
+const ExpansionCheckbox: FC<ExpansionCheckboxProps> = ({
+  expansionId,
+  title,
+  checked,
+  disabled,
+  onToggle,
+}) => {
+  const handleChange = (event: ChangeEvent<HTMLInputElement>): void => {
+    onToggle(expansionId, event.currentTarget.checked);
+  };
+
+  return <Checkbox label={title} checked={checked} onChange={handleChange} disabled={disabled} />;
+};
+
+export const RulesChat: FC = () => {
   const { t } = useTranslation();
   const [games, setGames] = useState<GameSummary[] | null>(null);
   const [gameId, setGameId] = useState<string | null>(null);
@@ -46,8 +76,8 @@ export function RulesChat() {
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}`);
         }
-        const payload = (await response.json()) as GameSummary[];
-        if (!cancelled) {
+        const payload: unknown = await response.json();
+        if (!cancelled && isGameSummaryList(payload)) {
           setGames(payload);
         }
       } catch {
@@ -116,7 +146,7 @@ export function RulesChat() {
     });
   };
 
-  const onSubmit = (event: FormEvent): void => {
+  const onSubmit = (event: SubmitEvent<HTMLFormElement>): void => {
     event.preventDefault();
     submitQuestion();
   };
@@ -126,6 +156,16 @@ export function RulesChat() {
       event.preventDefault();
       submitQuestion();
     }
+  };
+
+  const handleModeChange = (value: string): void => {
+    if (isAnswerMode(value)) {
+      setMode(value);
+    }
+  };
+
+  const handleQuestionChange = (event: ChangeEvent<HTMLTextAreaElement>): void => {
+    setQuestion(event.currentTarget.value);
   };
 
   const statusKey = streamingStatusKey(state);
@@ -161,14 +201,13 @@ export function RulesChat() {
                 {t('rulesChat.expansions.description')}
               </Text>
               {expansionsForBase.map((expansion) => (
-                <Checkbox
+                <ExpansionCheckbox
                   key={expansion.gameId}
-                  label={expansion.title}
+                  expansionId={expansion.gameId}
+                  title={expansion.title}
                   checked={expansionIds.includes(expansion.gameId)}
-                  onChange={(event) =>
-                    toggleExpansion(expansion.gameId, event.currentTarget.checked)
-                  }
                   disabled={state.isStreaming}
+                  onToggle={toggleExpansion}
                 />
               ))}
             </Stack>
@@ -178,11 +217,7 @@ export function RulesChat() {
         <Fieldset legend={t('rulesChat.mode.legend')} variant="filled">
           <SegmentedControl
             value={mode}
-            onChange={(value) => {
-              if (isAnswerMode(value)) {
-                setMode(value);
-              }
-            }}
+            onChange={handleModeChange}
             data={MODES.map((value) => ({ value, label: t(`rulesChat.mode.${value}`) }))}
             fullWidth
           />
@@ -192,7 +227,7 @@ export function RulesChat() {
           label={t('rulesChat.question.label')}
           placeholder={t('rulesChat.question.placeholder')}
           value={question}
-          onChange={(event) => setQuestion(event.currentTarget.value)}
+          onChange={handleQuestionChange}
           onKeyDown={onTextareaKeyDown}
           autosize
           minRows={2}
@@ -216,4 +251,4 @@ export function RulesChat() {
       </Stack>
     </form>
   );
-}
+};

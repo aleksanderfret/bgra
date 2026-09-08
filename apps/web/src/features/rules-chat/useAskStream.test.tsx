@@ -15,7 +15,7 @@ const source: RetrievedSource = {
 };
 
 /** A stream the test drives frame by frame, so state can be read mid-answer. */
-function engineStream() {
+const engineStream = () => {
   const encoder = new TextEncoder();
   let controller: ReadableStreamDefaultController<Uint8Array>;
 
@@ -25,11 +25,7 @@ function engineStream() {
     },
   });
 
-  vi.spyOn(globalThis, 'fetch').mockResolvedValue({
-    ok: true,
-    status: 200,
-    body,
-  } as Response);
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(body, { status: 200 }));
 
   return {
     async send(...events: AssistantEvent[]): Promise<void> {
@@ -44,7 +40,7 @@ function engineStream() {
       controller.close();
     },
   };
-}
+};
 
 const question: AskRequest = {
   gameId: 'azul',

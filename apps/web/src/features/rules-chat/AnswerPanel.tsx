@@ -1,6 +1,7 @@
 'use client';
 
 import { Alert, Badge, Box, Image, Paper, Stack, Text, Title } from '@mantine/core';
+import type { FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import { type AnswerState, isBlockingNotice, selectVisibleFigures } from './answer-state';
 
@@ -8,7 +9,7 @@ export interface AnswerPanelProps {
   state: AnswerState;
 }
 
-export function AnswerPanel({ state }: AnswerPanelProps) {
+export const AnswerPanel: FC<AnswerPanelProps> = ({ state }) => {
   const { t } = useTranslation();
   const figures = selectVisibleFigures(state);
 
@@ -105,4 +106,4 @@ export function AnswerPanel({ state }: AnswerPanelProps) {
       )}
     </Stack>
   );
-}
+};

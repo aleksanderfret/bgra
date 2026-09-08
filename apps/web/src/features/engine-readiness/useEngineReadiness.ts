@@ -10,7 +10,9 @@ import {
 
 const POLL_MS = 1_000;
 
-export function useEngineReadiness(offlineAfterMs: number = ENGINE_OFFLINE_AFTER_MS): EnginePhase {
+export const useEngineReadiness = (
+  offlineAfterMs: number = ENGINE_OFFLINE_AFTER_MS,
+): EnginePhase => {
   const [phase, setPhase] = useState<EnginePhase>('starting');
 
   useEffect(() => {
@@ -61,4 +63,4 @@ export function useEngineReadiness(offlineAfterMs: number = ENGINE_OFFLINE_AFTER
   }, [offlineAfterMs]);
 
   return phase;
-}
+};

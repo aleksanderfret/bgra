@@ -10,6 +10,9 @@ Follow `.cursor/skills/frontend-code/SKILL.md` when editing these files.
 
 - Nested ternaries in JSX are forbidden. Use early returns, `{cond && <X />}`, or a small component.
 - `any` is forbidden (`as any` included). Narrow with a type guard or a precise type.
+- No `as Type` casts for narrowing — build `value is T` guards (JSON, unknown payloads).
+- No deprecated React types (`FormEvent` → `SubmitEvent` for `onSubmit`; no `keyCode` / `onKeyPress`).
+- Prefer arrow functions for helpers, handlers, hooks, and exports (`const fn = (…) =>`), not `function`.
 - No inline callbacks in JSX. Name handlers before `return` (`onClick={handleSave}`, never `onClick={() => …}`).
 - No inline object types. Named `interface` for props/params (prefer `interface` over `type`).
 - Components: `const Name: FC<NameProps> = …` (not `function Name`); exception: Next.js page/layout/route.

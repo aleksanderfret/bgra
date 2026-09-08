@@ -1,11 +1,11 @@
 'use client';
 
 import { Button, Text } from '@mantine/core';
-import { useEffect, useState } from 'react';
+import { type FC, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getDesktopApi } from '@/lib/desktop-bridge';
 
-export function DiagnosticsButton() {
+export const DiagnosticsButton: FC = () => {
   const { t } = useTranslation();
   const [path, setPath] = useState<string | null>(null);
   const [available, setAvailable] = useState(false);
@@ -14,23 +14,21 @@ export function DiagnosticsButton() {
     setAvailable(getDesktopApi() !== null);
   }, []);
 
+  const handleSaveDiagnostics = (): void => {
+    const api = getDesktopApi();
+    if (api === null) {
+      return;
+    }
+    void api.saveDiagnostics().then((result) => setPath(result.path));
+  };
+
   if (!available) {
     return null;
   }
 
   return (
     <>
-      <Button
-        variant="subtle"
-        size="xs"
-        onClick={() => {
-          const api = getDesktopApi();
-          if (api === null) {
-            return;
-          }
-          void api.saveDiagnostics().then((result) => setPath(result.path));
-        }}
-      >
+      <Button variant="subtle" size="xs" onClick={handleSaveDiagnostics}>
         {t('setup.diagnostics.save')}
       </Button>
       {path !== null && (
@@ -40,4 +38,4 @@ export function DiagnosticsButton() {
       )}
     </>
   );
-}
+};

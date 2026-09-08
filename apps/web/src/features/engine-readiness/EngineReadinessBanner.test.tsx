@@ -70,11 +70,15 @@ describe('EngineReadinessBanner', () => {
 
     await waitFor(() => {
       expect(
-        fetchMock.mock.calls.some(
-          (call) =>
-            String(call[0]).includes('/api/engine/retrieval/reload') &&
-            (call[1] as RequestInit | undefined)?.method === 'POST',
-        ),
+        fetchMock.mock.calls.some((call) => {
+          if (!String(call[0]).includes('/api/engine/retrieval/reload')) {
+            return false;
+          }
+          const init = call[1];
+          return (
+            typeof init === 'object' && init !== null && 'method' in init && init.method === 'POST'
+          );
+        }),
       ).toBe(true);
     });
   });

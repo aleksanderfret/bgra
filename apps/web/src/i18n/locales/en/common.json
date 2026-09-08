@@ -38,6 +38,9 @@
   "preferences": {
     "label": "Display preferences"
   },
+  "ui": {
+    "missingValue": "—"
+  },
   "language": {
     "label": "Interface language",
     "pl": "Polski",

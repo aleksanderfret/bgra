@@ -22,7 +22,7 @@ export const ENGINE_TIMEOUT_MS = 10_000;
 
 export type EngineRouteKind = 'stream' | 'asset' | 'api' | 'long';
 
-export function routeKind(segments: string[]): EngineRouteKind {
+export const routeKind = (segments: string[]): EngineRouteKind => {
   switch (segments[0]) {
     case 'ask':
       return 'stream';
@@ -33,13 +33,13 @@ export function routeKind(segments: string[]): EngineRouteKind {
     default:
       return 'api';
   }
-}
+};
 
 /**
  * `null` when the path is not addressable. Segments are encoded individually
  * so one of them cannot smuggle in extra path levels.
  */
-export function engineTarget(baseUrl: string, segments: string[], search: string): URL | null {
+export const engineTarget = (baseUrl: string, segments: string[], search: string): URL | null => {
   if (segments.length === 0) {
     return null;
   }
@@ -50,9 +50,8 @@ export function engineTarget(baseUrl: string, segments: string[], search: string
   const target = new URL(`/${segments.map(encodeURIComponent).join('/')}`, baseUrl);
   target.search = search;
   return target;
-}
+};
 
-/** Where the engine is mounted on this app's origin. */
 export const ENGINE_BASE_PATH = '/api/engine';
 
 /**
@@ -61,14 +60,14 @@ export const ENGINE_BASE_PATH = '/api/engine';
  * this prefix; `null` for anything else, because an absolute URL would fetch
  * from the engine directly, around the one route allowed to reach it.
  */
-export function engineAssetUrl(enginePath: string): string | null {
+export const engineAssetUrl = (enginePath: string): string | null => {
   if (!enginePath.startsWith('/') || enginePath.startsWith('//')) {
     return null;
   }
   return `${ENGINE_BASE_PATH}${enginePath}`;
-}
+};
 
-export function requestHeadersForEngine(incoming: Headers): Headers {
+export const requestHeadersForEngine = (incoming: Headers): Headers => {
   const headers = new Headers();
   for (const name of REQUEST_ALLOWLIST) {
     const value = incoming.get(name);
@@ -77,9 +76,9 @@ export function requestHeadersForEngine(incoming: Headers): Headers {
     }
   }
   return headers;
-}
+};
 
-export function responseHeadersFromEngine(upstream: Headers, kind: EngineRouteKind): Headers {
+export const responseHeadersFromEngine = (upstream: Headers, kind: EngineRouteKind): Headers => {
   const headers = new Headers();
   for (const name of RESPONSE_ALLOWLIST) {
     const value = upstream.get(name);
@@ -102,4 +101,4 @@ export function responseHeadersFromEngine(upstream: Headers, kind: EngineRouteKi
 
   headers.set('cache-control', 'no-store');
   return headers;
-}
+};

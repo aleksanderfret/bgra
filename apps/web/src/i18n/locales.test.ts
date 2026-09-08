@@ -2,20 +2,20 @@ import { describe, expect, it } from 'vitest';
 import { resources } from './resources';
 import { LOCALES } from './settings';
 
-function keysOf(value: unknown, prefix = ''): string[] {
+const keysOf = (value: unknown, prefix = ''): string[] => {
   if (typeof value !== 'object' || value === null) {
     return [prefix];
   }
   return Object.entries(value)
     .flatMap(([key, child]) => keysOf(child, prefix === '' ? key : `${prefix}.${key}`))
     .sort();
-}
+};
 
-function placeholdersOf(value: string): string[] {
+const placeholdersOf = (value: string): string[] => {
   return [...value.matchAll(/\{\{(\w+)\}\}/g)].map((match) => match[1] ?? '').sort();
-}
+};
 
-function entriesOf(value: unknown, prefix = ''): [string, string][] {
+const entriesOf = (value: unknown, prefix = ''): [string, string][] => {
   if (typeof value === 'string') {
     return [[prefix, value]];
   }
@@ -25,7 +25,7 @@ function entriesOf(value: unknown, prefix = ''): [string, string][] {
   return Object.entries(value).flatMap(([key, child]) =>
     entriesOf(child, prefix === '' ? key : `${prefix}.${key}`),
   );
-}
+};
 
 const reference = resources.en.common;
 

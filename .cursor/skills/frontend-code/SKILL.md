@@ -1,6 +1,6 @@
 ---
 name: frontend-code
-description: Frontend coding rules for the Next.js / React / Mantine app in apps/web. Use when writing or reviewing TS, TSX, JSX, React components, Next.js pages, hooks, or i18n UI. Nested ternaries in JSX are forbidden; `any` is forbidden; event callbacks must be named before return; no inline object types — named interfaces; components are arrow functions typed with FC<Props>.
+description: Frontend coding rules for the Next.js / React / Mantine app in apps/web. Use when writing or reviewing TS, TSX, JSX, React components, Next.js pages, hooks, or i18n UI. Nested ternaries in JSX are forbidden; `any` is forbidden; no `as Type` narrowing — use type guards; event callbacks must be named before return; no inline object types — named interfaces; prefer arrow functions; components are FC<Props> arrows.
 paths: apps/web/**/*.{ts,tsx}
 ---
 
@@ -34,13 +34,86 @@ chain of `? :`. See `AnswerPanel` and `RulesChat`.
 
 **`any` is forbidden.** No `any`, no `as any`, no `// @ts-expect-error` to hide
 it, no `eslint-disable` / biome ignore for `noExplicitAny`. Narrow with a type
-guard (`isLocale`, `isAnswerMode`) or a typed assertion that names the real
-type (`as GameSummary[]` only at a trusted JSON boundary after a check).
+guard (`isLocale`, `isAnswerMode`).
+
+**No type casts for narrowing.** Do not write `value as SomeType` (or
+`payload as EngineErrorBody`) to silence the checker. Build a type guard
+(`value is SomeType`) and use it. Applies to JSON from `fetch`, unknown
+payloads, and mock call args.
+
+```tsx
+// Forbidden
+const body = payload as EngineErrorBody;
+const games = (await response.json()) as GameSummary[];
+
+// Required
+const isEngineErrorEvent = (value: unknown): value is EngineErrorEvent => {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return false;
+  }
+  return (
+    'type' in value &&
+    value.type === 'error' &&
+    'code' in value &&
+    typeof value.code === 'string'
+  );
+};
+
+const payload: unknown = await response.json();
+if (isGameSummaryList(payload)) {
+  setGames(payload);
+}
+```
+
+`as const` (const assertions on literals) is fine — that is not narrowing
+`unknown`. Prefer `'key' in value` / `typeof` over casting to a scratch
+interface just to read a field.
+
+**No deprecated React types or APIs.** Prefer the current `@types/react` names.
+In particular `FormEvent` / `FormEventHandler` are deprecated — they do not
+exist in the DOM. Use the real event for the handler:
+
+| Handler | Use |
+| --- | --- |
+| `onSubmit` | `SubmitEvent<HTMLFormElement>` |
+| `onChange` (inputs) | `ChangeEvent<…>` |
+| `onInput` | `InputEvent<…>` |
+| generic bubble | `SyntheticEvent<…>` |
+
+Do not use deprecated event fields (`keyCode`, `which`, `charCode`) or
+`onKeyPress` — use `key` / `code` and `onKeyDown` / `onKeyUp`.
+
+**Prefer arrow functions.** Helpers, handlers, hooks, type guards, and module
+exports use `const name = (…) => …` (or `async (…) => …`), not
+`function name(…)`. Same for nested helpers inside components and tests.
+
+```tsx
+// Forbidden
+function runtimeErrorMessage(t: Translate, code: string): string {
+  …
+}
+export function isLocale(value: string): value is Locale {
+  …
+}
+const handleSave = function () {
+  …
+};
+
+// Required
+const runtimeErrorMessage = (t: Translate, code: string): string => {
+  …
+};
+export const isLocale = (value: string): value is Locale => …
+const handleSave = (): void => {
+  …
+};
+```
 
 **No inline callbacks in JSX.** Define event handlers and other function props
 as named consts in the component body, before `return`. Pass the name in JSX.
 Applies to `onClick`, `onChange`, `onSubmit`, and any other function prop —
-including short one-liners.
+including short one-liners. Those named handlers are arrow functions (see
+above).
 
 ```tsx
 // Forbidden
@@ -48,10 +121,10 @@ including short one-liners.
 <Button onClick={() => { void api.save(); }}>…</Button>
 
 // Required
-const handleStart = () => {
+const handleStart = (): void => {
   setBusy(true);
 };
-const handleSave = () => {
+const handleSave = (): void => {
   void api.save();
 };
 
@@ -77,9 +150,9 @@ export function DesktopGate({ locale, children }: { locale: string; children: Re
   …
 }
 
-function formatBytes(opts: { value: number; unit: string }): string {
+const formatBytes = (opts: { value: number; unit: string }): string => {
   …
-}
+};
 
 // Required
 interface DesktopGateProps {
@@ -92,9 +165,9 @@ interface FormatBytesOptions {
   unit: string;
 }
 
-function formatBytes(opts: FormatBytesOptions): string {
+const formatBytes = (opts: FormatBytesOptions): string => {
   …
-}
+};
 ```
 
 **Prefer `interface` over `type`.** Use `interface` for object shapes
@@ -138,8 +211,10 @@ export const AnswerPanel: FC<AnswerPanelProps> = ({ state }) => {
 
 `FC` does not imply `children` — put `children` on the props interface when
 the component accepts them. Next.js special files that must stay default
-export functions (`page.tsx`, `layout.tsx`, `route.ts` handlers) are the
-exception; still use a named props interface there, never an inline object.
+export functions (`page.tsx`, `layout.tsx`) or HTTP method exports
+(`route.ts` `GET` / `POST` / …) are the exception; still use a named props
+interface there, never an inline object. Helpers inside those files still use
+arrows.
 
 ## Structure
 
@@ -180,7 +255,10 @@ exception; still use a named props interface there, never an inline object.
 
 - [ ] No nested ternary in JSX
 - [ ] No `any`
+- [ ] No `as Type` narrowing — use `value is T` guards
+- [ ] No deprecated React types (`FormEvent` → `SubmitEvent`, etc.)
 - [ ] No inline callbacks in JSX (handlers named before `return`)
+- [ ] Functions and handlers use arrows (`const fn = (…) =>`), not `function`
 - [ ] No inline object types; props/params use a named `interface` (prefer over `type`)
 - [ ] Components are `const Name: FC<NameProps> = …` (except Next.js page/layout/route)
 - [ ] New copy exists in both locale files

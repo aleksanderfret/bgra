@@ -1,24 +1,24 @@
 'use client';
 
 import { Alert, Button, Stack } from '@mantine/core';
-import { useState } from 'react';
+import { type FC, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEngineReadiness } from './useEngineReadiness';
 
-export function EngineReadinessBanner() {
+export const EngineReadinessBanner: FC = () => {
   const { t } = useTranslation();
   const phase = useEngineReadiness();
   const [retrying, setRetrying] = useState(false);
 
-  const retrySearch = async (): Promise<void> => {
+  const handleRetrySearch = (): void => {
     setRetrying(true);
-    try {
-      await fetch('/api/engine/retrieval/reload', { method: 'POST' });
-    } catch {
-      // Stay on search_unavailable; the button re-enables below.
-    } finally {
-      setRetrying(false);
-    }
+    void fetch('/api/engine/retrieval/reload', { method: 'POST' })
+      .catch(() => {
+        // Stay on search_unavailable; the button re-enables below.
+      })
+      .finally(() => {
+        setRetrying(false);
+      });
   };
 
   if (phase === 'ready') {
@@ -44,9 +44,7 @@ export function EngineReadinessBanner() {
             color="yellow"
             loading={retrying}
             disabled={retrying}
-            onClick={() => {
-              void retrySearch();
-            }}
+            onClick={handleRetrySearch}
           >
             {t('engineReadiness.searchUnavailable.retry')}
           </Button>
@@ -60,4 +58,4 @@ export function EngineReadinessBanner() {
       {t('engineReadiness.offline.body')}
     </Alert>
   );
-}
+};

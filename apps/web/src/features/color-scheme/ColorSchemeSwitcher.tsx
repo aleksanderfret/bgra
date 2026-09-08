@@ -7,17 +7,24 @@ import {
   useMantineColorScheme,
   VisuallyHidden,
 } from '@mantine/core';
-import { useId, useState } from 'react';
+import { type FC, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { COLOR_SCHEMES, isColorScheme } from './schemes';
 
-export function ColorSchemeSwitcher() {
+export const ColorSchemeSwitcher: FC = () => {
   const { t } = useTranslation();
   const labelId = useId();
   const { colorScheme, setColorScheme } = useMantineColorScheme();
   const [announcement, setAnnouncement] = useState('');
 
   const active = isColorScheme(colorScheme) ? colorScheme : 'auto';
+
+  const handleSchemeChange = (value: string): void => {
+    if (isColorScheme(value) && value !== active) {
+      setColorScheme(value);
+      setAnnouncement(t('colorScheme.changed', { scheme: t(`colorScheme.${value}`) }));
+    }
+  };
 
   return (
     <Stack gap={4}>
@@ -28,12 +35,7 @@ export function ColorSchemeSwitcher() {
         size="xs"
         aria-labelledby={labelId}
         value={active}
-        onChange={(value) => {
-          if (isColorScheme(value) && value !== active) {
-            setColorScheme(value);
-            setAnnouncement(t('colorScheme.changed', { scheme: t(`colorScheme.${value}`) }));
-          }
-        }}
+        onChange={handleSchemeChange}
         data={COLOR_SCHEMES.map((value) => ({
           value,
           label: t(`colorScheme.${value}`),
@@ -44,4 +46,4 @@ export function ColorSchemeSwitcher() {
       </VisuallyHidden>
     </Stack>
   );
-}
+};
