@@ -69,6 +69,24 @@ def _chat_model_already_warm() -> Iterator[AsyncMock]:
         yield load
 
 
+def _ingest_payload(response: httpx.Response) -> dict[str, object]:
+    content_type = response.headers.get("content-type", "")
+    if "event-stream" in content_type:
+        frames = _frames(response.text)
+        for event in frames:
+            if event.get("type") == "ingest_done":
+                game = event.get("game")
+                if isinstance(game, dict):
+                    return game
+            if event.get("type") == "error":
+                return event
+        raise AssertionError(f"No ingest_done in {frames}")
+    payload = response.json()
+    if isinstance(payload, dict):
+        return payload
+    raise AssertionError(f"Unexpected ingest payload: {payload!r}")
+
+
 def _frames(raw: str) -> list[dict[str, object]]:
     events: list[dict[str, object]] = []
     for frame in raw.split("\n\n"):
@@ -848,10 +866,17 @@ def test_ingest_pdf_upload_registers_the_game(client: TestClient, tmp_path: Path
         )
 
     assert response.status_code == 200
-    payload = response.json()
+    frames = _frames(response.text)
+    assert any(event.get("type") == "ingest_progress" for event in frames)
+    assert frames[0].get("stage") == "saving"
+    payload = _ingest_payload(response)
     assert payload["gameId"] == "azul"
-    assert payload["chunkCount"] > 0
-    assert "rulebook" in payload["documentKinds"]
+    chunk_count = payload["chunkCount"]
+    document_kinds = payload["documentKinds"]
+    assert isinstance(chunk_count, int)
+    assert chunk_count > 0
+    assert isinstance(document_kinds, list)
+    assert "rulebook" in document_kinds
     listed = client.get("/games").json()
     assert listed[0]["gameId"] == "azul"
 
@@ -940,7 +965,7 @@ async def test_ingest_pdf_upload_rejects_a_second_import_while_busy(
                 release.set()
                 first_response = await first
                 assert first_response.status_code == 200
-                assert first_response.json()["gameId"] == "azul"
+                assert _ingest_payload(first_response)["gameId"] == "azul"
     finally:
         release.set()
         app.dependency_overrides.clear()

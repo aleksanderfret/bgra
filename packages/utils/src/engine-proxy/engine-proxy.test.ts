@@ -14,7 +14,8 @@ describe('routeKind', () => {
     expect(routeKind(['ask'])).toBe('stream');
     expect(routeKind(['static', 'assets', 'azul', 'p04.png'])).toBe('asset');
     expect(routeKind(['games'])).toBe('api');
-    expect(routeKind(['ingest', 'pdf'])).toBe('long');
+    expect(routeKind(['ingest', 'pdf'])).toBe('stream');
+    expect(routeKind(['ingest', 'reindex'])).toBe('long');
     expect(routeKind([])).toBe('api');
   });
 });

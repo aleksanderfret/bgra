@@ -417,34 +417,36 @@ that the in-app remover is required for a full wipe); `pnpm verify` passes.
 
 ---
 
-## Stage 3A — Ingest progress
+## Stage 3A — Reusable activity progress ✅ **complete**
 
-**Goal:** wherever a rulebook PDF is added (setup drop zone, desktop shell, or CLI), the
-user sees a **smooth percent** and a **stage label**, not four equal jumps of 25%.
+**Goal:** one activity view for every long wait (first open, consented install, later
+launches, PDF import). A percent appears **only** when we can measure it. The original
+PDF-only bar lives in `docs/archive/stage-3a-ingest-progress.md`; this stage ships that
+import stream **and** the launch wait that used to freeze on the splash screen.
 
-Plan: `docs/archive/stage-3a-ingest-progress.md`.
+Plan: `docs/archive/stage-3a-activity-progress.md`.
 
-Do this **after Stage 3, 3C and 3B**. The last honest slice of the bar is writing search vectors
-(`indexing`). Before Stage 3 that work does not exist; faking “the chat model is learning
-the rules” would freeze the bar with nothing real happening. 3C covers games already in
-the library; 3A is only the import happening now. 3B comes first on a packaged install so
-the models the bar is indexing for are actually present.
+- Shared `ActivityProgress` (page and inline) and `activity.*` copy in `en`/`pl`. No
+  “parsing”, “vector graph”, or “embeddings”. The word Ollama stays on installer stages
+  only. `indexing` on screen is “Making these pages searchable…”
+- `percent` is `number | null`. Install and later-launch waits stay indeterminate except
+  installer bytes on `downloading_installer` when `totalBytes` is known. PDF import is
+  the one honest smooth percent (browser upload band, then server work)
+- Later launch: splash text during backend start; Next loads **before** returning-player
+  model/search work so the same wait continues in React. A returning player who lands on
+  `/setup` never sees Install again
+- First-ready hold until Ask is ready; `search_unavailable` / `offline` use the existing
+  banner, never an endless spinner
+- `POST /ingest/pdf` streams `ingest_progress` / `ingest_done` / `error`. Validation and
+  `409 ingest_busy` stay JSON before the stream. Abort returns the drop zone to idle; the
+  worker may still hold the lock until it finishes. CLI prints English `NN%` + stage
 
-- Stages are **codes** (UI copy in `en`/`pl`): `sending`, `saving`, `reading`, `drawing`,
-  `filing`, `community` (only if the BoardGameGeek checkbox is on), `indexing`
-- Measure what actually moves: upload **bytes** (`sending`), disk **bytes** (`saving`),
-  **page i of n** (`reading` and `drawing`), library ticks (`filing`), then per-chunk or
-  per-batch index writes (`indexing`). Blend so the bar never goes backwards
-- `POST /ingest/pdf` streams progress the same way `/ask` streams an answer (progress
-  frames, then done or error). Upload percent is measured in the browser; the engine
-  cannot report it until the file has arrived
-- `indexing` is search vectors, not training the chat model
-- CLI prints the same percent and stage (English log lines, not the UI catalogues)
-
-**Acceptance:** a multi-page PDF makes the bar tick often (at least once per page while
-reading and drawing); the label under the bar matches the current code; a second import
-while one is running is still rejected; cancelling the upload stops the work. After
-Stage 3, `indexing` is visible and the bar reaches 100% only when the game is searchable.
+**Acceptance:** later launch shows live splash text, then the React loader, until Ask is
+ready — no blank gate, no Install for a returning player. First open is check → consent →
+page loader → assistant. PDF percent is monotonic and real (layout path ticks at least
+once per page while reading and drawing; fallback read may jump). A second import while
+one is running is still `409`. Failed search/offline is the banner. No hardcoded
+player-facing strings.
 
 ---
 

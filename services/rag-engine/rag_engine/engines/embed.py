@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 
 import httpx
 
@@ -109,6 +109,7 @@ def embed_texts_sync_batched(
     *,
     batch_size: int = INGEST_EMBED_BATCH_SIZE,
     timeout_seconds: float = INGEST_TIMEOUT_SECONDS,
+    on_batch: Callable[[int, int], None] | None = None,
 ) -> list[list[float]]:
     if not texts:
         return []
@@ -124,6 +125,8 @@ def embed_texts_sync_batched(
                 timeout_seconds=timeout_seconds,
             )
         )
+        if on_batch is not None:
+            on_batch(min(start + size, len(texts)), len(texts))
     return vectors
 
 

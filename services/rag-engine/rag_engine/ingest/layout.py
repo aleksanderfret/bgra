@@ -13,6 +13,7 @@ from __future__ import annotations
 import logging
 import re
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -287,7 +288,10 @@ def blocks_to_sections(page_number: int, blocks: list[_Block]) -> list[LayoutSec
 
 
 def extract_layout_sections(
-    pdf_path: Path, *, deadline: float | None = None
+    pdf_path: Path,
+    *,
+    deadline: float | None = None,
+    on_page: Callable[[int, int], None] | None = None,
 ) -> list[LayoutSection]:
     try:
         import pymupdf
@@ -312,6 +316,8 @@ def extract_layout_sections(
             classified = [_classify(block, callouts) for block in _page_blocks(page)]
             ordered = order_page_blocks(classified, width, height)
             sections.extend(blocks_to_sections(index + 1, ordered))
+            if on_page is not None:
+                on_page(index + 1, document.page_count)
     return sections
 
 
@@ -356,6 +362,7 @@ def extract_pdf_chunks(
     doc_key: str,
     document_title: str,
     time_budget_seconds: float = LAYOUT_TIME_BUDGET_SECONDS,
+    on_page: Callable[[int, int], None] | None = None,
 ) -> tuple[list[ChunkRecord], str]:
     """Return chunks and the reader used: ``layout`` or ``pymupdf4llm``."""
     from rag_engine.ingest.chunking import chunk_markdown
@@ -364,7 +371,7 @@ def extract_pdf_chunks(
     assert_pdf_limits(pdf_path)
     deadline = time.monotonic() + time_budget_seconds
     try:
-        sections = extract_layout_sections(pdf_path, deadline=deadline)
+        sections = extract_layout_sections(pdf_path, deadline=deadline, on_page=on_page)
         chunks = layout_sections_to_chunks(
             sections,
             game_id=game_id,
@@ -391,6 +398,8 @@ def extract_pdf_chunks(
         )
 
     extracted = extract_markdown(pdf_path)
+    if on_page is not None:
+        on_page(1, 1)
     chunks = chunk_markdown(
         extracted.markdown,
         game_id=game_id,

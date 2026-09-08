@@ -1,9 +1,17 @@
 'use client';
 
 import { type GameSummary, isGameId } from '@bga/api-contract';
+import { ActivityProgress } from '@bga/components/activity-progress';
 import { useEngineReadiness } from '@bga/hooks/use-engine-readiness';
+import {
+  type ActivityView,
+  blendUploadPercent,
+  ingestProgressToActivity,
+  sendingActivity,
+} from '@bga/utils/activity-progress';
 import { GAMES_CHANGED_EVENT } from '@bga/utils/desktop-bridge';
 import { isGameSummaryList } from '@bga/utils/game-summary';
+import { type IngestUploadSession, postIngestPdf } from '@bga/utils/ingest-upload';
 import {
   Alert,
   Button,
@@ -92,11 +100,13 @@ export const PdfDropZone: FC = () => {
   const [feedback, setFeedback] = useState<ImportFeedback>({ kind: 'idle' });
   const [dragging, setDragging] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [activity, setActivity] = useState<ActivityView | null>(null);
   const enginePhase = useEngineReadiness();
   const gameIdRef = useRef<HTMLInputElement>(null);
   const documentTitleRef = useRef<HTMLInputElement>(null);
   const resetFileRef = useRef<() => void>(null);
-  const uploadAbortRef = useRef<AbortController | null>(null);
+  const uploadAbortRef = useRef<IngestUploadSession | null>(null);
+  const shownPercentRef = useRef<number | null>(null);
 
   useEffect(() => {
     return () => {
@@ -194,16 +204,108 @@ export const PdfDropZone: FC = () => {
       }
     }
 
-    uploadAbortRef.current?.abort();
-    const controller = new AbortController();
-    uploadAbortRef.current = controller;
-
+    const previousUpload = uploadAbortRef.current;
+    uploadAbortRef.current = null;
+    previousUpload?.abort();
+    shownPercentRef.current = null;
     setBusy(true);
+    setActivity(sendingActivity(0));
     setFeedback({ kind: 'idle' });
-    void fetch('/api/engine/ingest/pdf', { method: 'POST', body: form, signal: controller.signal })
-      .then(async (response) => {
-        const payload: unknown = await response.json().catch(() => null);
-        if (response.ok) {
+
+    const applyErrorCode = (code: string): void => {
+      if (code === 'invalid_game_id') {
+        setFeedback({ kind: 'invalid_game_id' });
+        queueMicrotask(() => gameIdRef.current?.focus());
+        return;
+      }
+      if (code === 'unknown_game') {
+        setFeedback({ kind: 'unknown_game' });
+        return;
+      }
+      if (code === 'invalid_document_title') {
+        setFeedback({ kind: 'invalid_document_title' });
+        queueMicrotask(() => documentTitleRef.current?.focus());
+        return;
+      }
+      if (code === 'invalid_base_game') {
+        setFeedback({ kind: 'invalid_base_game' });
+        return;
+      }
+      if (code === 'invalid_doc_key') {
+        setFeedback({ kind: 'invalid_doc_key' });
+        return;
+      }
+      if (code === 'invalid_file') {
+        setFeedback({ kind: 'invalid_file' });
+        return;
+      }
+      if (code === 'ingest_not_ready') {
+        setFeedback({ kind: 'ingest_not_ready', fileName: file.name });
+        return;
+      }
+      if (code === 'limit_exceeded') {
+        setFeedback({ kind: 'limit_exceeded' });
+        return;
+      }
+      if (code === 'page_image_too_large') {
+        setFeedback({ kind: 'page_image_too_large' });
+        return;
+      }
+      if (code === 'engine_unreachable') {
+        setFeedback({ kind: 'engine_unreachable' });
+        return;
+      }
+      if (code === 'ingest_busy') {
+        setFeedback({ kind: 'ingest_busy' });
+        return;
+      }
+      if (code === 'index_failed') {
+        setFeedback({ kind: 'index_failed' });
+        return;
+      }
+      setFeedback({ kind: 'ingest_failed' });
+    };
+
+    const finishUpload = (): void => {
+      setBusy(false);
+      setActivity(null);
+      resetFileRef.current?.();
+      uploadAbortRef.current = null;
+    };
+
+    let session: IngestUploadSession;
+    session = postIngestPdf(form, {
+      onAbort: () => {
+        if (uploadAbortRef.current === session) {
+          finishUpload();
+        }
+      },
+      onUploadPercent: (percent) => {
+        shownPercentRef.current = blendUploadPercent({
+          uploadPercent: percent,
+          serverPercent: null,
+          shown: shownPercentRef.current,
+        });
+        setActivity(sendingActivity(shownPercentRef.current ?? 0));
+      },
+      onEvent: (event) => {
+        if (event.type === 'ingest_progress') {
+          shownPercentRef.current = blendUploadPercent({
+            uploadPercent: null,
+            serverPercent: event.percent,
+            shown: shownPercentRef.current,
+          });
+          setActivity(
+            ingestProgressToActivity({
+              stage: event.stage,
+              current: event.current ?? undefined,
+              total: event.total ?? undefined,
+              displayPercent: shownPercentRef.current ?? event.percent,
+            }),
+          );
+          return;
+        }
+        if (event.type === 'ingest_done') {
           setFeedback({
             kind: 'success',
             gameId: resolvedGameId,
@@ -211,76 +313,14 @@ export const PdfDropZone: FC = () => {
             attached: mode === 'attach',
           });
           window.dispatchEvent(new Event(GAMES_CHANGED_EVENT));
+          finishUpload();
           return;
         }
-        const code =
-          engineErrorCode(payload) ?? (response.status === 502 ? 'engine_unreachable' : '');
-        if (code === 'invalid_game_id') {
-          setFeedback({ kind: 'invalid_game_id' });
-          queueMicrotask(() => gameIdRef.current?.focus());
-          return;
-        }
-        if (code === 'unknown_game') {
-          setFeedback({ kind: 'unknown_game' });
-          return;
-        }
-        if (code === 'invalid_document_title') {
-          setFeedback({ kind: 'invalid_document_title' });
-          queueMicrotask(() => documentTitleRef.current?.focus());
-          return;
-        }
-        if (code === 'invalid_base_game') {
-          setFeedback({ kind: 'invalid_base_game' });
-          return;
-        }
-        if (code === 'invalid_doc_key') {
-          setFeedback({ kind: 'invalid_doc_key' });
-          return;
-        }
-        if (code === 'invalid_file') {
-          setFeedback({ kind: 'invalid_file' });
-          return;
-        }
-        if (code === 'ingest_not_ready') {
-          setFeedback({ kind: 'ingest_not_ready', fileName: file.name });
-          return;
-        }
-        if (code === 'limit_exceeded') {
-          setFeedback({ kind: 'limit_exceeded' });
-          return;
-        }
-        if (code === 'page_image_too_large') {
-          setFeedback({ kind: 'page_image_too_large' });
-          return;
-        }
-        if (code === 'engine_unreachable') {
-          setFeedback({ kind: 'engine_unreachable' });
-          return;
-        }
-        if (code === 'ingest_busy') {
-          setFeedback({ kind: 'ingest_busy' });
-          return;
-        }
-        if (code === 'index_failed') {
-          setFeedback({ kind: 'index_failed' });
-          return;
-        }
-        setFeedback({ kind: 'ingest_failed' });
-      })
-      .catch((error: unknown) => {
-        if (error instanceof DOMException && error.name === 'AbortError') {
-          return;
-        }
-        setFeedback({ kind: 'engine_unreachable' });
-      })
-      .finally(() => {
-        if (uploadAbortRef.current !== controller) {
-          return;
-        }
-        setBusy(false);
-        resetFileRef.current?.();
-        uploadAbortRef.current = null;
-      });
+        applyErrorCode(event.code);
+        finishUpload();
+      },
+    });
+    uploadAbortRef.current = session;
   };
 
   const handleRetryIndex = (): void => {
@@ -533,15 +573,15 @@ export const PdfDropZone: FC = () => {
               <Text id={dropTitleId} fw={600}>
                 {t('pdfImport.drop.title')}
               </Text>
-              <Text
-                id={dropHintId}
-                size="sm"
-                role={busy ? 'status' : undefined}
-                aria-live={busy ? 'polite' : undefined}
-              >
-                {busy ? t('pdfImport.busy') : t('pdfImport.drop.body')}{' '}
-                {t('pdfImport.drop.keyboardHint')}
-              </Text>
+              <div id={dropHintId}>
+                {busy && activity !== null ? (
+                  <ActivityProgress layout="inline" view={activity} />
+                ) : (
+                  <Text size="sm">
+                    {t('pdfImport.drop.body')} {t('pdfImport.drop.keyboardHint')}
+                  </Text>
+                )}
+              </div>
               <Group>
                 <FileButton
                   resetRef={resetFileRef}

@@ -122,3 +122,16 @@ export interface HealthReport {
 export interface RetrievalReloadResponse {
   started: boolean;
 }
+
+export type IngestStage = 'saving' | 'reading' | 'drawing' | 'filing' | 'community' | 'indexing';
+
+export type IngestEvent =
+  | {
+      type: 'ingest_progress';
+      stage: IngestStage;
+      current: number | null;
+      total: number | null;
+      percent: number;
+    }
+  | { type: 'ingest_done'; game: GameSummary }
+  | { type: 'error'; code: string; message: string };

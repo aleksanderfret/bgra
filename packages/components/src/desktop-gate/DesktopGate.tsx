@@ -1,8 +1,11 @@
 'use client';
 
+import { ActivityProgress } from '@bga/components/activity-progress';
 import { getDesktopApi } from '@bga/utils/desktop-bridge';
 import { usePathname, useRouter } from 'next/navigation';
 import { type FC, type ReactNode, useEffect, useState } from 'react';
+
+const GATE_WAIT_VIEW = { activity: 'starting_assistant' as const, percent: null };
 
 export interface DesktopGateProps {
   locale: string;
@@ -44,7 +47,7 @@ export const DesktopGate: FC<DesktopGateProps> = ({ locale, children }) => {
   }, [locale, pathname, router]);
 
   if (!ready) {
-    return null;
+    return <ActivityProgress layout="page" view={GATE_WAIT_VIEW} />;
   }
   return children;
 };

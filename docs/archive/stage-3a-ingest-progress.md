@@ -1,7 +1,8 @@
 > **Archive copy.** English-only historical plans used to build BGA.
-> **Stage:** 3A (after Stage 3 and 3B; not implemented yet).
+> **Stage:** 3A (original PDF-only percent-bar scope).
 > **Origin:** Cursor plan for Stage 3A (PDF ingest progress bar).
-> **Outcome:** design parked until after Stage 3 (and 3B).
+> **Outcome:** superseded by [stage-3a-activity-progress.md](stage-3a-activity-progress.md).
+> The PDF stream and honest percent from this draft still landed there.
 
 ---
 # Stage 3A — PDF ingest progress (after retrieval)

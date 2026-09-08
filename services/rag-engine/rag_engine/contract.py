@@ -153,3 +153,25 @@ class HealthReport(WireModel):
 
 class RetrievalReloadResponse(WireModel):
     started: bool
+
+
+IngestStage = Literal["saving", "reading", "drawing", "filing", "community", "indexing"]
+
+
+class IngestProgressEvent(WireModel):
+    type: Literal["ingest_progress"] = "ingest_progress"
+    stage: IngestStage
+    current: int | None = None
+    total: int | None = None
+    percent: int
+
+
+class IngestDoneEvent(WireModel):
+    type: Literal["ingest_done"] = "ingest_done"
+    game: GameSummary
+
+
+IngestEvent = Annotated[
+    IngestProgressEvent | IngestDoneEvent | ErrorEvent,
+    Field(discriminator="type"),
+]

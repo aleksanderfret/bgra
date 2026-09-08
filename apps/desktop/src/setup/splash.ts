@@ -1,6 +1,15 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+export const SPLASH_ACTIVITY_CODES = [
+  'checking_computer',
+  'starting_assistant',
+  'preparing_search',
+  'reading_layout',
+] as const;
+
+export type SplashActivityCode = (typeof SPLASH_ACTIVITY_CODES)[number];
+
 export interface StartupCopy {
   title: string;
   body: string;
@@ -33,6 +42,21 @@ export function startupCopyFromCatalogue(catalogue: unknown): StartupCopy | null
   return { title: startup.loadingTitle, body: startup.loadingBody };
 }
 
+export function activityLineFromCatalogue(catalogue: unknown, code: string): string | null {
+  if (!isRecord(catalogue)) {
+    return null;
+  }
+  const activity = catalogue.activity;
+  if (!isRecord(activity)) {
+    return null;
+  }
+  const line = activity[code];
+  if (typeof line !== 'string' || line.length === 0) {
+    return null;
+  }
+  return line;
+}
+
 export function readStartupCopy(localesDir: string, locale: 'en' | 'pl'): StartupCopy {
   const raw = readFileSync(join(localesDir, locale, 'common.json'), 'utf8');
   const copy = startupCopyFromCatalogue(JSON.parse(raw) as unknown);
@@ -42,12 +66,55 @@ export function readStartupCopy(localesDir: string, locale: 'en' | 'pl'): Startu
   return copy;
 }
 
+export function readActivityLine(localesDir: string, locale: 'en' | 'pl', code: string): string {
+  const raw = readFileSync(join(localesDir, locale, 'common.json'), 'utf8');
+  const line = activityLineFromCatalogue(JSON.parse(raw) as unknown, code);
+  if (line === null) {
+    throw new Error(`Missing activity.${code} in ${locale} catalogue`);
+  }
+  return line;
+}
+
 function escapeHtml(value: string): string {
   return value
     .replaceAll('&', '&amp;')
     .replaceAll('<', '&lt;')
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;');
+}
+
+export function splashSetActivityScript(title: string, body: string): string {
+  return `(() => {
+    const titleEl = document.getElementById('activity-title');
+    const bodyEl = document.getElementById('activity-body');
+    if (titleEl) titleEl.textContent = ${JSON.stringify(title)};
+    if (bodyEl) bodyEl.textContent = ${JSON.stringify(body)};
+    document.title = ${JSON.stringify(title)};
+  })();`;
+}
+
+export interface SplashPageTarget {
+  isDestroyed(): boolean;
+  executeJavaScript(script: string): Promise<unknown>;
+}
+
+export interface ApplySplashActivityOptions {
+  target: SplashPageTarget | null;
+  localesDir: string;
+  locale: 'en' | 'pl';
+  code: SplashActivityCode;
+}
+
+export function applySplashActivity(options: ApplySplashActivityOptions): void {
+  const { target, localesDir, locale, code } = options;
+  if (target === null || target.isDestroyed()) {
+    return;
+  }
+  const title = readActivityLine(localesDir, locale, code);
+  const body = readStartupCopy(localesDir, locale).body;
+  void target.executeJavaScript(splashSetActivityScript(title, body)).catch(() => {
+    /* splash may already have navigated away */
+  });
 }
 
 export function buildSplashHtml(options: SplashHtmlOptions): string {
@@ -75,23 +142,33 @@ export function buildSplashHtml(options: SplashHtmlOptions): string {
     main { max-width: 28rem; padding: 2rem; text-align: center; }
     h1 { font-size: 1.35rem; font-weight: 600; margin: 1rem 0 0.5rem; }
     p { margin: 0; line-height: 1.45; opacity: 0.82; }
-    .dot {
-      width: 2.25rem;
-      height: 2.25rem;
-      margin: 0 auto;
-      border-radius: 50%;
-      border: 3px solid currentColor;
-      border-right-color: transparent;
-      animation: spin 0.8s linear infinite;
+    .mark { width: 5.5rem; height: 5.5rem; margin: 0 auto; }
+    .ring { fill: none; stroke-width: 3; stroke-linecap: round; }
+    .track { stroke: currentColor; opacity: 0.18; }
+    .inner {
+      stroke: currentColor;
+      opacity: 0.28;
+      transform-origin: 44px 44px;
+      animation: orbit 1.8s linear infinite;
     }
-    @keyframes spin { to { transform: rotate(360deg); } }
+    .outer {
+      stroke: currentColor;
+      stroke-dasharray: 36 90;
+      transform-origin: 44px 44px;
+      animation: orbit 0.85s linear infinite;
+    }
+    @keyframes orbit { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body${darkClass}>
-  <main aria-busy="true" aria-live="polite">
-    <div class="dot" aria-hidden="true"></div>
-    <h1>${title}</h1>
-    <p>${body}</p>
+  <main role="status" aria-busy="true" aria-live="polite">
+    <svg class="mark" viewBox="0 0 88 88" aria-hidden="true">
+      <circle class="ring track" cx="44" cy="44" r="36"></circle>
+      <circle class="ring inner" cx="44" cy="44" r="26"></circle>
+      <circle class="ring outer" cx="44" cy="44" r="36"></circle>
+    </svg>
+    <h1 id="activity-title">${title}</h1>
+    <p id="activity-body">${body}</p>
   </main>
 </body>
 </html>`;

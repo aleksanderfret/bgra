@@ -11,6 +11,42 @@ interface StubFetchResponse {
   json: () => Promise<unknown>;
 }
 
+interface StubXhrOptions {
+  status: number;
+  body: string;
+  contentType: string;
+  hang?: boolean;
+}
+
+const stubIngestXhr = (options: StubXhrOptions): void => {
+  vi.stubGlobal(
+    'XMLHttpRequest',
+    class {
+      upload = { onprogress: null };
+      status = options.status;
+      responseText = options.body;
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      onabort: (() => void) | null = null;
+      open(): void {}
+      send(): void {
+        if (options.hang) {
+          return;
+        }
+        queueMicrotask(() => {
+          this.onload?.();
+        });
+      }
+      abort(): void {
+        this.onabort?.();
+      }
+      getResponseHeader(name: string): string | null {
+        return name.toLowerCase() === 'content-type' ? options.contentType : null;
+      }
+    },
+  );
+};
+
 const stubEngineFetch = (
   handler: (url: string) => StubFetchResponse | null,
 ): ReturnType<typeof vi.fn> => {
@@ -114,17 +150,17 @@ describe('PdfDropZone', () => {
     });
   });
 
-  it('uploads the PDF through the engine proxy and reports success as a status', async () => {
-    const fetchMock = stubEngineFetch((url) => {
-      if (url.includes('/ingest/pdf')) {
-        return {
-          ok: true,
-          json: async () => ({ gameId: 'azul', title: 'Azul', chunkCount: 2 }),
-        };
-      }
-      return null;
+  it('shows sending activity while the upload is in flight', async () => {
+    vi.stubGlobal(
+      'fetch',
+      stubEngineFetch(() => null),
+    );
+    stubIngestXhr({
+      status: 200,
+      contentType: 'text/event-stream',
+      body: '',
+      hang: true,
     });
-    vi.stubGlobal('fetch', fetchMock);
 
     render(<PdfDropZone />, 'en');
 
@@ -143,11 +179,34 @@ describe('PdfDropZone', () => {
       file,
     );
 
-    await waitFor(() => {
-      expect(fetchMock.mock.calls.some((call) => String(call[0]).includes('/ingest/pdf'))).toBe(
-        true,
-      );
+    expect(await screen.findByText(en.activity.sending)).toBeInTheDocument();
+  });
+
+  it('uploads the PDF through the engine proxy and reports success as a status', async () => {
+    const fetchMock = stubEngineFetch(() => null);
+    vi.stubGlobal('fetch', fetchMock);
+    stubIngestXhr({
+      status: 200,
+      contentType: 'text/event-stream',
+      body: `data: ${JSON.stringify({ type: 'ingest_done', game: { gameId: 'azul' } })}\n\n`,
     });
+
+    render(<PdfDropZone />, 'en');
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: en.pdfImport.drop.chooseFile })).toBeEnabled();
+    });
+
+    await userEvent.type(
+      screen.getByRole('textbox', { name: new RegExp(en.pdfImport.gameId.label) }),
+      'azul',
+    );
+
+    const file = new File(['%PDF'], 'rules.pdf', { type: 'application/pdf' });
+    await userEvent.upload(
+      screen.getByLabelText(en.pdfImport.drop.chooseFile, { selector: 'input' }),
+      file,
+    );
 
     expect(await screen.findByRole('status')).toHaveTextContent(
       en.pdfImport.success.body.replace('{{gameId}}', 'azul'),
@@ -157,16 +216,13 @@ describe('PdfDropZone', () => {
   it('announces a failed import as an alert', async () => {
     vi.stubGlobal(
       'fetch',
-      stubEngineFetch((url) => {
-        if (url.includes('/ingest/pdf')) {
-          return {
-            ok: false,
-            json: async () => ({ type: 'error', code: 'ingest_failed', message: 'boom' }),
-          };
-        }
-        return null;
-      }),
+      stubEngineFetch(() => null),
     );
+    stubIngestXhr({
+      status: 500,
+      contentType: 'application/json',
+      body: JSON.stringify({ type: 'error', code: 'ingest_failed', message: 'boom' }),
+    });
 
     render(<PdfDropZone />, 'en');
 
@@ -191,16 +247,13 @@ describe('PdfDropZone', () => {
   it('announces a busy engine as an alert', async () => {
     vi.stubGlobal(
       'fetch',
-      stubEngineFetch((url) => {
-        if (url.includes('/ingest/pdf')) {
-          return {
-            ok: false,
-            json: async () => ({ type: 'error', code: 'ingest_busy', message: 'busy' }),
-          };
-        }
-        return null;
-      }),
+      stubEngineFetch(() => null),
     );
+    stubIngestXhr({
+      status: 409,
+      contentType: 'application/json',
+      body: JSON.stringify({ type: 'error', code: 'ingest_busy', message: 'busy' }),
+    });
 
     render(<PdfDropZone />, 'en');
 
@@ -225,16 +278,13 @@ describe('PdfDropZone', () => {
   it('announces a search-index failure as an alert', async () => {
     vi.stubGlobal(
       'fetch',
-      stubEngineFetch((url) => {
-        if (url.includes('/ingest/pdf')) {
-          return {
-            ok: false,
-            json: async () => ({ type: 'error', code: 'index_failed', message: 'embed down' }),
-          };
-        }
-        return null;
-      }),
+      stubEngineFetch(() => null),
     );
+    stubIngestXhr({
+      status: 503,
+      contentType: 'application/json',
+      body: JSON.stringify({ type: 'error', code: 'index_failed', message: 'embed down' }),
+    });
 
     render(<PdfDropZone />, 'en');
 
@@ -263,18 +313,17 @@ describe('PdfDropZone', () => {
     vi.stubGlobal(
       'fetch',
       stubEngineFetch((url) => {
-        if (url.includes('/ingest/pdf')) {
-          return {
-            ok: false,
-            json: async () => ({ type: 'error', code: 'index_failed', message: 'embed down' }),
-          };
-        }
         if (url.includes('/ingest/reindex')) {
           return { ok: true, json: async () => ({ ok: true, documentsIndexed: 1 }) };
         }
         return null;
       }),
     );
+    stubIngestXhr({
+      status: 503,
+      contentType: 'application/json',
+      body: JSON.stringify({ type: 'error', code: 'index_failed', message: 'embed down' }),
+    });
 
     render(<PdfDropZone />, 'en');
 

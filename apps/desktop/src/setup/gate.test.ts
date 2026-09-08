@@ -6,12 +6,14 @@ import {
   liveProbeOk,
   packagingUvRelativePath,
   parseHealthProbe,
+  splashActivityFromProbe,
 } from './gate';
 
 const readyProbe = {
   ollama: true,
   reranker: true,
   retrievalLoading: false,
+  layoutIngest: false,
   missingModels: [] as string[],
   llm: 'chat',
   embedding: 'embed',
@@ -32,6 +34,7 @@ describe('parseHealthProbe', () => {
       ollama: true,
       reranker: false,
       retrievalLoading: true,
+      layoutIngest: false,
       missingModels: ['a'],
       llm: 'a',
       embedding: 'b',
@@ -59,6 +62,18 @@ describe('liveProbeOk / gatePassed', () => {
     expect(gatePassed({ setupCompleteFlag: true, probe: { ...readyProbe, reranker: false } })).toBe(
       false,
     );
+  });
+});
+
+describe('splashActivityFromProbe', () => {
+  it('prefers layout ingest over a generic search wait', () => {
+    expect(
+      splashActivityFromProbe({ ...readyProbe, layoutIngest: true, retrievalLoading: true }),
+    ).toBe('reading_layout');
+    expect(splashActivityFromProbe({ ...readyProbe, retrievalLoading: true })).toBe(
+      'preparing_search',
+    );
+    expect(splashActivityFromProbe(readyProbe)).toBeNull();
   });
 });
 

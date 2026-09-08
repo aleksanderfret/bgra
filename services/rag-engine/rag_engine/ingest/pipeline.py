@@ -6,12 +6,14 @@ import json
 import shutil
 import uuid
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
 from rag_engine.contract import DocumentKind, GameDocumentSummary, GameSummary
 from rag_engine.ingest.bgg_faq import BggUnavailableError, build_faq_chunks
 from rag_engine.ingest.chunking import clean_heading, split_section_text
+from rag_engine.ingest.ingest_percent import IngestStage, ingest_percent
 from rag_engine.ingest.layout import (
     INGEST_LAYOUT_VERSION,
     extract_pdf_chunks,
@@ -42,11 +44,38 @@ from rag_engine.storage_paths import (
 ProgressCallback = Callable[[str], None]
 
 
+@dataclass(frozen=True)
+class ProgressTick:
+    stage: IngestStage
+    current: int | None = None
+    total: int | None = None
+
+
+IngestProgressCallback = Callable[[ProgressTick], None]
+
+
 def _log(message: str, progress: ProgressCallback | None) -> None:
     if progress is not None:
         progress(message)
     else:
         print(message, flush=True)
+
+
+def _tick(
+    stage: IngestStage,
+    progress: IngestProgressCallback | None,
+    *,
+    current: int | None = None,
+    total: int | None = None,
+) -> None:
+    tick = ProgressTick(stage=stage, current=current, total=total)
+    percent = ingest_percent(stage, current, total)
+    if current is not None and total is not None:
+        print(f"{percent}% {stage} {current}/{total}", flush=True)
+    else:
+        print(f"{percent}% {stage}", flush=True)
+    if progress is not None:
+        progress(tick)
 
 
 def write_chunks_jsonl(path: Path, chunks: list[ChunkRecord]) -> None:
@@ -264,7 +293,7 @@ def ingest_pdf(
     document_title: str | None = None,
     doc_key: str | None = None,
     base_game_id: str | None = None,
-    progress: ProgressCallback | None = None,
+    progress: IngestProgressCallback | None = None,
 ) -> list[ChunkRecord]:
     assert_game_id(game_id)
     if base_game_id is not None:
@@ -283,17 +312,22 @@ def ingest_pdf(
         work.mkdir(parents=True, exist_ok=False)
         tmp_doc.mkdir(parents=True, exist_ok=True)
 
-        _log(f"reading page layout from {pdf_path.name}", progress)
+        _log(f"reading page layout from {pdf_path.name}", None)
         chunks, reader = extract_pdf_chunks(
             pdf_path,
             game_id=game_id,
             kind=kind,
             doc_key=resolved_doc_key,
             document_title=resolved_doc_title,
+            on_page=lambda current, total: _tick("reading", progress, current=current, total=total),
         )
-        _log(f"layout reader={reader}", progress)
-        _log("rendering page image(s)", progress)
-        render_page_pngs(pdf_path, tmp_doc)
+        _log(f"layout reader={reader}", None)
+        _log("rendering page image(s)", None)
+        render_page_pngs(
+            pdf_path,
+            tmp_doc,
+            on_page=lambda current, total: _tick("drawing", progress, current=current, total=total),
+        )
 
         if not chunks:
             raise RuntimeError("No text chunks were extracted from the PDF.")
@@ -309,7 +343,7 @@ def ingest_pdf(
             ingest_layout_version=INGEST_LAYOUT_VERSION if reader == "layout" else 0,
         )
 
-        _log("promoting files into storage", progress)
+        _log("promoting files into storage", None)
         _promote_document(storage_dir, game_id, kind, resolved_doc_key, tmp_doc)
         recount_game(
             storage_dir,
@@ -317,14 +351,18 @@ def ingest_pdf(
             title=title,
             base_game_id=base_game_id,
         )
+        _tick("filing", progress, current=1, total=1)
         _index_written_document(
             storage_dir,
             game_id=game_id,
             kind=kind,
             doc_key=resolved_doc_key,
             chunks=chunks,
+            on_batch=lambda current, total: _tick(
+                "indexing", progress, current=current, total=total
+            ),
         )
-        _log(f"ingested {len(chunks)} chunk(s) for {game_id}/{resolved_doc_key}", progress)
+        _log(f"ingested {len(chunks)} chunk(s) for {game_id}/{resolved_doc_key}", None)
         return chunks
     finally:
         if work.exists():
@@ -341,7 +379,7 @@ def ingest_rulebook(
     doc_key: str | None = None,
     base_game_id: str | None = None,
     fetch_community_faq: bool = False,
-    progress: ProgressCallback | None = None,
+    progress: IngestProgressCallback | None = None,
 ) -> GameSummary:
     ingest_pdf(
         storage_dir,
@@ -356,6 +394,7 @@ def ingest_rulebook(
     )
     if fetch_community_faq:
         resolved_title = title or game_id
+        _tick("community", progress)
         try:
             faq_doc_key, faq_chunks = build_faq_chunks(
                 game_id=game_id,
@@ -370,10 +409,11 @@ def ingest_rulebook(
                 title=resolved_title,
                 document_title="BoardGameGeek description",
                 base_game_id=base_game_id,
-                progress=progress,
             )
         except BggUnavailableError as error:
-            _log(f"community FAQ skipped: {error}", progress)
+            _log(f"community FAQ skipped: {error}", None)
+        else:
+            _tick("community", progress, current=1, total=1)
     return recount_game(
         storage_dir,
         game_id,
@@ -455,6 +495,7 @@ def _index_written_document(
     kind: DocumentKind,
     doc_key: str,
     chunks: list[ChunkRecord],
+    on_batch: Callable[[int, int], None] | None = None,
 ) -> None:
     final_doc = document_dir(storage_dir, game_id, kind, doc_key)
     manifest = read_document_manifest(final_doc / MANIFEST_FILE_NAME)
@@ -471,6 +512,7 @@ def _index_written_document(
         indexed_at=indexed_at,
         ollama_url=settings.ollama_url,
         embedding_model=settings.profile.embedding,
+        on_batch=on_batch,
     )
 
 

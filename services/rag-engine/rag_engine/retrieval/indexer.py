@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from pathlib import Path
 
 from rag_engine.contract import DocumentKind
@@ -27,6 +28,7 @@ def maybe_index_document(
     indexed_at: str,
     ollama_url: str,
     embedding_model: str,
+    on_batch: Callable[[int, int], None] | None = None,
 ) -> None:
     index = open_chunk_index(storage_dir)
     if index is None:
@@ -45,6 +47,7 @@ def maybe_index_document(
             embedding_model,
             [chunk.text for chunk in chunks],
             timeout_seconds=INGEST_TIMEOUT_SECONDS,
+            on_batch=on_batch,
         )
     except (OllamaUnreachableError, ModelNotInstalledError) as error:
         raise IndexingError(str(error)) from error

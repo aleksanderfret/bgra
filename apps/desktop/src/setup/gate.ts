@@ -1,7 +1,10 @@
+import type { SplashActivityCode } from './splash';
+
 export type HealthProbe = {
   ollama: boolean;
   reranker: boolean;
   retrievalLoading: boolean;
+  layoutIngest: boolean;
   missingModels: string[];
   llm: string;
   embedding: string;
@@ -38,6 +41,12 @@ export function parseHealthProbe(payload: unknown): HealthProbe | null {
   if (retrievalLoading === null) {
     return null;
   }
+  let layoutIngest = false;
+  if (typeof comps.layoutIngest === 'boolean') {
+    layoutIngest = comps.layoutIngest;
+  } else if (typeof comps.layout_ingest === 'boolean') {
+    layoutIngest = comps.layout_ingest;
+  }
   if (typeof mods.llm !== 'string' || typeof mods.embedding !== 'string') {
     return null;
   }
@@ -49,6 +58,7 @@ export function parseHealthProbe(payload: unknown): HealthProbe | null {
     ollama: comps.ollama,
     reranker: comps.reranker,
     retrievalLoading,
+    layoutIngest,
     missingModels,
     llm: mods.llm,
     embedding: mods.embedding,
@@ -75,6 +85,16 @@ export function desktopLocale(appLocale: string): 'en' | 'pl' {
 
 export function initialAppPath(options: { locale: 'en' | 'pl'; gatePassed: boolean }): string {
   return options.gatePassed ? `/${options.locale}` : `/${options.locale}/setup`;
+}
+
+export function splashActivityFromProbe(probe: HealthProbe): SplashActivityCode | null {
+  if (probe.layoutIngest) {
+    return 'reading_layout';
+  }
+  if (probe.retrievalLoading) {
+    return 'preparing_search';
+  }
+  return null;
 }
 
 export function packagingUvRelativePath(platform: NodeJS.Platform): string {

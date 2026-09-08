@@ -4,25 +4,45 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import queue
 import tempfile
+from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
-from rag_engine.contract import GameSummary
+from rag_engine.contract import (
+    ErrorEvent,
+    GameSummary,
+    IngestDoneEvent,
+    IngestProgressEvent,
+)
+from rag_engine.ingest.ingest_percent import ingest_percent
 from rag_engine.ingest.pdf import (
     MAX_PDF_BYTES,
     IngestExtraMissingError,
     PageImageLimitError,
     PdfLimitError,
 )
-from rag_engine.ingest.pipeline import ensure_search_index, ingest_rulebook, rebuild_search_index
+from rag_engine.ingest.pipeline import (
+    ProgressTick,
+    ensure_search_index,
+    ingest_rulebook,
+    rebuild_search_index,
+)
 from rag_engine.ingest.registry import load_games
 from rag_engine.retrieval.indexer import IndexingError
 from rag_engine.settings import Settings, get_settings
-from rag_engine.storage_paths import InvalidDocKeyError, InvalidGameIdError, slugify_doc_key
+from rag_engine.sse import SSE_HEADERS, SSE_MEDIA_TYPE, encode_event
+from rag_engine.storage_paths import (
+    InvalidDocKeyError,
+    InvalidGameIdError,
+    assert_doc_key,
+    assert_game_id,
+    slugify_doc_key,
+)
 
 router = APIRouter(tags=["library"])
 _logger = logging.getLogger(__name__)
@@ -78,6 +98,25 @@ async def _write_pdf_upload(upload: UploadFile, dest: Path) -> None:
         raise ValueError("Uploaded file is not a PDF.")
 
 
+def _ingest_error_event(error: BaseException) -> ErrorEvent:
+    if isinstance(error, InvalidGameIdError):
+        return ErrorEvent(code="invalid_game_id", message=str(error))
+    if isinstance(error, InvalidDocKeyError):
+        return ErrorEvent(code="invalid_doc_key", message=str(error))
+    if isinstance(error, PageImageLimitError):
+        return ErrorEvent(code="page_image_too_large", message=str(error))
+    if isinstance(error, PdfLimitError):
+        return ErrorEvent(code="limit_exceeded", message=str(error))
+    if isinstance(error, ValueError):
+        return ErrorEvent(code="invalid_file", message=str(error))
+    if isinstance(error, IngestExtraMissingError):
+        return ErrorEvent(code="ingest_not_ready", message=str(error))
+    if isinstance(error, IndexingError):
+        return ErrorEvent(code="index_failed", message=str(error))
+    _logger.exception("PDF ingest failed")
+    return ErrorEvent(code="ingest_failed", message=str(error))
+
+
 @router.post("/ingest/pdf", response_model=None)
 async def ingest_pdf_upload(
     settings: Annotated[Settings, Depends(get_settings)],
@@ -89,7 +128,7 @@ async def ingest_pdf_upload(
     base_game_id: Annotated[str, Form(alias="baseGameId")] = "",
     mode: Annotated[str, Form()] = "create",
     fetch_community_faq: Annotated[str, Form(alias="fetchCommunityFaq")] = "false",
-) -> GameSummary | JSONResponse:
+) -> StreamingResponse | JSONResponse:
     if not await _try_begin_ingest():
         await file.close()
         return _error(409, "ingest_busy", "Another PDF import is already running.")
@@ -99,6 +138,15 @@ async def ingest_pdf_upload(
     resolved_doc_key = doc_key.strip() or None
     resolved_base = base_game_id.strip() or None
     attach = mode.strip().lower() == "attach"
+
+    try:
+        assert_game_id(game_id)
+        if resolved_base is not None:
+            assert_game_id(resolved_base)
+    except InvalidGameIdError as error:
+        await file.close()
+        await _end_ingest()
+        return _error(400, "invalid_game_id", str(error))
 
     if attach:
         known = {game.game_id for game in load_games(settings.storage_dir)}
@@ -126,6 +174,14 @@ async def ingest_pdf_upload(
                 else slugify_doc_key(resolved_document_title)
             )
 
+    try:
+        if resolved_doc_key is not None:
+            assert_doc_key(resolved_doc_key)
+    except InvalidDocKeyError as error:
+        await file.close()
+        await _end_ingest()
+        return _error(400, "invalid_doc_key", str(error))
+
     if resolved_base == game_id:
         await file.close()
         await _end_ingest()
@@ -149,40 +205,80 @@ async def ingest_pdf_upload(
         with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
             tmp_path = Path(tmp.name)
         await _write_pdf_upload(file, tmp_path)
-        summary = await asyncio.to_thread(
-            ingest_rulebook,
-            settings.storage_dir,
-            game_id=game_id,
-            pdf_path=tmp_path,
-            title=display_title,
-            document_title=resolved_document_title,
-            doc_key=resolved_doc_key,
-            base_game_id=resolved_base,
-            fetch_community_faq=_truthy(fetch_community_faq),
-        )
-        return summary
-    except InvalidGameIdError as error:
-        return _error(400, "invalid_game_id", str(error))
-    except InvalidDocKeyError as error:
-        return _error(400, "invalid_doc_key", str(error))
     except PdfLimitError as error:
-        if isinstance(error, PageImageLimitError):
-            return _error(413, "page_image_too_large", str(error))
-        return _error(413, "limit_exceeded", str(error))
-    except ValueError as error:
-        return _error(400, "invalid_file", str(error))
-    except IngestExtraMissingError as error:
-        return _error(503, "ingest_not_ready", str(error))
-    except IndexingError as error:
-        return _error(503, "index_failed", str(error))
-    except Exception as error:
-        _logger.exception("PDF ingest failed")
-        return _error(500, "ingest_failed", str(error))
-    finally:
         if tmp_path is not None:
             tmp_path.unlink(missing_ok=True)
         await file.close()
         await _end_ingest()
+        if isinstance(error, PageImageLimitError):
+            return _error(413, "page_image_too_large", str(error))
+        return _error(413, "limit_exceeded", str(error))
+    except ValueError as error:
+        if tmp_path is not None:
+            tmp_path.unlink(missing_ok=True)
+        await file.close()
+        await _end_ingest()
+        return _error(400, "invalid_file", str(error))
+
+    saved_pdf = tmp_path
+    progress_queue: queue.Queue[ProgressTick | GameSummary | BaseException] = queue.Queue()
+
+    def on_progress(tick: ProgressTick) -> None:
+        progress_queue.put(tick)
+
+    def worker() -> None:
+        try:
+            summary = ingest_rulebook(
+                settings.storage_dir,
+                game_id=game_id,
+                pdf_path=saved_pdf,
+                title=display_title,
+                document_title=resolved_document_title,
+                doc_key=resolved_doc_key,
+                base_game_id=resolved_base,
+                fetch_community_faq=_truthy(fetch_community_faq),
+                progress=on_progress,
+            )
+            progress_queue.put(summary)
+        except BaseException as error:
+            progress_queue.put(error)
+
+    async def generate() -> AsyncIterator[str]:
+        worker_task = asyncio.create_task(asyncio.to_thread(worker))
+        try:
+            yield encode_event(
+                IngestProgressEvent(
+                    stage="saving",
+                    current=1,
+                    total=1,
+                    percent=ingest_percent("saving", 1, 1),
+                )
+            )
+            while True:
+                item = await asyncio.to_thread(progress_queue.get)
+                if isinstance(item, ProgressTick):
+                    yield encode_event(
+                        IngestProgressEvent(
+                            stage=item.stage,
+                            current=item.current,
+                            total=item.total,
+                            percent=ingest_percent(item.stage, item.current, item.total),
+                        )
+                    )
+                    continue
+                if isinstance(item, GameSummary):
+                    yield encode_event(IngestDoneEvent(game=item))
+                    break
+                yield encode_event(_ingest_error_event(item))
+                break
+        finally:
+            await worker_task
+            if tmp_path is not None:
+                tmp_path.unlink(missing_ok=True)
+            await file.close()
+            await _end_ingest()
+
+    return StreamingResponse(generate(), media_type=SSE_MEDIA_TYPE, headers=SSE_HEADERS)
 
 
 @router.post("/ingest/reindex", response_model=None)

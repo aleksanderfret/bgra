@@ -39,6 +39,24 @@
     "loadingTitle": "Getting ready…",
     "loadingBody": "The assistant opens when this computer is ready. The first time can take a minute."
   },
+  "activity": {
+    "unknown": "Still working…",
+    "detail": "{{current}} of {{total}}",
+    "checking_computer": "Checking this computer…",
+    "starting_assistant": "Starting the assistant…",
+    "downloading_installer": "Downloading the Ollama installer…",
+    "waiting_for_ollama": "Waiting for Ollama to finish installing and start…",
+    "pulling_models": "Downloading the models for this computer…",
+    "preparing_search": "Preparing rulebook search…",
+    "reading_layout": "Reading your rulebooks again…",
+    "sending": "Sending the rulebook…",
+    "saving": "Saving the file…",
+    "reading": "Reading the pages…",
+    "drawing": "Drawing pictures of the pages…",
+    "filing": "Filing in the library…",
+    "community": "Fetching community notes…",
+    "indexing": "Making these pages searchable…"
+  },
   "preferences": {
     "label": "Display preferences"
   },
@@ -205,12 +223,6 @@
       "openDownloadPage": "Open the Ollama download page",
       "readyTitle": "Ready",
       "readyBody": "Everything is ready — opening the assistant…",
-      "stage": {
-        "downloading_installer": "Downloading the Ollama installer…",
-        "waiting_for_ollama": "Waiting for Ollama to finish installing and start…",
-        "pulling_models": "Downloading the models for this computer…",
-        "preparing_search": "Preparing rulebook search…"
-      },
       "errorTitle": "Could not finish setup",
       "error": {
         "download_failed": "Could not download the Ollama installer. Check your internet connection, then try again.",

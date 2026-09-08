@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -88,7 +89,12 @@ def _page_png_bytes(page: object, dpi: int) -> bytes:
     return pixmap.tobytes("png")  # type: ignore[no-any-return]
 
 
-def render_page_pngs(pdf_path: Path, output_dir: Path) -> list[Path]:
+def render_page_pngs(
+    pdf_path: Path,
+    output_dir: Path,
+    *,
+    on_page: Callable[[int, int], None] | None = None,
+) -> list[Path]:
     assert_pdf_limits(pdf_path)
     try:
         import pymupdf
@@ -124,5 +130,7 @@ def render_page_pngs(pdf_path: Path, output_dir: Path) -> list[Path]:
             target = output_dir / f"p{index + 1:02d}.png"
             target.write_bytes(png_bytes)
             written.append(target)
+            if on_page is not None:
+                on_page(index + 1, document.page_count)
 
     return written

@@ -35,8 +35,16 @@ import {
   initialAppPath,
   liveProbeOk,
   parseHealthProbe,
+  splashActivityFromProbe,
 } from '../setup/gate';
-import { buildSplashHtml, readStartupCopy, splashDataUrl } from '../setup/splash';
+import { desktopLaunchActions } from '../setup/launch-order';
+import {
+  applySplashActivity,
+  buildSplashHtml,
+  readStartupCopy,
+  type SplashActivityCode,
+  splashDataUrl,
+} from '../setup/splash';
 import {
   type MachineSnapshot,
   type ProfileRecommendation,
@@ -72,6 +80,7 @@ let uiLocale: 'en' | 'pl' = 'en';
 let lastProbe: HealthProbe | null = null;
 let ensureRuntimeBusy = false;
 let backendsReady = false;
+let pendingSplashActivity: SplashActivityCode = 'checking_computer';
 const windowsWithNavigationLock = new WeakSet<BrowserWindow>();
 
 function packageRoot(): string {
@@ -135,6 +144,23 @@ function emitRuntimeProgress(progress: RuntimeProgress): void {
   for (const window of BrowserWindow.getAllWindows()) {
     window.webContents.send('desktop:runtime-progress', progress);
   }
+}
+
+function writeSplashActivity(code: SplashActivityCode): void {
+  applySplashActivity({
+    target: mainWindow?.webContents ?? null,
+    localesDir: i18nLocalesDir(),
+    locale: uiLocale,
+    code,
+  });
+}
+
+function pushSplashActivity(code: SplashActivityCode): void {
+  pendingSplashActivity = code;
+  if (mainWindow === null || mainWindow.webContents.isLoading()) {
+    return;
+  }
+  writeSplashActivity(code);
 }
 
 async function resolveTools(): Promise<void> {
@@ -223,6 +249,7 @@ function setupState(): DesktopSetupState {
     setupComplete: setupCompleteFlagExists(),
     askReady,
     gatePassed: currentGatePassed(),
+    runtimeBusy: ensureRuntimeBusy,
     missingModels: probe?.missingModels ?? [],
     healthModels: {
       llm: probe?.llm ?? '',
@@ -400,6 +427,7 @@ async function runEnsureRuntime(): Promise<void> {
 }
 
 async function startBackend(options: { skipRetrievalWarm: boolean }): Promise<void> {
+  pushSplashActivity('checking_computer');
   dataDir = join(app.getPath('userData'), 'storage');
   mkdirSync(dataDir, { recursive: true });
   mkdirSync(join(app.getPath('userData'), 'logs'), { recursive: true });
@@ -424,6 +452,7 @@ async function startBackend(options: { skipRetrievalWarm: boolean }): Promise<vo
     throw new Error('uv is required to start the engine');
   }
 
+  pushSplashActivity('starting_assistant');
   await syncPythonEnvironment(engineDir);
 
   const profileEnv = recommendation?.profileId ?? 'starter-32gb';
@@ -532,6 +561,11 @@ async function startBackend(options: { skipRetrievalWarm: boolean }): Promise<vo
   await waitForHttpWhileAlive(`http://127.0.0.1:${enginePort}/health`, engineProcess, {
     timeoutMs: 60_000,
   });
+  await refreshProbe();
+  const bootActivity = lastProbe === null ? null : splashActivityFromProbe(lastProbe);
+  if (bootActivity !== null) {
+    pushSplashActivity(bootActivity);
+  }
   if (nextProcess === null) {
     throw new Error('Next.js process failed to start');
   }
@@ -653,6 +687,9 @@ function createWindow(): Promise<void> {
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
+  mainWindow.webContents.once('did-finish-load', () => {
+    writeSplashActivity(pendingSplashActivity);
+  });
   void mainWindow.loadURL(splashDataUrl(html));
   return shown;
 }
@@ -725,23 +762,33 @@ if (!gotLock) {
         // open the assistant — never make the player re-tap Install.
         await resolveTools();
         const returningPlayer = setupCompleteFlagExists() || ollamaPath !== null;
-        await startBackend({ skipRetrievalWarm: !returningPlayer });
-        if (returningPlayer) {
-          try {
-            await runEnsureRuntime();
-          } catch {
-            // Keep the flag so reopen still retries automatically. Only clear
-            // when Ollama itself was removed from the machine.
-            await resolveTools();
-            if (ollamaPath === null) {
-              clearSetupCompleteFlag();
-            }
+        for (const action of desktopLaunchActions({ returningPlayer })) {
+          switch (action.type) {
+            case 'startBackend':
+              await startBackend({ skipRetrievalWarm: action.skipRetrievalWarm });
+              break;
+            case 'loadAppPage':
+              await splashShown;
+              await loadAppPage();
+              break;
+            case 'ensureRuntime':
+              try {
+                await runEnsureRuntime();
+              } catch {
+                await resolveTools();
+                if (ollamaPath === null) {
+                  clearSetupCompleteFlag();
+                }
+              }
+              break;
           }
         }
         backendsReady = true;
       }
-      await splashShown;
-      await loadAppPage();
+      if (isDev && process.env.BGA_WEB_URL) {
+        await splashShown;
+        await loadAppPage();
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       dialog.showErrorBox('BGA failed to start', message);

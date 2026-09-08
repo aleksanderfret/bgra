@@ -1,5 +1,7 @@
 'use client';
 
+import { ActivityProgress } from '@bga/components/activity-progress';
+import { runtimeProgressToActivity } from '@bga/utils/activity-progress';
 import {
   type DesktopSetupState,
   getDesktopApi,
@@ -10,6 +12,16 @@ import { Alert, Button, Group, List, Stack, Text } from '@mantine/core';
 import { useRouter } from 'next/navigation';
 import { type FC, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+
+const CHECKING_VIEW = { activity: 'checking_computer' as const, percent: null };
+const PREPARING_VIEW = { activity: 'preparing_search' as const, percent: null };
+
+export const shouldAutoResumeSetup = (state: DesktopSetupState): boolean => {
+  if (state.askReady) {
+    return false;
+  }
+  return state.runtimeBusy || state.setupComplete || state.ollamaPath !== null;
+};
 
 type Translate = ReturnType<typeof useTranslation>['t'];
 
@@ -78,7 +90,7 @@ export const SetupPanel: FC = () => {
   }
 
   if (state === null) {
-    return <Text>{t('setup.loading')}</Text>;
+    return <ActivityProgress layout="page" view={CHECKING_VIEW} />;
   }
 
   const api = getDesktopApi();
@@ -87,23 +99,13 @@ export const SetupPanel: FC = () => {
   const warningReason = reason === 'insufficient_memory' || reason === 'insufficient_disk';
   const platform = state.machine?.platform;
   const missingValue = t('ui.missingValue');
-  const stageMessage = (() => {
-    if (progress === null) {
-      return null;
-    }
-    switch (progress.stage) {
-      case 'downloading_installer':
-        return t('setup.runtime.stage.downloading_installer');
-      case 'waiting_for_ollama':
-        return t('setup.runtime.stage.waiting_for_ollama');
-      case 'pulling_models':
-        return t('setup.runtime.stage.pulling_models');
-      case 'preparing_search':
-        return t('setup.runtime.stage.preparing_search');
-      default:
-        return null;
-    }
-  })();
+  const waitView =
+    progress === null ? PREPARING_VIEW : (runtimeProgressToActivity(progress) ?? PREPARING_VIEW);
+  const showWait = errorCode === null && !state.askReady && (busy || shouldAutoResumeSetup(state));
+
+  if (showWait) {
+    return <ActivityProgress layout="page" view={waitView} />;
+  }
 
   const handleOpenDownloadPage = (): void => {
     void api?.openExternalHttps(state.ollamaDownloadUrl);
@@ -213,12 +215,6 @@ export const SetupPanel: FC = () => {
         <Alert color="yellow" title={t('setup.runtime.osPromptWindowsTitle')}>
           <Text size="sm">{t('setup.runtime.osPromptWindows')}</Text>
         </Alert>
-      ) : null}
-
-      {stageMessage !== null ? (
-        <Text size="sm" c="dimmed">
-          {stageMessage}
-        </Text>
       ) : null}
 
       {errorCode !== null ? (

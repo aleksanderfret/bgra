@@ -29,7 +29,7 @@ export const routeKind = (segments: string[]): EngineRouteKind => {
     case 'static':
       return 'asset';
     case 'ingest':
-      return 'long';
+      return segments[1] === 'pdf' ? 'stream' : 'long';
     default:
       return 'api';
   }

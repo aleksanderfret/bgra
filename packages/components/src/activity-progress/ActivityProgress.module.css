@@ -1,0 +1,77 @@
+.page {
+  box-sizing: border-box;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  text-align: center;
+}
+
+.inline {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  text-align: start;
+}
+
+.mark {
+  width: 5.5rem;
+  height: 5.5rem;
+  flex: 0 0 auto;
+}
+
+.inline .mark {
+  width: 2.75rem;
+  height: 2.75rem;
+}
+
+.ring {
+  fill: none;
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.track {
+  stroke: var(--mantine-color-default-border);
+}
+
+.inner {
+  stroke: var(--mantine-color-blue-filled);
+  opacity: 0.28;
+  transform-origin: 50% 50%;
+  animation: orbit 1.8s linear infinite;
+}
+
+.outerSpin {
+  stroke: var(--mantine-color-blue-filled);
+  stroke-dasharray: 36 90;
+  transform-origin: 50% 50%;
+  animation: orbit 0.85s linear infinite;
+}
+
+.outerDeterminate {
+  stroke: var(--mantine-color-blue-filled);
+  transform-origin: 50% 50%;
+  transform: rotate(-90deg);
+  transition: stroke-dashoffset 240ms ease;
+}
+
+.label {
+  animation: fade-in 220ms ease;
+}
+
+@keyframes orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0.35;
+  }
+  to {
+    opacity: 1;
+  }
+}

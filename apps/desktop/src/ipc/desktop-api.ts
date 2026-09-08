@@ -20,6 +20,7 @@ export interface DesktopSetupState {
   askReady: boolean;
   /** Stored flag + Ask-ready — used for navigation off /setup. */
   gatePassed: boolean;
+  runtimeBusy: boolean;
   missingModels: string[];
   healthModels: { llm: string; embedding: string };
 }

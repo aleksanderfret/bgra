@@ -4,6 +4,11 @@ export {
   isAssistantEvent,
 } from './event-stream';
 export {
+  createIngestEventDecoder,
+  type IngestEventDecoder,
+  isIngestEvent,
+} from './ingest-event-stream';
+export {
   type AnswerMode,
   type AskRequest,
   type AssistantEvent,
@@ -15,6 +20,8 @@ export {
   type GameSummary,
   type Groundedness,
   type HealthReport,
+  type IngestEvent,
+  type IngestStage,
   isDocKey,
   isGameId,
   type PipelineStage,

@@ -39,6 +39,24 @@
     "loadingTitle": "Przygotowuję aplikację…",
     "loadingBody": "Asystent otworzy się, gdy wszystko będzie gotowe. Za pierwszym razem może to chwilę potrwać."
   },
+  "activity": {
+    "unknown": "Nadal pracuję…",
+    "detail": "{{current}} z {{total}}",
+    "checking_computer": "Sprawdzam ten komputer…",
+    "starting_assistant": "Uruchamiam asystenta…",
+    "downloading_installer": "Pobieram instalator Ollamy…",
+    "waiting_for_ollama": "Czekam, aż Ollama dokończy instalację i się uruchomi…",
+    "pulling_models": "Pobieram modele na ten komputer…",
+    "preparing_search": "Przygotowuję wyszukiwanie w instrukcjach…",
+    "reading_layout": "Ponownie czytam Twoje instrukcje…",
+    "sending": "Wysyłam instrukcję…",
+    "saving": "Zapisuję plik…",
+    "reading": "Czytam strony…",
+    "drawing": "Rysuję obrazki stron…",
+    "filing": "Odkładam do biblioteki…",
+    "community": "Pobieram notatki społeczności…",
+    "indexing": "Przygotowuję te strony do wyszukiwania…"
+  },
   "preferences": {
     "label": "Ustawienia wyświetlania"
   },
@@ -205,12 +223,6 @@
       "openDownloadPage": "Otwórz stronę pobierania Ollamy",
       "readyTitle": "Gotowe",
       "readyBody": "Wszystko gotowe — otwieram asystenta…",
-      "stage": {
-        "downloading_installer": "Pobieram instalator Ollamy…",
-        "waiting_for_ollama": "Czekam, aż Ollama dokończy instalację i wystartuje…",
-        "pulling_models": "Pobieram modele dla tego komputera…",
-        "preparing_search": "Przygotowuję wyszukiwanie w instrukcjach…"
-      },
       "errorTitle": "Nie udało się dokończyć konfiguracji",
       "error": {
         "download_failed": "Nie udało się pobrać instalatora Ollamy. Sprawdź internet i spróbuj ponownie.",

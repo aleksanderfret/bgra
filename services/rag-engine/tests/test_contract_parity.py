@@ -16,6 +16,8 @@ from rag_engine.contract import (
     GameSummary,
     Groundedness,
     HealthReport,
+    IngestEvent,
+    IngestStage,
     PipelineStage,
     RetrievalReloadResponse,
     RetrievedSource,
@@ -137,6 +139,24 @@ def test_health_report_fields_match() -> None:
     python_fields = {to_camel(name) for name in HealthReport.model_fields}
 
     assert ts_fields == python_fields
+
+
+def test_ingest_stages_match() -> None:
+    ts_stages = _quoted(_declaration(_source(), "export type IngestStage ="))
+
+    assert ts_stages == set(get_args(IngestStage))
+
+
+def test_every_ingest_event_exists_on_both_sides() -> None:
+    block = _declaration(_source(), "export type IngestEvent =")
+    ts_events = set(re.findall(r"type:\s*'([^']+)'", block))
+
+    union = get_args(IngestEvent)[0]
+    python_events = {
+        get_args(member.model_fields["type"].annotation)[0] for member in get_args(union)
+    }
+
+    assert ts_events == python_events
 
 
 def test_retrieval_reload_response_fields_match() -> None:

@@ -1,1 +1,1 @@
-export { SetupPanel } from './SetupPanel';
+export { SetupPanel, shouldAutoResumeSetup } from './SetupPanel';

@@ -23,7 +23,8 @@ here because nothing was built between Stage 2 and that work.
 | [stage-2-document-ingestion.md](stage-2-document-ingestion.md) | 2 — PDF and transcripts → chunks and page pictures | Implemented |
 | [stage-2a-multi-doc-expansions.md](stage-2a-multi-doc-expansions.md) | 2A — several PDFs per game; expansions as linked games | Implemented |
 | [stage-3-retrieval.md](stage-3-retrieval.md) | 3 — answers from the documents, with a page citation | Implemented |
-| [stage-3a-ingest-progress.md](stage-3a-ingest-progress.md) | 3A — smooth percent bar while a PDF is added | Parked until after Stage 3 (and 3B) |
+| [stage-3a-ingest-progress.md](stage-3a-ingest-progress.md) | 3A — PDF percent bar (original scope) | Superseded by [stage-3a-activity-progress.md](stage-3a-activity-progress.md) |
+| [stage-3a-activity-progress.md](stage-3a-activity-progress.md) | 3A — reusable activity view, boot handoff, honest PDF percent | Implemented |
 | [stage-3e-adaptive-thinking.md](stage-3e-adaptive-thinking.md) | 3E — think only when hits conflict or barely clear the cutoff | Implemented |
 | [stage-3f-search-unavailable.md](stage-3f-search-unavailable.md) | 3F — honest banner when search never started | Implemented |
 | [stage-3c-search-catch-up.md](stage-3c-search-catch-up.md) | 3C — rebuild search for an existing library on start | Implemented |

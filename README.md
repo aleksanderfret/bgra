@@ -256,7 +256,7 @@ was imported before search was installed, rebuild the index:
 uv run python -m rag_engine.ingest index
 ```
 
-You can confirm the material is ready with `GET /games` (non-zero `chunkCount`, documents listed) and by checking `storage/assets/<gameId>/documents/rulebook/<docKey>/pNN.png`. On Ask, pick a base game and optionally tick expansions. A live percent bar while a PDF is imported is Stage 3A. A first-run wall that installs Ollama for a packaged app is Stage 3B.
+You can confirm the material is ready with `GET /games` (non-zero `chunkCount`, documents listed) and by checking `storage/assets/<gameId>/documents/rulebook/<docKey>/pNN.png`. On Ask, pick a base game and optionally tick expansions. Adding a PDF shows a live activity view and an honest percent (Stage 3A — plan: [`docs/archive/stage-3a-activity-progress.md`](docs/archive/stage-3a-activity-progress.md)). A first-run wall that installs Ollama for a packaged app is Stage 3B.
 
 For a YouTube teaching video (captions preferred; Whisper only if you also installed `--extra speech`):
 

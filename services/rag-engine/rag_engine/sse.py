@@ -1,5 +1,7 @@
 """SSE frames: one event, JSON in `data`, camelCase keys."""
 
+from pydantic import BaseModel
+
 from .contract import AssistantEvent
 
 SSE_MEDIA_TYPE = "text/event-stream"
@@ -12,7 +14,7 @@ SSE_HEADERS = {
 }
 
 
-def encode_event(event: AssistantEvent) -> str:
+def encode_event(event: AssistantEvent | BaseModel) -> str:
     # Compact JSON escapes newlines, so a payload cannot end a frame early.
     return f"data: {event.model_dump_json(by_alias=True)}\n\n"
 
