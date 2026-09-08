@@ -1,11 +1,11 @@
-import type { NextRequest } from 'next/server';
 import {
   ENGINE_TIMEOUT_MS,
   engineTarget,
   requestHeadersForEngine,
   responseHeadersFromEngine,
   routeKind,
-} from '@/lib/engine-proxy';
+} from '@bga/utils/engine-proxy';
+import type { NextRequest } from 'next/server';
 
 const ENGINE_URL = process.env.RAG_ENGINE_URL ?? 'http://127.0.0.1:8000';
 

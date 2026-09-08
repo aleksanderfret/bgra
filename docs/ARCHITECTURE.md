@@ -95,7 +95,7 @@ frame, and the marker can also be torn apart across two stream tokens.
    counted in `rejectedFigureCount`.
 
 So an invented path is not "handled" — it is **impossible to display**. The guarantee is
-described by the tests in `apps/web/src/features/rules-chat/answer-state.test.ts`.
+described by the tests in `packages/utils/src/answer-state/answer-state.test.ts`.
 
 ### 3.4. No reranking and no hybrid retrieval
 

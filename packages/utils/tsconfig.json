@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM"],
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "noEmit": true,
+    "types": [],
+    "paths": {
+      "@bga-web-i18n/*": ["../../apps/web/src/i18n/*"]
+    }
+  },
+  "include": ["src/**/*.ts"]
+}

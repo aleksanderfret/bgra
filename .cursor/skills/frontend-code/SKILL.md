@@ -216,6 +216,12 @@ export functions (`page.tsx`, `layout.tsx`) or HTTP method exports
 interface there, never an inline object. Helpers inside those files still use
 arrows.
 
+**Package layout.** Reusable UI, hooks, utils, and full-page compositions
+belong in `@bga/components`, `@bga/hooks`, `@bga/utils`, and `@bga/pages`.
+Follow `.cursor/skills/frontend-packages/SKILL.md`: one unit per folder, local
+`index` only, no package barrels, no `export *` / `import *`, named exports
+only (Next route files may default-export a named page).
+
 ## Structure
 
 - **Early returns** for error and empty states. Do not nest the happy path

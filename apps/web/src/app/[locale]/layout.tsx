@@ -1,12 +1,12 @@
 import '@mantine/core/styles.css';
 import '@mantine/notifications/styles.css';
 
+import { DesktopGate } from '@bga/components/desktop-gate';
 import { ColorSchemeScript, MantineProvider, mantineHtmlProps } from '@mantine/core';
 import { Notifications } from '@mantine/notifications';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { DEFAULT_COLOR_SCHEME, theme } from '@/app/theme';
-import { DesktopGate } from '@/features/desktop-setup/DesktopGate';
 import { I18nProvider } from '@/i18n/I18nProvider';
 import { getTranslation } from '@/i18n/server';
 import { isLocale, LOCALES } from '@/i18n/settings';

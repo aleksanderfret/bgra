@@ -30,7 +30,13 @@ const nextConfig: NextConfig = {
 
   // The contract package is consumed straight from TypeScript source, so there
   // is no build step to sequence before `next dev`.
-  transpilePackages: ['@bga/api-contract'],
+  transpilePackages: [
+    '@bga/api-contract',
+    '@bga/utils',
+    '@bga/hooks',
+    '@bga/components',
+    '@bga/pages',
+  ],
 
   // This repo keeps one AGENTS.md, at the root. A generated copy under apps/web
   // would be a second set of instructions, drifting from the first.

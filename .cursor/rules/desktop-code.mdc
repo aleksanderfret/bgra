@@ -1,0 +1,13 @@
+---
+description: Electron desktop shell organization for apps/desktop.
+globs: apps/desktop/**/*.{ts,tsx,js,mjs}
+alwaysApply: false
+---
+
+# Desktop code
+
+Follow `.cursor/skills/desktop-code/SKILL.md`.
+
+- Prefer `main/`, `preload/`, `ipc/`, `runtime/`, `system/`, `setup/` under `src/` — not a flat dump of every file.
+- Named exports; no `export *` / `import *`.
+- Preload stays minimal; tests sit next to the module.

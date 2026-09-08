@@ -11,11 +11,12 @@ Keep them in git. Personal Cursor config stays in `~/.cursor/`.
 
 | Area | Choice | Note |
 | --- | --- | --- |
-| Frontend | Next.js 16.3, React 19, Mantine 9 | No Tailwind. Style with Mantine components and its CSS variables. |
+| Frontend | Next.js 16.3, React 19, Mantine 9 | No Tailwind. Style with Mantine components and its CSS variables. Shared UI lives in `@bga/components`, `@bga/pages`, `@bga/hooks`, `@bga/utils` (see `.cursor/skills/frontend-packages`). |
 | Types | TypeScript 7 | No programmatic compiler API until 7.1, so `typescript-eslint` cannot be used. |
 | Lint | Biome 2.5 | Single config at the repo root. Do not add ESLint. |
 | Tests | Vitest 4 | `globals: false`, so import `describe`/`it`/`expect` explicitly. |
 | Backend | FastAPI, Python 3.14, uv | `mypy --strict` and `ruff` both gate CI. |
+| Desktop | Electron 35 | Main/preload under `apps/desktop/src/{main,preload,ipc,runtime,system,setup}`. |
 | Tasks | Turborepo + pnpm workspaces | Turbo 2 uses `tasks`, not `pipeline`. |
 
 ## Commands

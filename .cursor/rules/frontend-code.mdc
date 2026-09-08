@@ -16,6 +16,7 @@ Follow `.cursor/skills/frontend-code/SKILL.md` when editing these files.
 - No inline callbacks in JSX. Name handlers before `return` (`onClick={handleSave}`, never `onClick={() => …}`).
 - No inline object types. Named `interface` for props/params (prefer `interface` over `type`).
 - Components: `const Name: FC<NameProps> = …` (not `function Name`); exception: Next.js page/layout/route.
+- Shared UI/hooks/utils/pages: follow `.cursor/skills/frontend-packages/SKILL.md` (`@bga/components` etc.).
 - No hardcoded user-facing text. Follow `.cursor/skills/translations/SKILL.md`.
 - Mantine only. No Tailwind.
 - `'use client'` only when the file needs state, effects, or browser events.

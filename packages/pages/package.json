@@ -1,0 +1,27 @@
+{
+  "name": "@bga/pages",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Full-page UI compositions for the BGA frontend",
+  "exports": {
+    "./*": "./src/*/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "lint": "biome check"
+  },
+  "dependencies": {
+    "@bga/components": "workspace:*",
+    "@mantine/core": "9.6.0",
+    "i18next": "26.4.1",
+    "react": "19.2.8"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.18",
+    "typescript": "7.0.2",
+    "vitest": "4.1.11"
+  }
+}

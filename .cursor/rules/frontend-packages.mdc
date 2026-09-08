@@ -1,0 +1,14 @@
+---
+description: FE shared packages layout (components, pages, hooks, utils under packages/).
+globs: packages/{components,pages,hooks,utils}/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# Frontend packages
+
+Follow `.cursor/skills/frontend-packages/SKILL.md`.
+
+- Units live in `@bga/components`, `@bga/pages`, `@bga/hooks`, `@bga/utils` — one folder each, local `index.ts` only.
+- No package-wide barrel; no `export *` / `import *`.
+- Named exports only (Next `page.tsx` / `layout.tsx` may default-export a named page adapter).
+- Components, hooks, utils have co-located tests; pages do not.
