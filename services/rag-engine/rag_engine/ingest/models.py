@@ -2,9 +2,16 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 from rag_engine.contract import DOC_KEY_PATTERN, GAME_ID_PATTERN, DocumentKind
+
+BlockKind = Literal["rule", "example", "note", "catalogue"]
+
+BLOCK_KIND_RULE: BlockKind = "rule"
+BLOCK_KIND_CATALOGUE: BlockKind = "catalogue"
 
 
 class ChunkRecord(BaseModel):
@@ -17,6 +24,9 @@ class ChunkRecord(BaseModel):
     text: str
     heading: str = ""
     image_url: str | None = None
+    #: Stable id for sibling expansion; empty when the chunk has no heading.
+    section_id: str = ""
+    block_kind: BlockKind = BLOCK_KIND_RULE
 
 
 def chunk_id_for_page(

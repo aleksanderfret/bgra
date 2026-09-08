@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 
 from rag_engine.contract import DocumentKind
-from rag_engine.engines.embed import INGEST_TIMEOUT_SECONDS, embed_texts_sync
+from rag_engine.engines.embed import INGEST_TIMEOUT_SECONDS, embed_texts_sync_batched
 from rag_engine.engines.llm import ModelNotInstalledError, OllamaUnreachableError
 from rag_engine.ingest.models import ChunkRecord
 from rag_engine.retrieval.service import open_chunk_index
@@ -40,7 +40,7 @@ def maybe_index_document(
         index.delete_document(game_id, kind, doc_key)
         return
     try:
-        vectors = embed_texts_sync(
+        vectors = embed_texts_sync_batched(
             ollama_url,
             embedding_model,
             [chunk.text for chunk in chunks],

@@ -333,6 +333,7 @@ What you can already do, and what is still on the way. The numbered engineering 
 
 - [x] If looking through the rulebooks never started, the screen says so and asking stays off — the app does not pretend it is ready.
 - [x] Take extra care when the book and an errata disagree; everyday questions stay snappy.
+- [ ] A question asking for a whole list ("every action", "every phase") gets the whole list, not just the first few matches.
 - [ ] After an update, a game already in your library just works — no dropping the PDF again.
 - [ ] The first time you open the downloaded app, it sets itself up. No terminal.
 - [ ] Watch a real progress bar while a rulebook is being added.

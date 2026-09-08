@@ -440,6 +440,72 @@ full answer is still readable; past chat is not in the search index as FAQ;
 
 ---
 
+## Stage 3G — Rulebook import understanding (section coverage and page layout gate)
+
+**Goal:** a question that asks for a whole list ("list every action") gets the whole
+list, not just the first few passages the reranker kept. Also settle whether page
+layout (columns, boxes, examples) is a second, separate loss before building a reader
+for it.
+
+Do this **after Stage 3E and 3F** (the relevance-score fix that made
+`insufficient_evidence` reachable again also surfaced this: fewer, sharper passages
+means a list spread across many headings can lose coverage) and **before Stage 4**.
+This stage runs Stage 6A's measurement gate now instead of waiting for Stage 6; see the
+note there. A full Cursor plan exists for this stage; archive it to
+`docs/archive/stage-3g-rulebook-import-understanding.md` once work starts.
+
+**Phase 0 — measure before building** (blocks Phase 2 only, not Phase 1):
+
+- Pick 2–3 passages that sit in a sidenote, an example box, or a second column, on the
+  densest rulebook available. Ask the current pipeline about them unmodified — it
+  already uses `pymupdf4llm`, which claims layout-aware extraction — and record whether
+  the right passage is even retrieved.
+- Write the miss rate down. If it is small, stop: keep the light reader, and the number
+  closes this question for the next person.
+- **Done:** World Order alone looked mild; **Through the Ages handbook**
+  (`cywilizacja-poprzez-wieki` / `rulebook/handbook`) showed real miss — wrong
+  column order on page 3, callout detached across columns on page 9, 16 orphan
+  `Przykład` chunks. Numbers and fixtures are in `docs/ARCHITECTURE.md` §3.5a.
+  **Phase 2 is justified and shipped** (`ingest/layout.py`, `ingestLayoutVersion`).
+
+**Phase 1 — section map, catalogue chunk, sibling expansion** (independent of Phase 0
+and 2; ships first):
+
+- Each chunk keeps a `section_id` (derived from its existing heading, no PDF re-read)
+  and a `block_kind` (`rule` by default; `catalogue` for one new synthetic chunk per
+  document listing every section name and page).
+- A `catalogue` chunk that clears the relevance filter is never shown to the player or
+  the model as a source: it triggers expansion to the sections it names, then is
+  dropped from the final passages.
+- After the relevance filter and before the `retrieval_top_k` cutoff, a kept passage may
+  pull in the rest of its own section — never past the profile's `retrieval_top_k`, and
+  never ahead of a passage that cleared the filter on its own merit.
+- A short-question regression test (e.g. "what does the Trade action do?") keeps
+  exactly the passages it kept before this stage — expansion must not resurrect noise
+  the relevance fix just removed.
+
+**Phase 2 — layout-aware reader** (gated on Phase 0 finding a real miss):
+
+- A PyMuPDF block reader that orders columns by reading position and keeps an
+  example/callout box attached to the rule beside it, replacing `pymupdf4llm` only
+  where it is measured to lose that link. Chunk boundaries come from this pass
+  directly, not from a second blind character-count split afterwards.
+- A persisted `ingestLayoutVersion` on the document manifest, so a heavier re-import
+  runs once per document, not on every engine start.
+- A migration only touches a document with a stored `source.pdf`; FAQ and transcript
+  documents have none and are never re-parsed as a PDF.
+- A time budget measured on a fixture near `MAX_PDF_PAGES` (200), with a fallback to
+  the light reader if exceeded — an upload must not silently outlast the proxy's
+  `maxDuration`.
+
+**Acceptance:** "list every action" (or the equivalent in the question's language)
+returns every action named in the rulebook, sourced from more than one passage when the
+rulebook never lists them in one place; an ordinary single-fact question is not slower
+or noisier than before this stage; the Phase 0 miss rate is written down whether or not
+Phase 2 ships; `pnpm verify` passes.
+
+---
+
 ## Stage 4 — Teaching mode
 
 **Goal:** the assistant teaches rather than merely answering. The lesson uses the
@@ -528,6 +594,12 @@ or fell.
 **Goal:** know whether fancy rulebook pages are where we lose answers — and only then
 spend the work to understand the **layout**, not just the words. This stage is a
 **gate**. Shipping a heavier reader is optional; measuring the miss is not.
+
+**Superseded by Stage 3G**, which runs this exact gate right after Stage 3 instead of
+waiting for Stage 6 — the list-coverage regression that motivated 3G needed the same
+"measure before building a reader" discipline. The acceptance criteria below are
+unchanged; read this section as the layout-reader spec that Stage 3G's Phase 2
+implements if its gate opens.
 
 Publisher books are often two columns, with sidenotes in frames and “Example”
 callouts beside the rule they illustrate. Today we copy the text out once

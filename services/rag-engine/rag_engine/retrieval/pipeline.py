@@ -1,9 +1,18 @@
 import asyncio
+import re
 from typing import Protocol
 
 from rag_engine.contract import DocumentKind
+from rag_engine.ingest.chunking import clean_heading
+from rag_engine.ingest.models import BLOCK_KIND_CATALOGUE, BLOCK_KIND_RULE
+from rag_engine.ingest.section_map import section_id_for
 from rag_engine.retrieval.fuse import reciprocal_rank_fusion
 from rag_engine.retrieval.types import RetrievedChunk
+
+#: Do not drag a whole long section in for one incidental hit.
+_MAX_SECTION_CHUNKS_TO_EXPAND = 6
+
+_CATALOGUE_LINE_RE = re.compile(r"^(?:page\s+\d+:\s*)?(.+)$", re.IGNORECASE)
 
 
 class Embedder(Protocol):
@@ -22,6 +31,15 @@ class ChunkIndex(Protocol):
         self,
         query: str,
         game_ids: list[str],
+        limit: int,
+    ) -> list[RetrievedChunk]: ...
+
+    def find_by_section(
+        self,
+        game_ids: list[str],
+        *,
+        doc_key: str,
+        section_id: str,
         limit: int,
     ) -> list[RetrievedChunk]: ...
 
@@ -64,6 +82,95 @@ def keep_relevant(
     return [chunk.model_copy(update={"score": score}) for chunk, score in scored if score >= cut]
 
 
+def _headings_from_catalogue(text: str) -> list[str]:
+    headings: list[str] = []
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.lower().startswith("section catalogue"):
+            continue
+        match = _CATALOGUE_LINE_RE.match(line)
+        if match is None:
+            continue
+        heading = clean_heading(match.group(1))
+        if heading:
+            headings.append(heading)
+    return headings
+
+
+def expand_siblings(
+    kept: list[RetrievedChunk],
+    *,
+    index: ChunkIndex,
+    game_ids: list[str],
+    top_k: int,
+) -> list[RetrievedChunk]:
+    """Fill gaps inside a kept section / catalogue, without exceeding top_k.
+
+    Passages that already cleared the relevance filter always outrank expansions,
+    but siblings of a high-scoring hit are taken before lower-scoring unrelated
+    hits — otherwise a list question that kept six weak pages never gets the
+    second half of its table of contents.
+
+    A catalogue chunk stays in the list for the model (it is the complete list);
+    the ask path strips it from the player-facing sources only.
+    """
+    if not kept or top_k <= 0:
+        return []
+
+    ordered: list[RetrievedChunk] = []
+    seen: set[str] = set()
+
+    def _append(chunk: RetrievedChunk, *, as_expansion: bool) -> None:
+        if len(ordered) >= top_k or chunk.id in seen:
+            return
+        ordered.append(chunk if not as_expansion else chunk.model_copy(update={"score": 0.0}))
+        seen.add(chunk.id)
+
+    for hit in kept:
+        if len(ordered) >= top_k:
+            break
+        _append(hit, as_expansion=False)
+        if hit.block_kind == BLOCK_KIND_CATALOGUE:
+            for heading in _headings_from_catalogue(hit.text):
+                if len(ordered) >= top_k:
+                    break
+                section_id = section_id_for(heading)
+                siblings = index.find_by_section(
+                    game_ids,
+                    doc_key=hit.doc_key,
+                    section_id=section_id,
+                    limit=_MAX_SECTION_CHUNKS_TO_EXPAND + 1,
+                )
+                if len(siblings) > _MAX_SECTION_CHUNKS_TO_EXPAND:
+                    # Long sections: one representative chunk is enough; the
+                    # catalogue already named the section for the model.
+                    if siblings:
+                        _append(siblings[0], as_expansion=True)
+                    continue
+                for sibling in siblings:
+                    _append(sibling, as_expansion=True)
+            continue
+        if hit.block_kind != BLOCK_KIND_RULE or not hit.section_id:
+            continue
+        siblings = index.find_by_section(
+            game_ids,
+            doc_key=hit.doc_key,
+            section_id=hit.section_id,
+            limit=_MAX_SECTION_CHUNKS_TO_EXPAND + 1,
+        )
+        if len(siblings) > _MAX_SECTION_CHUNKS_TO_EXPAND:
+            continue
+        for sibling in siblings:
+            _append(sibling, as_expansion=True)
+
+    return ordered[:top_k]
+
+
+def player_facing_hits(hits: list[RetrievedChunk]) -> list[RetrievedChunk]:
+    """Catalogue chunks are an index aid — not a page the player can open."""
+    return [hit for hit in hits if hit.block_kind != BLOCK_KIND_CATALOGUE]
+
+
 async def retrieve(
     *,
     question: str,
@@ -104,4 +211,6 @@ async def retrieve(
         share_of_best=relevance_share_of_best,
     )
     relevant.sort(key=lambda chunk: chunk.score, reverse=True)
-    return relevant[:top_k]
+    if not relevant:
+        return []
+    return expand_siblings(relevant, index=index, game_ids=game_ids, top_k=top_k)

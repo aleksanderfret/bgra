@@ -37,6 +37,7 @@ type ImportFeedback =
   | { kind: 'page_image_too_large' }
   | { kind: 'ingest_failed' }
   | { kind: 'index_failed' }
+  | { kind: 'index_retry_success' }
   | { kind: 'ingest_busy' }
   | { kind: 'success'; gameId: string; documentTitle: string; attached: boolean };
 
@@ -259,6 +260,52 @@ export function PdfDropZone() {
         }
         setBusy(false);
         resetFileRef.current?.();
+        uploadAbortRef.current = null;
+      });
+  };
+
+  const handleRetryIndex = (): void => {
+    if (!importAllowed || busy) {
+      return;
+    }
+    uploadAbortRef.current?.abort();
+    const controller = new AbortController();
+    uploadAbortRef.current = controller;
+    setBusy(true);
+    void fetch('/api/engine/ingest/reindex', {
+      method: 'POST',
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        const payload: unknown = await response.json().catch(() => null);
+        if (response.ok) {
+          setFeedback({ kind: 'index_retry_success' });
+          window.dispatchEvent(new Event(GAMES_CHANGED_EVENT));
+          return;
+        }
+        const code =
+          engineErrorCode(payload) ?? (response.status === 502 ? 'engine_unreachable' : '');
+        if (code === 'ingest_busy') {
+          setFeedback({ kind: 'ingest_busy' });
+          return;
+        }
+        if (code === 'engine_unreachable') {
+          setFeedback({ kind: 'engine_unreachable' });
+          return;
+        }
+        setFeedback({ kind: 'index_failed' });
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          return;
+        }
+        setFeedback({ kind: 'engine_unreachable' });
+      })
+      .finally(() => {
+        if (uploadAbortRef.current !== controller) {
+          return;
+        }
+        setBusy(false);
         uploadAbortRef.current = null;
       });
   };
@@ -517,8 +564,30 @@ export function PdfDropZone() {
           </Alert>
         )}
         {feedback.kind === 'index_failed' && (
-          <Alert color="red" title={t('pdfImport.error.indexFailedTitle')} role="alert">
-            {t('pdfImport.error.indexFailedBody')}
+          <Alert color="orange" title={t('pdfImport.error.indexFailedTitle')} role="alert">
+            <Stack gap="sm">
+              <Text size="sm">{t('pdfImport.error.indexFailedBody')}</Text>
+              <Button
+                type="button"
+                variant="light"
+                size="sm"
+                loading={busy}
+                disabled={!importAllowed}
+                onClick={handleRetryIndex}
+              >
+                {t('pdfImport.error.indexFailedRetry')}
+              </Button>
+            </Stack>
+          </Alert>
+        )}
+        {feedback.kind === 'index_retry_success' && (
+          <Alert
+            color="teal"
+            title={t('pdfImport.error.indexRetrySuccessTitle')}
+            role="status"
+            aria-live="polite"
+          >
+            {t('pdfImport.error.indexRetrySuccessBody')}
           </Alert>
         )}
         {feedback.kind === 'ingest_busy' && (

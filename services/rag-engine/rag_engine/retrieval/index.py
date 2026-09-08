@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import logging
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Protocol, cast
 
 from rag_engine.contract import DocumentKind
 from rag_engine.retrieval.types import RetrievedChunk
 from rag_engine.storage_paths import assert_doc_key, assert_game_id, index_dir
+
+logger = logging.getLogger(__name__)
 
 _TABLE = "chunks"
 
@@ -18,6 +22,25 @@ class _LanceQuery(Protocol):
     def to_list(self) -> list[dict[str, object]]: ...
 
 
+class _LanceSchemaField(Protocol):
+    @property
+    def name(self) -> str: ...
+
+
+class _LanceSchema(Protocol):
+    def __iter__(self) -> Iterator[_LanceSchemaField]: ...
+
+
+class _LanceArrowColumn(Protocol):
+    def to_pylist(self) -> list[object]: ...
+
+
+class _LanceArrow(Protocol):
+    def __len__(self) -> int: ...
+
+    def column(self, name: str) -> _LanceArrowColumn: ...
+
+
 class _LanceTable(Protocol):
     def delete(self, predicate: str) -> None: ...
 
@@ -25,11 +48,16 @@ class _LanceTable(Protocol):
 
     def create_fts_index(self, column: str, *, replace: bool = False) -> None: ...
 
-    def search(self, query: object, query_type: str = "vector") -> _LanceQuery: ...
+    def search(self, query: object = None, query_type: str = "vector") -> _LanceQuery: ...
 
-    def count_rows(self, predicate: str) -> int: ...
+    def count_rows(self, predicate: str | None = None) -> int: ...
 
-    def to_list(self) -> list[dict[str, object]]: ...
+    def add_columns(self, transforms: dict[str, str]) -> object: ...
+
+    def to_arrow(self) -> _LanceArrow: ...
+
+    @property
+    def schema(self) -> _LanceSchema: ...
 
 
 class _LanceDb(Protocol):
@@ -75,8 +103,21 @@ class LanceDbIndex:
             self._db.create_table(_TABLE, rows)
             table = self._db.open_table(_TABLE)
         else:
+            self._ensure_section_columns(table)
             table.add(rows)
         table.create_fts_index("text", replace=True)
+
+    def _ensure_section_columns(self, table: _LanceTable) -> None:
+        """Grow an older on-disk table that predates section_id / block_kind."""
+        names = {field.name for field in table.schema}
+        missing: dict[str, str] = {}
+        if "section_id" not in names:
+            missing["section_id"] = "cast('' as string)"
+        if "block_kind" not in names:
+            missing["block_kind"] = "cast('rule' as string)"
+        if not missing:
+            return
+        table.add_columns(missing)
 
     def search_vector(
         self,
@@ -122,9 +163,50 @@ class LanceDbIndex:
         try:
             return table.count_rows(f"game_id IN ({_in_clause(game_ids)})")
         except Exception:
-            rows = table.to_list()
-            allowed = set(game_ids)
-            return sum(1 for row in rows if row.get("game_id") in allowed)
+            logger.exception("Lance count_rows failed; scanning the arrow table.")
+            try:
+                arrow = table.to_arrow()
+                values = arrow.column("game_id").to_pylist()
+                allowed = set(game_ids)
+                return sum(1 for value in values if value in allowed)
+            except Exception:
+                logger.exception("Lance arrow scan failed while counting games.")
+                return 0
+
+    def find_by_section(
+        self,
+        game_ids: list[str],
+        *,
+        doc_key: str,
+        section_id: str,
+        limit: int,
+    ) -> list[RetrievedChunk]:
+        table = self._table()
+        if table is None or not game_ids or not section_id:
+            return []
+        assert_doc_key(doc_key)
+        safe_section = section_id.replace("'", "''")
+        try:
+            results = (
+                table.search()
+                .where(
+                    f"game_id IN ({_in_clause(game_ids)}) AND doc_key = '{doc_key}' "
+                    f"AND section_id = '{safe_section}' AND block_kind != 'catalogue'",
+                    prefilter=True,
+                )
+                .limit(max(limit * 4, limit))
+                .to_list()
+            )
+        except Exception:
+            logger.exception(
+                "Lance find_by_section failed for doc_key=%s section_id=%s",
+                doc_key,
+                section_id,
+            )
+            return []
+        hits = [_from_row(row) for row in results]
+        hits.sort(key=lambda chunk: (chunk.page is None, chunk.page or 0, chunk.id))
+        return hits[:limit]
 
 
 def _row(chunk: RetrievedChunk) -> dict[str, object]:
@@ -142,6 +224,8 @@ def _row(chunk: RetrievedChunk) -> dict[str, object]:
         "image_url": chunk.image_url,
         "indexed_at": chunk.indexed_at,
         "vector": chunk.vector,
+        "section_id": chunk.section_id,
+        "block_kind": chunk.block_kind,
     }
 
 
@@ -159,4 +243,6 @@ def _from_row(row: dict[str, object]) -> RetrievedChunk:
         image_url=str(row["image_url"]) if row.get("image_url") else None,
         indexed_at=str(row.get("indexed_at") or ""),
         score=0.0,
+        section_id=str(row.get("section_id") or ""),
+        block_kind=row.get("block_kind") or "rule",  # type: ignore[arg-type]
     )

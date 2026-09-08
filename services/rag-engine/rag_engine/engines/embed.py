@@ -10,6 +10,8 @@ from rag_engine.engines.llm import (
 
 QUERY_TIMEOUT_SECONDS = 30.0
 INGEST_TIMEOUT_SECONDS = 120.0
+#: Keep each Ollama request small so a loaded chat model does not OOM the embed step.
+INGEST_EMBED_BATCH_SIZE = 32
 
 
 def _parse_embeddings(payload: object, expected: int) -> list[list[float]]:
@@ -40,6 +42,14 @@ def _handle_embed_response(
     return _parse_embeddings(response.json(), expected)
 
 
+def _map_transport_error(ollama_url: str, error: httpx.HTTPError) -> OllamaUnreachableError:
+    if isinstance(error, httpx.TimeoutException):
+        return OllamaUnreachableError(f"Ollama timed out while embedding at {ollama_url}: {error}")
+    if isinstance(error, httpx.ConnectError):
+        return OllamaUnreachableError(f"Cannot reach Ollama at {ollama_url}: {error}")
+    return OllamaUnreachableError(f"Ollama request failed at {ollama_url}: {error}")
+
+
 async def embed_texts(
     ollama_url: str,
     model: str,
@@ -61,8 +71,8 @@ async def embed_texts(
                     "keep_alive": OLLAMA_KEEP_ALIVE,
                 },
             )
-    except httpx.ConnectError as error:
-        raise OllamaUnreachableError(f"Cannot reach Ollama at {ollama_url}: {error}") from error
+    except httpx.HTTPError as error:
+        raise _map_transport_error(ollama_url, error) from error
     return _handle_embed_response(response, model, len(texts))
 
 
@@ -87,9 +97,34 @@ def embed_texts_sync(
                     "keep_alive": OLLAMA_KEEP_ALIVE,
                 },
             )
-    except httpx.ConnectError as error:
-        raise OllamaUnreachableError(f"Cannot reach Ollama at {ollama_url}: {error}") from error
+    except httpx.HTTPError as error:
+        raise _map_transport_error(ollama_url, error) from error
     return _handle_embed_response(response, model, len(texts))
+
+
+def embed_texts_sync_batched(
+    ollama_url: str,
+    model: str,
+    texts: Sequence[str],
+    *,
+    batch_size: int = INGEST_EMBED_BATCH_SIZE,
+    timeout_seconds: float = INGEST_TIMEOUT_SECONDS,
+) -> list[list[float]]:
+    if not texts:
+        return []
+    size = max(1, batch_size)
+    vectors: list[list[float]] = []
+    for start in range(0, len(texts), size):
+        batch = texts[start : start + size]
+        vectors.extend(
+            embed_texts_sync(
+                ollama_url,
+                model,
+                batch,
+                timeout_seconds=timeout_seconds,
+            )
+        )
+    return vectors
 
 
 class OllamaEmbedder:

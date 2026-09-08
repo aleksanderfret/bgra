@@ -236,7 +236,7 @@
       "chooseFile": "Wybierz PDF",
       "keyboardHint": "Żeby dodać plik z klawiatury, użyj Wybierz PDF."
     },
-    "busy": "Importuję…",
+    "busy": "Sprawdzam układ stron, potem dzielę je na przeszukiwalne fragmenty…",
     "success": {
       "title": "Instrukcja wczytana",
       "body": "„{{gameId}}” jest na liście gier. Możesz pytać o tę instrukcję; odpowiedzi podają numer strony.",
@@ -264,9 +264,12 @@
       "pageImageTooLargeTitle": "Obraz strony jest za ciężki",
       "pageImageTooLargeBody": "Jedna strona nadal daje obraz większy niż 5 MB nawet po obniżeniu rozdzielczości. Spróbuj lżejszego skanu albo mniejszego PDF-a od wydawcy.",
       "ingestFailedTitle": "Import nie powiódł się",
-      "ingestFailedBody": "Nie udało się zamienić pliku na strony. Spróbuj innego PDF-a albo sprawdź dziennik silnika.",
+      "ingestFailedBody": "Nie udało się zamienić pliku na strony. Spróbuj innego PDF-a albo spróbuj ponownie za chwilę.",
       "indexFailedTitle": "Strony zapisane, wyszukiwanie niegotowe",
-      "indexFailedBody": "PDF jest już na tym komputerze, ale nie udało się dodać go do wyszukiwania (Ollama może być wyłączona). Włącz Ollamę, potem uruchom: uv run python -m rag_engine.ingest index",
+      "indexFailedBody": "PDF jest już na tym komputerze, ale jeszcze nie udało się dodać go do wyszukiwania. Zostaw asystenta włączonego i naciśnij Spróbuj ponownie.",
+      "indexFailedRetry": "Spróbuj ponownie",
+      "indexRetrySuccessTitle": "Wyszukiwanie gotowe",
+      "indexRetrySuccessBody": "Zapisane strony są już dostępne przy pytaniach.",
       "ingestBusyTitle": "Trwa inny import",
       "ingestBusyBody": "Poczekaj, aż skończy się wczytywanie obecnej instrukcji, i spróbuj ponownie."
     }

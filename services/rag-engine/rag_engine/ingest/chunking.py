@@ -113,9 +113,23 @@ class _Section:
     lines: list[str]
 
 
+_HTML_TAG_RE = re.compile(r"</?[a-zA-Z][^>]*>")
+_STRIKE_RE = re.compile(r"~~+")
+_EMPHASIS_RE = re.compile(r"[*_`]{1,3}")
+_SPACE_RE = re.compile(r"\s+")
+
+
 def clean_heading(heading: str) -> str:
-    """`**Akcje**` is a heading named Akcje, not one named with asterisks."""
-    return heading.strip().strip("*_ ").strip()
+    """Strip Markdown/HTML noise left by the PDF reader from a section title.
+
+    Publisher PDFs often survive as `**Akcje**` or
+    `<mark>Budow</mark> a** **Bazy` — those marks are not part of the name.
+    """
+    text = _HTML_TAG_RE.sub("", heading)
+    text = _STRIKE_RE.sub("", text)
+    text = _EMPHASIS_RE.sub("", text)
+    text = text.replace("\x08", "")
+    return _SPACE_RE.sub(" ", text).strip(" -_|")
 
 
 def _parse_sections(markdown: str) -> list[_Section]:
@@ -200,4 +214,7 @@ def chunk_markdown(
                 )
             )
 
-    return chunks
+    from rag_engine.ingest.section_map import build_catalogue_chunks, enrich_chunks
+
+    enriched = enrich_chunks(chunks)
+    return enriched + build_catalogue_chunks(enriched)

@@ -64,3 +64,36 @@ async def test_embed_texts_maps_connect_error() -> None:
         pytest.raises(OllamaUnreachableError),
     ):
         await embed_texts("http://127.0.0.1:11434", "bge-m3", ["hello"])
+
+
+@pytest.mark.asyncio
+async def test_embed_texts_maps_timeout() -> None:
+    mock_client = AsyncMock()
+    mock_client.__aenter__.return_value = mock_client
+    mock_client.post = AsyncMock(side_effect=httpx.ReadTimeout("slow"))
+
+    with (
+        patch("rag_engine.engines.embed.httpx.AsyncClient", return_value=mock_client),
+        pytest.raises(OllamaUnreachableError, match="timed out"),
+    ):
+        await embed_texts("http://127.0.0.1:11434", "bge-m3", ["hello"])
+
+
+def test_embed_texts_sync_batched_splits_requests() -> None:
+    from rag_engine.engines.embed import embed_texts_sync_batched
+
+    with patch(
+        "rag_engine.engines.embed.embed_texts_sync",
+        side_effect=lambda *_a, **_k: [[0.1], [0.2]],
+    ) as embed:
+        vectors = embed_texts_sync_batched(
+            "http://127.0.0.1:11434",
+            "bge-m3",
+            ["a", "b", "c", "d"],
+            batch_size=2,
+        )
+
+    assert vectors == [[0.1], [0.2], [0.1], [0.2]]
+    assert embed.call_count == 2
+    assert list(embed.call_args_list[0].args[2]) == ["a", "b"]
+    assert list(embed.call_args_list[1].args[2]) == ["c", "d"]

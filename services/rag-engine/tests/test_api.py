@@ -806,6 +806,18 @@ def test_ingest_pdf_upload_rejects_a_bad_game_id(client: TestClient, tmp_path: P
     assert body["code"] == "invalid_game_id"
 
 
+def test_ingest_reindex_runs_search_catch_up(client: TestClient) -> None:
+    with patch(
+        "rag_engine.routers.ingest.ensure_search_index",
+        return_value=2,
+    ) as catch_up:
+        response = client.post("/ingest/reindex")
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "documentsIndexed": 2}
+    catch_up.assert_called_once()
+
+
 def test_ingest_pdf_upload_rejects_non_pdf_bytes(client: TestClient) -> None:
     response = client.post(
         "/ingest/pdf",

@@ -236,7 +236,7 @@
       "chooseFile": "Choose PDF",
       "keyboardHint": "To add a file with the keyboard, use Choose PDF."
     },
-    "busy": "Importing…",
+    "busy": "Reading how the pages are laid out, then turning them into searchable sections…",
     "success": {
       "title": "Rulebook imported",
       "body": "“{{gameId}}” is on the game list. You can ask about this rulebook; answers cite the page.",
@@ -264,9 +264,12 @@
       "pageImageTooLargeTitle": "A page image is too heavy",
       "pageImageTooLargeBody": "One page still makes a picture larger than 5 MB even after lowering resolution. Try a lighter scan or a smaller publisher PDF.",
       "ingestFailedTitle": "Import failed",
-      "ingestFailedBody": "The file could not be turned into pages. Try another PDF, or check the engine log.",
+      "ingestFailedBody": "The file could not be turned into pages. Try another PDF, or try again in a moment.",
       "indexFailedTitle": "Pages saved, search not ready",
-      "indexFailedBody": "The PDF is on this computer, but it could not be added to search (Ollama may be stopped). Start Ollama, then run: uv run python -m rag_engine.ingest index",
+      "indexFailedBody": "The PDF is on this computer, but it could not be added to search yet. Keep the assistant running, then tap Try again.",
+      "indexFailedRetry": "Try again",
+      "indexRetrySuccessTitle": "Search is ready",
+      "indexRetrySuccessBody": "The saved pages are now available for questions.",
       "ingestBusyTitle": "Another import is running",
       "ingestBusyBody": "Wait until the current rulebook finishes, then try again."
     }

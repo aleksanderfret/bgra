@@ -182,6 +182,51 @@ rules; that took invention to 0 of 6 runs without changing answers that were
 already well evidenced. It is a mitigation, not a proof — the stage 6 evaluation
 set is what turns this into a regression check.
 
+List questions are a **coverage** problem, not a relevance one. After
+`keep_relevant`, "list every action" regularly kept 1–4 passages while the full
+list lived in the table of contents (two chunks) plus eight section headings.
+Stage 3G Phase 1 adds a synthetic section catalogue at import time and expands
+siblings of a kept section **before** filling the `retrieval_top_k` budget with
+weaker unrelated hits. Measured on World Order: 8 of 8 action names in the
+retrieved passages and in the answer; Trade still returns two Handel passages;
+pizza still returns zero. The catalogue stays in the model prompt (it *is* the
+list) and is stripped only from the player-facing sources list.
+
+### 3.5a. Page layout miss rate (Stage 3G Phase 0)
+
+World Order alone looked fine enough to defer a custom reader. **Through the Ages
+handbook** (`cywilizacja-poprzez-wieki` / `rulebook/handbook`, 24 pages) is the denser
+fixture and reverses that decision.
+
+| Check | World Order | Through the Ages handbook |
+| --- | --- | --- |
+| 3+ columnish pages | few | **23 of 24** |
+| Banded layout (multi-col upper *and* lower, art in between) | rare | **22 of 24** |
+| Mid-page text that straddles columns | occasional | **16 of 24** |
+| Orphan `Przykład` chunks (heading only "Przykład") | 3 | **16** (7 on page 13 alone) |
+
+Concrete reading-order failures in today's `pymupdf4llm` Markdown:
+
+**Page 3** (human order: left→middle→right top row, then right middle, then bottom
+happiness band). Extract order starts **Ery i poziomy → Budynki → Farmy** (right and
+middle *before* left). Body of "Ery i poziomy" is then **interleaved after** the
+happiness heading — lower-band text appears in the middle of an upper-band section.
+
+**Page 9** (human: finish left column including the blue "Limit kart" box, then middle,
+then right). Extract puts **Limit liczby kart** *after* "Nowy robotnik" (right column),
+so a callout that belongs with "Wzięcie karty / technologie" is glued to the wrong
+topic. Caption "Zapłać 2…" from the bottom diagram survives, but late.
+
+So the miss is no longer "small" on a real, dense handbook: **wrong column order**,
+**band interleaving across illustrations**, and **callout boxes detached from their
+rule**. Stage 3G Phase 2 ships a geometry-based layout reader (`ingest/layout.py`):
+bands top→bottom, columns left→right, examples keep the parent rule heading.
+Regression fixtures are handbook pages 3, 9 and 13. `pymupdf4llm` remains the
+fallback on timeout or extract failure — and a fallback does **not** stamp
+`ingestLayoutVersion`, so the next engine start retries layout. Documents with
+`source.pdf` migrate once via `ingestLayoutVersion` on the manifest when layout
+succeeds.
+
 ### 3.6. No evaluation set — the largest omission in the whole plan
 
 The plan had **no** way of establishing whether the assistant answers correctly. In a

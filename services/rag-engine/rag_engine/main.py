@@ -9,7 +9,12 @@ from fastapi.staticfiles import StaticFiles
 from . import __version__
 from .engines.embed import embed_texts
 from .engines.llm import load_model
-from .ingest.pipeline import resplit_stored_chunks
+from .ingest.pipeline import (
+    ensure_layout_ingest,
+    ensure_search_index,
+    ensure_section_maps,
+    resplit_stored_chunks,
+)
 from .retrieval.service import try_load
 from .routers import ask, games, health, ingest
 from .settings import Settings, ensure_storage_writable, get_settings
@@ -44,6 +49,36 @@ async def _resize_oversized_chunks(settings: Settings) -> None:
         logger.info("Re-split %d document(s) into smaller passages.", rewritten)
 
 
+async def _ensure_section_maps(settings: Settings) -> None:
+    try:
+        rewritten = await asyncio.to_thread(ensure_section_maps, settings.storage_dir)
+    except Exception:
+        logger.exception("Could not build section catalogues; retrying on the next start.")
+        return
+    if rewritten:
+        logger.info("Built section catalogues for %d document(s).", rewritten)
+
+
+async def _ensure_layout_ingest(settings: Settings) -> None:
+    try:
+        rewritten = await asyncio.to_thread(ensure_layout_ingest, settings.storage_dir)
+    except Exception:
+        logger.exception("Could not re-read PDF page layout; retrying on the next start.")
+        return
+    if rewritten:
+        logger.info("Re-read page layout for %d document(s).", rewritten)
+
+
+async def _ensure_search_index(settings: Settings) -> None:
+    try:
+        fixed = await asyncio.to_thread(ensure_search_index, settings.storage_dir)
+    except Exception:
+        logger.exception("Could not catch up the search index; retrying on the next start.")
+        return
+    if fixed:
+        logger.info("Caught up search for %d document(s) already on disk.", fixed)
+
+
 def _is_current_generation(app: FastAPI, generation: int) -> bool:
     return int(getattr(app.state, "retrieval_load_generation", 0)) == generation
 
@@ -60,6 +95,9 @@ async def _warm_retrieval(app: FastAPI, reranker_id: str, generation: int) -> No
             return
         if stack is not None:
             await _resize_oversized_chunks(settings)
+            await _ensure_section_maps(settings)
+            await _ensure_layout_ingest(settings)
+            await _ensure_search_index(settings)
         if not _is_current_generation(app, generation):
             return
         app.state.retrieval_stack = stack

@@ -249,5 +249,51 @@ describe('PdfDropZone', () => {
     );
 
     expect(await screen.findByRole('alert')).toHaveTextContent(en.pdfImport.error.indexFailedBody);
+    expect(
+      screen.getByRole('button', { name: en.pdfImport.error.indexFailedRetry }),
+    ).toBeInTheDocument();
+  });
+
+  it('retries search indexing from the alert without re-uploading the PDF', async () => {
+    vi.stubGlobal(
+      'fetch',
+      stubEngineFetch((url) => {
+        if (url.includes('/ingest/pdf')) {
+          return {
+            ok: false,
+            json: async () => ({ type: 'error', code: 'index_failed', message: 'embed down' }),
+          };
+        }
+        if (url.includes('/ingest/reindex')) {
+          return { ok: true, json: async () => ({ ok: true, documentsIndexed: 1 }) };
+        }
+        return null;
+      }),
+    );
+
+    render(<PdfDropZone />, 'en');
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: en.pdfImport.drop.chooseFile })).toBeEnabled();
+    });
+
+    await userEvent.type(
+      screen.getByRole('textbox', { name: new RegExp(en.pdfImport.gameId.label) }),
+      'azul',
+    );
+
+    const file = new File(['%PDF'], 'rules.pdf', { type: 'application/pdf' });
+    await userEvent.upload(
+      screen.getByLabelText(en.pdfImport.drop.chooseFile, { selector: 'input' }),
+      file,
+    );
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: en.pdfImport.error.indexFailedRetry }),
+    );
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      en.pdfImport.error.indexRetrySuccessBody,
+    );
   });
 });

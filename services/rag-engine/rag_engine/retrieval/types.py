@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 
 from rag_engine.contract import DocumentKind
-from rag_engine.ingest.models import ChunkRecord
+from rag_engine.ingest.models import BLOCK_KIND_RULE, BlockKind, ChunkRecord
 
 
 class RetrievedChunk(BaseModel):
@@ -17,6 +17,8 @@ class RetrievedChunk(BaseModel):
     indexed_at: str = ""
     score: float = 0.0
     vector: list[float] | None = None
+    section_id: str = ""
+    block_kind: BlockKind = BLOCK_KIND_RULE
 
     @classmethod
     def from_record(
@@ -38,4 +40,6 @@ class RetrievedChunk(BaseModel):
             image_url=record.image_url,
             indexed_at=indexed_at,
             score=score,
+            section_id=record.section_id,
+            block_kind=record.block_kind,
         )

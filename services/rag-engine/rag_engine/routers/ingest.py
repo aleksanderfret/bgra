@@ -8,7 +8,7 @@ import tempfile
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 from fastapi.responses import JSONResponse
 
 from rag_engine.contract import GameSummary
@@ -18,7 +18,7 @@ from rag_engine.ingest.pdf import (
     PageImageLimitError,
     PdfLimitError,
 )
-from rag_engine.ingest.pipeline import ingest_rulebook
+from rag_engine.ingest.pipeline import ensure_search_index, ingest_rulebook, rebuild_search_index
 from rag_engine.ingest.registry import load_games
 from rag_engine.retrieval.indexer import IndexingError
 from rag_engine.settings import Settings, get_settings
@@ -182,4 +182,27 @@ async def ingest_pdf_upload(
         if tmp_path is not None:
             tmp_path.unlink(missing_ok=True)
         await file.close()
+        await _end_ingest()
+
+
+@router.post("/ingest/reindex", response_model=None)
+async def reindex_search(
+    settings: Annotated[Settings, Depends(get_settings)],
+    full: Annotated[bool, Query()] = False,
+) -> JSONResponse:
+    """Add on-disk documents to search without re-importing the PDF."""
+    if not await _try_begin_ingest():
+        return _error(409, "ingest_busy", "Another PDF import is already running.")
+    try:
+        if full:
+            count = await asyncio.to_thread(rebuild_search_index, settings.storage_dir)
+        else:
+            count = await asyncio.to_thread(ensure_search_index, settings.storage_dir)
+        return JSONResponse({"ok": True, "documentsIndexed": count})
+    except IndexingError as error:
+        return _error(503, "index_failed", str(error))
+    except Exception as error:
+        _logger.exception("Search reindex failed")
+        return _error(500, "ingest_failed", str(error))
+    finally:
         await _end_ingest()

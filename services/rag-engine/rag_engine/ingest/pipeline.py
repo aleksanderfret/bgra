@@ -11,10 +11,19 @@ from pathlib import Path
 
 from rag_engine.contract import DocumentKind, GameDocumentSummary, GameSummary
 from rag_engine.ingest.bgg_faq import BggUnavailableError, build_faq_chunks
-from rag_engine.ingest.chunking import chunk_markdown, clean_heading, split_section_text
-from rag_engine.ingest.models import ChunkRecord
-from rag_engine.ingest.pdf import extract_markdown, render_page_pngs
+from rag_engine.ingest.chunking import clean_heading, split_section_text
+from rag_engine.ingest.layout import (
+    INGEST_LAYOUT_VERSION,
+    extract_pdf_chunks,
+)
+from rag_engine.ingest.models import BLOCK_KIND_CATALOGUE, ChunkRecord
+from rag_engine.ingest.pdf import render_page_pngs
 from rag_engine.ingest.registry import load_games, recount_game
+from rag_engine.ingest.section_map import (
+    SECTION_MAP_VERSION,
+    build_catalogue_chunks,
+    enrich_chunks,
+)
 from rag_engine.retrieval.indexer import maybe_index_document
 from rag_engine.settings import get_settings
 from rag_engine.storage_paths import (
@@ -27,6 +36,7 @@ from rag_engine.storage_paths import (
     document_dir,
     game_assets_dir,
     slugify_doc_key,
+    source_pdf_path,
 )
 
 ProgressCallback = Callable[[str], None]
@@ -84,32 +94,53 @@ def write_document_manifest(
     title: str,
     kind: DocumentKind,
     indexed_at: str | None = None,
+    section_map_version: int | None = None,
+    ingest_layout_version: int | None = None,
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     stamped = indexed_at or datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-    payload = {
+    payload: dict[str, object] = {
         "title": title,
         "documentKind": kind,
         "indexedAt": stamped,
     }
+    previous = _read_manifest_raw(path) if path.is_file() else None
+    if section_map_version is not None:
+        payload["sectionMapVersion"] = section_map_version
+    elif previous is not None and "sectionMapVersion" in previous:
+        payload["sectionMapVersion"] = previous["sectionMapVersion"]
+    if ingest_layout_version is not None:
+        payload["ingestLayoutVersion"] = ingest_layout_version
+    elif previous is not None and "ingestLayoutVersion" in previous:
+        payload["ingestLayoutVersion"] = previous["ingestLayoutVersion"]
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
-def read_document_manifest(path: Path) -> dict[str, str] | None:
-    if not path.is_file():
-        return None
+def _read_manifest_raw(path: Path) -> dict[str, object] | None:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except OSError, json.JSONDecodeError:
         return None
-    if not isinstance(payload, dict):
+    return payload if isinstance(payload, dict) else None
+
+
+def read_document_manifest(path: Path) -> dict[str, str] | None:
+    payload = _read_manifest_raw(path)
+    if payload is None:
         return None
     title = payload.get("title")
     kind = payload.get("documentKind")
     indexed_at = payload.get("indexedAt")
     if not isinstance(title, str) or not isinstance(kind, str) or not isinstance(indexed_at, str):
         return None
-    return {"title": title, "documentKind": kind, "indexedAt": indexed_at}
+    result = {"title": title, "documentKind": kind, "indexedAt": indexed_at}
+    for key in ("sectionMapVersion", "ingestLayoutVersion"):
+        version = payload.get(key)
+        if isinstance(version, int):
+            result[key] = str(version)
+        elif isinstance(version, str) and version.isdigit():
+            result[key] = version
+    return result
 
 
 def list_game_documents(storage_dir: Path, game_id: str) -> list[GameDocumentSummary]:
@@ -247,18 +278,18 @@ def ingest_pdf(
         work.mkdir(parents=True, exist_ok=False)
         tmp_doc.mkdir(parents=True, exist_ok=True)
 
-        _log(f"extracting markdown from {pdf_path.name}", progress)
-        extracted = extract_markdown(pdf_path)
-        _log(f"rendering {extracted.page_count} page image(s)", progress)
-        render_page_pngs(pdf_path, tmp_doc)
-
-        chunks = chunk_markdown(
-            extracted.markdown,
+        _log(f"reading page layout from {pdf_path.name}", progress)
+        chunks, reader = extract_pdf_chunks(
+            pdf_path,
             game_id=game_id,
             kind=kind,
             doc_key=resolved_doc_key,
             document_title=resolved_doc_title,
         )
+        _log(f"layout reader={reader}", progress)
+        _log("rendering page image(s)", progress)
+        render_page_pngs(pdf_path, tmp_doc)
+
         if not chunks:
             raise RuntimeError("No text chunks were extracted from the PDF.")
 
@@ -268,6 +299,9 @@ def ingest_pdf(
             tmp_doc / MANIFEST_FILE_NAME,
             title=resolved_doc_title,
             kind=kind,
+            section_map_version=SECTION_MAP_VERSION,
+            # Only stamp success. A fallback leaves 0 so the next boot retries layout.
+            ingest_layout_version=INGEST_LAYOUT_VERSION if reader == "layout" else 0,
         )
 
         _log("promoting files into storage", progress)
@@ -370,16 +404,19 @@ def ingest_chunks(
         )
         for chunk in chunks
     ]
+    enriched = enrich_chunks(stamped_chunks)
+    finalized = enriched + build_catalogue_chunks(enriched)
     work = game_assets_dir(storage_dir, game_id) / f".ingest-tmp-{uuid.uuid4().hex}"
     tmp_doc = work / "documents" / kind / doc_key
     try:
         work.mkdir(parents=True, exist_ok=False)
         tmp_doc.mkdir(parents=True, exist_ok=True)
-        write_chunks_jsonl(tmp_doc / CHUNKS_FILE_NAME, stamped_chunks)
+        write_chunks_jsonl(tmp_doc / CHUNKS_FILE_NAME, finalized)
         write_document_manifest(
             tmp_doc / MANIFEST_FILE_NAME,
             title=resolved_doc_title,
             kind=kind,
+            section_map_version=SECTION_MAP_VERSION,
         )
         _promote_document(storage_dir, game_id, kind, doc_key, tmp_doc)
         recount_game(
@@ -393,10 +430,10 @@ def ingest_chunks(
             game_id=game_id,
             kind=kind,
             doc_key=doc_key,
-            chunks=stamped_chunks,
+            chunks=finalized,
         )
-        _log(f"ingested {len(stamped_chunks)} {kind} chunk(s) for {game_id}", progress)
-        return stamped_chunks
+        _log(f"ingested {len(finalized)} {kind} chunk(s) for {game_id}", progress)
+        return finalized
     finally:
         if work.exists():
             shutil.rmtree(work, ignore_errors=True)
@@ -435,6 +472,9 @@ def _index_written_document(
 def _resplit_chunks(chunks: list[ChunkRecord]) -> list[ChunkRecord]:
     resplit: list[ChunkRecord] = []
     for chunk in chunks:
+        if chunk.block_kind == BLOCK_KIND_CATALOGUE or ":catalogue:" in chunk.id:
+            resplit.append(chunk)
+            continue
         heading = clean_heading(chunk.heading)
         for index, piece in enumerate(split_section_text(chunk.text)):
             # Suffixing keeps the first piece addressable under the id already
@@ -485,6 +525,197 @@ def resplit_stored_chunks(
     return rewritten
 
 
+def _strip_catalogue(chunks: list[ChunkRecord]) -> list[ChunkRecord]:
+    return [
+        chunk
+        for chunk in chunks
+        if chunk.block_kind != BLOCK_KIND_CATALOGUE and ":catalogue:" not in chunk.id
+    ]
+
+
+def _manifest_version(manifest: dict[str, str] | None, key: str) -> int:
+    raw = manifest.get(key) if manifest else None
+    return int(raw) if raw and raw.isdigit() else 0
+
+
+def ensure_section_maps(
+    storage_dir: Path,
+    progress: ProgressCallback | None = None,
+) -> int:
+    """Add section ids and a catalogue chunk to documents that predate Stage 3G.
+
+    Idempotent via ``sectionMapVersion`` on the document manifest — runs once per
+    document, not on every engine start. Works from ``chunks.jsonl`` alone (no PDF).
+    Documents that still need a layout re-extract are skipped: layout rebuilds the
+    catalogue itself and would discard this work.
+    """
+    settings = get_settings()
+    rewritten = 0
+    for game in load_games(storage_dir):
+        for document in list_game_documents(storage_dir, game.game_id):
+            doc_dir = document_dir(
+                storage_dir, game.game_id, document.document_kind, document.doc_key
+            )
+            manifest_path = doc_dir / MANIFEST_FILE_NAME
+            manifest = read_document_manifest(manifest_path)
+            version = _manifest_version(manifest, "sectionMapVersion")
+            pdf = source_pdf_path(
+                storage_dir, game.game_id, document.document_kind, document.doc_key
+            )
+            layout_version = _manifest_version(manifest, "ingestLayoutVersion")
+            if pdf.is_file() and layout_version < INGEST_LAYOUT_VERSION:
+                continue
+
+            path = chunks_path(storage_dir, game.game_id, document.document_kind, document.doc_key)
+            chunks = read_chunks_jsonl(path)
+            base = _strip_catalogue(chunks)
+            enriched = enrich_chunks(base)
+            rebuilt = enriched + build_catalogue_chunks(enriched)
+            if version >= SECTION_MAP_VERSION and rebuilt == chunks:
+                continue
+
+            work = game_assets_dir(storage_dir, game.game_id) / f".section-tmp-{uuid.uuid4().hex}"
+            tmp_doc = work / "documents" / document.document_kind / document.doc_key
+            try:
+                work.mkdir(parents=True, exist_ok=False)
+                shutil.copytree(doc_dir, tmp_doc)
+                write_chunks_jsonl(tmp_doc / CHUNKS_FILE_NAME, rebuilt)
+                write_document_manifest(
+                    tmp_doc / MANIFEST_FILE_NAME,
+                    title=document.title,
+                    kind=document.document_kind,
+                    indexed_at=document.indexed_at,
+                    section_map_version=SECTION_MAP_VERSION,
+                    ingest_layout_version=layout_version if layout_version > 0 else None,
+                )
+                _promote_document(
+                    storage_dir,
+                    game.game_id,
+                    document.document_kind,
+                    document.doc_key,
+                    tmp_doc,
+                )
+            finally:
+                if work.exists():
+                    shutil.rmtree(work, ignore_errors=True)
+
+            maybe_index_document(
+                storage_dir,
+                game_id=game.game_id,
+                kind=document.document_kind,
+                doc_key=document.doc_key,
+                chunks=rebuilt,
+                indexed_at=document.indexed_at,
+                ollama_url=settings.ollama_url,
+                embedding_model=settings.profile.embedding,
+            )
+            recount_game(storage_dir, game.game_id)
+            rewritten += 1
+            _log(
+                f"section map {game.game_id}/{document.doc_key}: "
+                f"{len(chunks)} -> {len(rebuilt)} chunk(s)",
+                progress,
+            )
+    return rewritten
+
+
+def ensure_layout_ingest(
+    storage_dir: Path,
+    progress: ProgressCallback | None = None,
+) -> int:
+    """Re-extract PDF documents with the layout reader when the version is behind.
+
+    Only touches documents that still have ``source.pdf``. Writes through a temp
+    directory and swaps atomically — never mutates live ``chunks.jsonl`` in place.
+    A ``pymupdf4llm`` fallback does not bump the version, so the next boot retries.
+    """
+    settings = get_settings()
+    rewritten = 0
+    for game in load_games(storage_dir):
+        for document in list_game_documents(storage_dir, game.game_id):
+            pdf = source_pdf_path(
+                storage_dir, game.game_id, document.document_kind, document.doc_key
+            )
+            if not pdf.is_file():
+                continue
+            doc_dir = document_dir(
+                storage_dir, game.game_id, document.document_kind, document.doc_key
+            )
+            manifest = read_document_manifest(doc_dir / MANIFEST_FILE_NAME)
+            version = _manifest_version(manifest, "ingestLayoutVersion")
+            if version >= INGEST_LAYOUT_VERSION:
+                continue
+
+            _log(
+                f"re-reading layout for {game.game_id}/{document.doc_key}",
+                progress,
+            )
+            work = game_assets_dir(storage_dir, game.game_id) / f".layout-tmp-{uuid.uuid4().hex}"
+            tmp_doc = work / "documents" / document.document_kind / document.doc_key
+            try:
+                work.mkdir(parents=True, exist_ok=False)
+                tmp_doc.mkdir(parents=True, exist_ok=True)
+                chunks, reader = extract_pdf_chunks(
+                    pdf,
+                    game_id=game.game_id,
+                    kind=document.document_kind,
+                    doc_key=document.doc_key,
+                    document_title=document.title,
+                )
+                if not chunks:
+                    _log(
+                        f"layout skipped {game.game_id}/{document.doc_key}: no chunks",
+                        progress,
+                    )
+                    continue
+                if reader != "layout":
+                    _log(
+                        f"layout fallback for {game.game_id}/{document.doc_key}; "
+                        "keeping previous chunks and retrying next start",
+                        progress,
+                    )
+                    continue
+                write_chunks_jsonl(tmp_doc / CHUNKS_FILE_NAME, chunks)
+                shutil.copy2(pdf, tmp_doc / SOURCE_PDF_NAME)
+                render_page_pngs(pdf, tmp_doc)
+                write_document_manifest(
+                    tmp_doc / MANIFEST_FILE_NAME,
+                    title=document.title,
+                    kind=document.document_kind,
+                    indexed_at=document.indexed_at,
+                    section_map_version=SECTION_MAP_VERSION,
+                    ingest_layout_version=INGEST_LAYOUT_VERSION,
+                )
+                _promote_document(
+                    storage_dir,
+                    game.game_id,
+                    document.document_kind,
+                    document.doc_key,
+                    tmp_doc,
+                )
+                maybe_index_document(
+                    storage_dir,
+                    game_id=game.game_id,
+                    kind=document.document_kind,
+                    doc_key=document.doc_key,
+                    chunks=chunks,
+                    indexed_at=document.indexed_at,
+                    ollama_url=settings.ollama_url,
+                    embedding_model=settings.profile.embedding,
+                )
+                recount_game(storage_dir, game.game_id)
+                rewritten += 1
+                _log(
+                    f"layout {game.game_id}/{document.doc_key} via {reader}: "
+                    f"{len(chunks)} chunk(s)",
+                    progress,
+                )
+            finally:
+                if work.exists():
+                    shutil.rmtree(work, ignore_errors=True)
+    return rewritten
+
+
 def rebuild_search_index(storage_dir: Path) -> int:
     """Re-embed every JSONL document. Returns the number of documents indexed."""
     settings = get_settings()
@@ -507,3 +738,49 @@ def rebuild_search_index(storage_dir: Path) -> int:
             )
             indexed += 1
     return indexed
+
+
+def ensure_search_index(
+    storage_dir: Path,
+    progress: ProgressCallback | None = None,
+) -> int:
+    """Re-index games whose on-disk chunks outnumber the search index.
+
+    Covers the case where a PDF was saved but embedding failed mid-import, so
+    Ask would otherwise search an incomplete library until someone re-imports.
+    """
+    from rag_engine.retrieval.service import open_chunk_index
+
+    index = open_chunk_index(storage_dir)
+    if index is None:
+        return 0
+    settings = get_settings()
+    fixed = 0
+    for game in load_games(storage_dir):
+        if game.chunk_count == 0:
+            continue
+        migrate_legacy_flat_pages(storage_dir, game.game_id)
+        indexed_rows = index.count_for_games([game.game_id])
+        if indexed_rows >= game.chunk_count:
+            continue
+        for document in list_game_documents(storage_dir, game.game_id):
+            chunks = read_chunks_jsonl(
+                chunks_path(storage_dir, game.game_id, document.document_kind, document.doc_key)
+            )
+            maybe_index_document(
+                storage_dir,
+                game_id=game.game_id,
+                kind=document.document_kind,
+                doc_key=document.doc_key,
+                chunks=chunks,
+                indexed_at=document.indexed_at,
+                ollama_url=settings.ollama_url,
+                embedding_model=settings.profile.embedding,
+            )
+            fixed += 1
+            _log(
+                f"search catch-up {game.game_id}/{document.doc_key}: "
+                f"{indexed_rows} indexed rows, {game.chunk_count} on disk",
+                progress,
+            )
+    return fixed

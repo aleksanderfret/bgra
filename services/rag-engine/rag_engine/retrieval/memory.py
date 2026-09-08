@@ -50,3 +50,24 @@ class MemoryIndex:
 
     def count_for_games(self, game_ids: list[str]) -> int:
         return sum(1 for chunk in self.rows.values() if chunk.game_id in game_ids)
+
+    def find_by_section(
+        self,
+        game_ids: list[str],
+        *,
+        doc_key: str,
+        section_id: str,
+        limit: int,
+    ) -> list[RetrievedChunk]:
+        if not section_id:
+            return []
+        hits = [
+            chunk
+            for chunk in self.rows.values()
+            if chunk.game_id in game_ids
+            and chunk.doc_key == doc_key
+            and chunk.section_id == section_id
+            and chunk.block_kind != "catalogue"
+        ]
+        hits.sort(key=lambda chunk: (chunk.page is None, chunk.page or 0, chunk.id))
+        return hits[:limit]

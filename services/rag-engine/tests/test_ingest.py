@@ -13,6 +13,7 @@ from rag_engine.ingest.chunking import (
 )
 from rag_engine.ingest.pdf import PdfLimitError, assert_pdf_limits, extract_markdown
 from rag_engine.ingest.pipeline import (
+    ensure_search_index,
     ingest_pdf,
     read_chunks_jsonl,
     resplit_stored_chunks,
@@ -51,13 +52,16 @@ Play one tile.
         doc_key="main",
         document_title="Rulebook",
     )
-    assert len(chunks) == 2
-    assert chunks[0].heading == "Setup"
-    assert chunks[0].page == 1
-    assert chunks[0].doc_key == "main"
-    assert chunks[0].image_url == "/static/assets/azul/documents/rulebook/main/p01.png"
-    assert chunks[1].id == "azul:rulebook:main:p02:c00"
-    assert "Play one tile" in chunks[1].text
+    rules = [chunk for chunk in chunks if chunk.block_kind != "catalogue"]
+    assert len(rules) == 2
+    assert rules[0].heading == "Setup"
+    assert rules[0].page == 1
+    assert rules[0].doc_key == "main"
+    assert rules[0].section_id == "setup"
+    assert rules[0].image_url == "/static/assets/azul/documents/rulebook/main/p01.png"
+    assert rules[1].id == "azul:rulebook:main:p02:c00"
+    assert "Play one tile" in rules[1].text
+    assert any(chunk.block_kind == "catalogue" for chunk in chunks)
 
 
 def test_split_section_text_keeps_a_short_section_whole() -> None:
@@ -117,17 +121,19 @@ def test_chunk_markdown_splits_a_long_section_into_numbered_pieces() -> None:
         doc_key="main",
         document_title="Rulebook",
     )
+    rules = [chunk for chunk in chunks if chunk.block_kind != "catalogue"]
 
-    assert len(chunks) > 1
-    assert [chunk.id for chunk in chunks] == [
-        f"azul:rulebook:main:p04:c{index:02d}" for index in range(len(chunks))
+    assert len(rules) > 1
+    assert [chunk.id for chunk in rules] == [
+        f"azul:rulebook:main:p04:c{index:02d}" for index in range(len(rules))
     ]
-    assert all(chunk.heading == "Trading" for chunk in chunks)
-    assert all(chunk.page == 4 for chunk in chunks)
-    assert all(len(chunk.text) <= CHUNK_TARGET_CHARS for chunk in chunks)
+    assert all(chunk.heading == "Trading" for chunk in rules)
+    assert all(chunk.page == 4 for chunk in rules)
+    assert all(len(chunk.text) <= CHUNK_TARGET_CHARS for chunk in rules)
     assert all(
-        chunk.image_url == "/static/assets/azul/documents/rulebook/main/p04.png" for chunk in chunks
+        chunk.image_url == "/static/assets/azul/documents/rulebook/main/p04.png" for chunk in rules
     )
+    assert any(chunk.block_kind == "catalogue" for chunk in chunks)
 
 
 def test_ingest_pdf_writes_chunks_pngs_and_registry(tmp_path: Path) -> None:
@@ -352,6 +358,45 @@ def test_resplit_stored_chunks_is_idempotent(tmp_path: Path) -> None:
     with patch("rag_engine.ingest.pipeline.maybe_index_document"):
         assert resplit_stored_chunks(storage) == 1
         assert resplit_stored_chunks(storage) == 0
+
+
+def test_ensure_search_index_reindexes_when_disk_outruns_search(tmp_path: Path) -> None:
+    storage = tmp_path / "storage"
+    storage.mkdir()
+    _store_one_document(storage, "Trade with any neighbouring state.")
+
+    class FakeIndex:
+        def count_for_games(self, _game_ids: list[str]) -> int:
+            return 0
+
+    with (
+        patch("rag_engine.retrieval.service.open_chunk_index", return_value=FakeIndex()),
+        patch("rag_engine.ingest.pipeline.maybe_index_document") as index,
+    ):
+        assert ensure_search_index(storage) == 1
+
+    assert index.call_count == 1
+    assert index.call_args.kwargs["game_id"] == "world-order"
+
+
+def test_ensure_search_index_skips_when_search_already_matches(tmp_path: Path) -> None:
+    storage = tmp_path / "storage"
+    storage.mkdir()
+    _store_one_document(storage, "Trade with any neighbouring state.")
+    games = load_games(storage)
+    assert games[0].chunk_count == 1
+
+    class FakeIndex:
+        def count_for_games(self, _game_ids: list[str]) -> int:
+            return 1
+
+    with (
+        patch("rag_engine.retrieval.service.open_chunk_index", return_value=FakeIndex()),
+        patch("rag_engine.ingest.pipeline.maybe_index_document") as index,
+    ):
+        assert ensure_search_index(storage) == 0
+
+    index.assert_not_called()
 
 
 def test_bad_game_id_writes_nothing(tmp_path: Path) -> None:

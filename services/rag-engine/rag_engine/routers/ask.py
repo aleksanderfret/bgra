@@ -32,7 +32,7 @@ from rag_engine.engines.llm import (
     load_model,
 )
 from rag_engine.ingest.registry import active_game_ids, validate_expansion_ids
-from rag_engine.retrieval.pipeline import retrieve
+from rag_engine.retrieval.pipeline import player_facing_hits, retrieve
 from rag_engine.retrieval.prompt import build_messages
 from rag_engine.retrieval.service import RetrievalStack
 from rag_engine.retrieval.sources import to_retrieved_source
@@ -134,7 +134,9 @@ async def _stream_answer(
             )
             return
 
-        yield encode_event(SourcesEvent(sources=[to_retrieved_source(hit) for hit in hits]))
+        yield encode_event(
+            SourcesEvent(sources=[to_retrieved_source(hit) for hit in player_facing_hits(hits)])
+        )
         yield encode_comment("sources")
         if await http_request.is_disconnected():
             return
