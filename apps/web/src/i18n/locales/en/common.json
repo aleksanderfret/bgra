@@ -31,6 +31,10 @@
       "body": "Close the app and open it again."
     }
   },
+  "startup": {
+    "loadingTitle": "Getting ready…",
+    "loadingBody": "The assistant opens when this computer is ready. The first time can take a minute."
+  },
   "preferences": {
     "label": "Display preferences"
   },
@@ -49,7 +53,7 @@
   "rulesChat": {
     "engineOffline": {
       "title": "The RAG engine is not responding",
-      "body": "Start it with <command>pnpm dev</command> in the repository directory. The interface works, but without the engine there is nowhere to get the rules from."
+      "body": "Close the app and open it again. In a browser-only session, start the stack from the project, then reload this page."
     },
     "game": {
       "label": "Game",
@@ -167,7 +171,7 @@
     },
     "ollama": {
       "missingTitle": "Ollama is not installed",
-      "missingBody": "The language models run through Ollama on this computer. Install it, start it once, then reopen this app.",
+      "missingBody": "The language models run through Ollama on this computer. Use Install and download below.",
       "download": "Download Ollama (opens in a new tab)",
       "foundTitle": "Ollama found",
       "foundBody": "Using {{path}}"
@@ -179,7 +183,38 @@
       "pullDone": "Models are ready.",
       "pullFailed": "Download failed: {{message}}"
     },
-    "continue": "Continue to the assistant",
+    "runtime": {
+      "needsTitle": "What this computer still needs",
+      "needsOllama": "Ollama installed and running",
+      "needsChatModel": "Answer model: {{model}}",
+      "needsEmbeddingModel": "Search model: {{model}}",
+      "osPromptMacTitle": "macOS will ask for confirmation",
+      "osPromptMac": "When Ollama’s installer opens, macOS may ask you to confirm. That is expected — allow it so Ollama can install.",
+      "macDragToApplications": "If a disk image window appears, drag Ollama into Applications. Stay in this app — we start Ollama for you.",
+      "ignoreOllamaTerminal": "If Ollama shows a window asking you to type something in Terminal, close that window. You do not need Terminal for this app.",
+      "osPromptWindowsTitle": "Windows may ask for permission",
+      "osPromptWindows": "When the Ollama installer opens, Windows may show a permission prompt. That is expected — allow it so Ollama can install.",
+      "primaryAction": "Install and download",
+      "openDownloadPage": "Open the Ollama download page",
+      "readyTitle": "Ready",
+      "readyBody": "Everything is ready — opening the assistant…",
+      "stage": {
+        "downloading_installer": "Downloading the Ollama installer…",
+        "waiting_for_ollama": "Waiting for Ollama to finish installing and start…",
+        "pulling_models": "Downloading the models for this computer…",
+        "preparing_search": "Preparing rulebook search…"
+      },
+      "errorTitle": "Could not finish setup",
+      "error": {
+        "download_failed": "Could not download the Ollama installer. Check your internet connection, then try again.",
+        "ollama_timeout": "Ollama did not become ready in time. Finish the Ollama install, open Ollama once, then try again.",
+        "pull_failed": "Could not download the models. Keep this app open, check that Ollama is running, then try again.",
+        "search_timeout": "Models are present, but search did not finish starting. Close the app and open it again.",
+        "runtime_failed": "Something went wrong during setup. Try again. If it keeps failing, close the app and open it again."
+      }
+    },
+    "continue": "Open the assistant",
+    "continueDisabledHint": "Tap Install and download once. When it finishes, the assistant opens by itself.",
     "diagnostics": {
       "save": "Save diagnostics to a file",
       "saved": "Saved to {{path}}. Send that file if something breaks — nothing is uploaded automatically."
@@ -257,9 +292,9 @@
       "invalidFileTitle": "Not a PDF",
       "invalidFileBody": "Choose a publisher rulebook saved as a PDF.",
       "ingestNotReadyTitle": "Import is not available",
-      "ingestNotReadyBody": "Received “{{fileName}}”, but PDF tools are not installed in the engine environment. Run uv sync --extra ingest in services/rag-engine, then try again.",
+      "ingestNotReadyBody": "Received “{{fileName}}”, but this app cannot turn PDFs into pages yet. Close the app and open it again, then try once more.",
       "engineUnreachableTitle": "The assistant is offline",
-      "engineUnreachableBody": "Start the app with pnpm dev so the web interface and the engine are both running, then try again.",
+      "engineUnreachableBody": "Close the app and open it again, then try once more.",
       "limitExceededTitle": "PDF is too large",
       "limitExceededBody": "This file is over 80 MB or has more than 200 pages. Use a smaller publisher PDF.",
       "pageImageTooLargeTitle": "A page image is too heavy",

@@ -12,8 +12,16 @@ extraResources:
   # Monorepo standalone lays out apps/web/server.js under the standalone root.
   # Copying to repo/ (not repo/apps/web) keeps server.js at repo/apps/web/server.js
   # and the traced node_modules next to apps/.
+  #
+  # electron-builder's FileMatcher always skips a *root* folder named node_modules
+  # (see app-builder-lib util/filter.js). Copy that tree as its own FileSet so Next
+  # can resolve `require('next')` from standalone server.js.
   - from: ../../apps/web/.next/standalone
     to: repo
+    filter:
+      - "**/*"
+  - from: ../../apps/web/.next/standalone/node_modules
+    to: repo/node_modules
     filter:
       - "**/*"
   - from: ../../apps/web/.next/static
@@ -43,6 +51,14 @@ extraResources:
     filter:
       - "**/*"
       - "!node_modules/**"
+  - from: ../../apps/web/src/i18n/locales
+    to: i18n
+    filter:
+      - "**/common.json"
+  - from: packaging/bin
+    to: bin
+    filter:
+      - "**/*"
 mac:
   category: public.app-category.utilities
   target:

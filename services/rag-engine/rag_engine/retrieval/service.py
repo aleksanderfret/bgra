@@ -50,12 +50,15 @@ def try_load(reranker_id: str) -> RetrievalStack | None:
         return None
     from sentence_transformers import CrossEncoder
 
+    from rag_engine.mac_dock import hide_cli_from_macos_dock
+
     logger.info("Loading reranker %s (first start can take several minutes).", reranker_id)
     print(
         f"Loading reranker {reranker_id}; first start can take several minutes...",
         flush=True,
     )
     model = CrossEncoder(reranker_id)
+    hide_cli_from_macos_dock()
     print("Reranker ready.", flush=True)
 
     def open_index(storage_dir: Path) -> ChunkIndex:

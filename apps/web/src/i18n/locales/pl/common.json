@@ -31,6 +31,10 @@
       "body": "Zamknij aplikację i otwórz ją ponownie."
     }
   },
+  "startup": {
+    "loadingTitle": "Przygotowuję aplikację…",
+    "loadingBody": "Asystent otworzy się, gdy wszystko będzie gotowe. Za pierwszym razem może to chwilę potrwać."
+  },
   "preferences": {
     "label": "Ustawienia wyświetlania"
   },
@@ -49,7 +53,7 @@
   "rulesChat": {
     "engineOffline": {
       "title": "Silnik RAG nie odpowiada",
-      "body": "Uruchom go poleceniem <command>pnpm dev</command> w katalogu repozytorium. Interfejs działa, ale bez silnika nie ma skąd wziąć zasad."
+      "body": "Zamknij aplikację i otwórz ją ponownie. W samej przeglądarce uruchom stos z projektu, a potem odśwież tę stronę."
     },
     "game": {
       "label": "Gra",
@@ -167,7 +171,7 @@
     },
     "ollama": {
       "missingTitle": "Brak Ollamy",
-      "missingBody": "Modele językowe działają przez Ollamę na tym komputerze. Zainstaluj ją, uruchom raz, potem otwórz tę aplikację ponownie.",
+      "missingBody": "Modele językowe działają przez Ollamę na tym komputerze. Użyj przycisku Zainstaluj i pobierz poniżej.",
       "download": "Pobierz Ollamę (otwiera nową kartę)",
       "foundTitle": "Znaleziono Ollamę",
       "foundBody": "Używam {{path}}"
@@ -179,7 +183,38 @@
       "pullDone": "Modele są gotowe.",
       "pullFailed": "Pobieranie nie powiodło się: {{message}}"
     },
-    "continue": "Przejdź do asystenta",
+    "runtime": {
+      "needsTitle": "Czego jeszcze potrzebuje ten komputer",
+      "needsOllama": "Ollama zainstalowana i uruchomiona",
+      "needsChatModel": "Model odpowiedzi: {{model}}",
+      "needsEmbeddingModel": "Model wyszukiwania: {{model}}",
+      "osPromptMacTitle": "macOS poprosi o potwierdzenie",
+      "osPromptMac": "Gdy otworzy się instalator Ollamy, macOS może poprosić o potwierdzenie. To normalne — zezwól, żeby Ollama mogła się zainstalować.",
+      "macDragToApplications": "Jeśli pojawi się okno z obrazem dysku, przeciągnij Ollamę do Applications. Zostań w tej aplikacji — Ollamę uruchomimy za Ciebie.",
+      "ignoreOllamaTerminal": "Jeśli Ollama pokaże okno z poleceniem do Terminala, zamknij to okno. Do tej aplikacji Terminal nie jest potrzebny.",
+      "osPromptWindowsTitle": "Windows może poprosić o pozwolenie",
+      "osPromptWindows": "Gdy otworzy się instalator Ollamy, Windows może pokazać prośbę o uprawnienia. To normalne — zezwól, żeby Ollama mogła się zainstalować.",
+      "primaryAction": "Zainstaluj i pobierz",
+      "openDownloadPage": "Otwórz stronę pobierania Ollamy",
+      "readyTitle": "Gotowe",
+      "readyBody": "Wszystko gotowe — otwieram asystenta…",
+      "stage": {
+        "downloading_installer": "Pobieram instalator Ollamy…",
+        "waiting_for_ollama": "Czekam, aż Ollama dokończy instalację i wystartuje…",
+        "pulling_models": "Pobieram modele dla tego komputera…",
+        "preparing_search": "Przygotowuję wyszukiwanie w instrukcjach…"
+      },
+      "errorTitle": "Nie udało się dokończyć konfiguracji",
+      "error": {
+        "download_failed": "Nie udało się pobrać instalatora Ollamy. Sprawdź internet i spróbuj ponownie.",
+        "ollama_timeout": "Ollama nie była gotowa na czas. Dokończ instalację Ollamy, otwórz ją raz, a potem spróbuj ponownie.",
+        "pull_failed": "Nie udało się pobrać modeli. Zostaw tę aplikację otwartą, upewnij się, że Ollama działa, i spróbuj ponownie.",
+        "search_timeout": "Modele są, ale wyszukiwanie nie dokończyło startu. Zamknij aplikację i otwórz ją ponownie.",
+        "runtime_failed": "Coś poszło nie tak podczas konfiguracji. Spróbuj ponownie. Jeśli nadal nie działa, zamknij aplikację i otwórz ją ponownie."
+      }
+    },
+    "continue": "Otwórz asystenta",
+    "continueDisabledHint": "Kliknij raz Zainstaluj i pobierz. Po zakończeniu asystent otworzy się sam.",
     "diagnostics": {
       "save": "Zapisz diagnostykę do pliku",
       "saved": "Zapisano w {{path}}. Wyślij ten plik, jeśli coś się zepsuje — nic nie jest wysyłane automatycznie."
@@ -257,9 +292,9 @@
       "invalidFileTitle": "To nie jest PDF",
       "invalidFileBody": "Wybierz instrukcję wydawcy zapisaną jako PDF.",
       "ingestNotReadyTitle": "Import niedostępny",
-      "ingestNotReadyBody": "Odebrano „{{fileName}}”, ale narzędzia PDF nie są zainstalowane w środowisku silnika. Uruchom uv sync --extra ingest w services/rag-engine i spróbuj ponownie.",
+      "ingestNotReadyBody": "Odebrano „{{fileName}}”, ale ta aplikacja nie może jeszcze zamieniać PDF-ów na strony. Zamknij aplikację i otwórz ją ponownie, a potem spróbuj jeszcze raz.",
       "engineUnreachableTitle": "Asystent jest wyłączony",
-      "engineUnreachableBody": "Uruchom aplikację przez pnpm dev, żeby interfejs i silnik działały razem, i spróbuj ponownie.",
+      "engineUnreachableBody": "Zamknij aplikację i otwórz ją ponownie, a potem spróbuj jeszcze raz.",
       "limitExceededTitle": "PDF jest za duży",
       "limitExceededBody": "Plik ma ponad 80 MB albo więcej niż 200 stron. Użyj mniejszego PDF-a od wydawcy.",
       "pageImageTooLargeTitle": "Obraz strony jest za ciężki",

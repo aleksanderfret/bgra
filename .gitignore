@@ -7,6 +7,7 @@ build/
 dist/
 coverage/
 apps/desktop/release/
+apps/desktop/packaging/bin/
 *.tsbuildinfo
 next-env.d.ts
 .turbo/

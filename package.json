@@ -20,8 +20,9 @@
     "commit": "cz",
     "release:prepare": "node scripts/release-prepare.mjs",
     "release:package": "node scripts/release-package.mjs",
-    "verify": "turbo run typecheck test lint build && biome check && node --test commitlint.config.test.mjs scripts/release-prepare.test.mjs",
-    "preflight": "turbo run lint typecheck test && node --test commitlint.config.test.mjs scripts/release-prepare.test.mjs",
+    "reset:app": "node scripts/reset-app.mjs",
+    "verify": "turbo run typecheck test lint build && biome check && node --test commitlint.config.test.mjs scripts/release-prepare.test.mjs scripts/reset-app.test.mjs",
+    "preflight": "turbo run lint typecheck test && node --test commitlint.config.test.mjs scripts/release-prepare.test.mjs scripts/reset-app.test.mjs",
     "prepare": "husky && editor=\"$(git rev-parse --show-toplevel)/scripts/git-commit-editor.sh\" && git config --local core.editor \"$editor\" && git config --local sequence.editor \"$editor\""
   },
   "devDependencies": {

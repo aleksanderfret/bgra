@@ -15,11 +15,15 @@ from .ingest.pipeline import (
     ensure_section_maps,
     resplit_stored_chunks,
 )
+from .mac_dock import hide_cli_from_macos_dock
 from .retrieval.service import try_load
 from .routers import ask, games, health, ingest
 from .settings import Settings, ensure_storage_writable, get_settings
 
 logger = logging.getLogger(__name__)
+
+# Before uvicorn binds: bare `python` otherwise gets a blinking Dock "exec" tile.
+hide_cli_from_macos_dock()
 
 
 async def _pin_ollama_weights(settings: Settings) -> None:
@@ -124,9 +128,17 @@ def schedule_retrieval_load(app: FastAPI, reranker_id: str) -> asyncio.Task[None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    import os
+
     settings = get_settings()
-    # Serve /health and /games immediately; CrossEncoder load can take minutes.
-    schedule_retrieval_load(app, settings.profile.reranker)
+    # Packaged first-run (Stage 3B) skips warm until models exist; reload always works.
+    if os.environ.get("BGA_SKIP_RETRIEVAL_WARM") == "1":
+        app.state.retrieval_stack = None
+        app.state.retrieval_loading = False
+        logger.info("Skipping retrieval warm-up (BGA_SKIP_RETRIEVAL_WARM=1).")
+    else:
+        # Serve /health and /games immediately; CrossEncoder load can take minutes.
+        schedule_retrieval_load(app, settings.profile.reranker)
     try:
         yield
     finally:

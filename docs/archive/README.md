@@ -27,10 +27,11 @@ here because nothing was built between Stage 2 and that work.
 | [stage-3e-adaptive-thinking.md](stage-3e-adaptive-thinking.md) | 3E — think only when hits conflict or barely clear the cutoff | Implemented |
 | [stage-3f-search-unavailable.md](stage-3f-search-unavailable.md) | 3F — honest banner when search never started | Implemented |
 | [stage-3c-search-catch-up.md](stage-3c-search-catch-up.md) | 3C — rebuild search for an existing library on start | Implemented |
+| [stage-3b-first-run-install-gate.md](stage-3b-first-run-install-gate.md) | 3B — first-run Ollama + models wall on packaged desktop | Implemented (smoke Mac + Windows before release) |
 | [stage-3g-rulebook-import-understanding.md](stage-3g-rulebook-import-understanding.md) | 3G — section coverage (list questions) and a gated page-layout reader | Phase 1 + Phase 2 shipped; handbook layout fixtures |
 
-Stage 3B (first-run install gate) is specified in the living roadmap, not as a
-separate implementation plan yet.
+Stage 3B (first-run install gate) plan:
+[`stage-3b-first-run-install-gate.md`](stage-3b-first-run-install-gate.md).
 
 ## Not included
 

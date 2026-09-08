@@ -549,7 +549,14 @@ index. Packaging (`electron-builder`) is a separate `package` script, outside
 `pnpm verify`, so `git push` does not build installers. Unsigned builds are enough for
 a handful of testers; code signing and notarisation wait until distribution is a real
 goal. Sharing packaged indexes between users is deliberately unsupported: an index
-contains rulebook text and page renders.
+contains rulebook text and page renders. Stage 3B adds a first-run install gate on
+this path: until engine `/health` shows Ask-ready (Ollama up, no missing models,
+reranker loaded, retrieval not loading), the window stays on setup. The official
+Ollama installer is downloaded by the main process (not bundled in `BGA.app`); a
+stored `setup-complete` flag is ignored if the live probe fails. Packaged boots
+set `BGA_SKIP_RETRIEVAL_WARM=1` until that gate passes so Stage 3C catch-up does
+not race the model download; `POST /retrieval/reload` then starts warm + catch-up.
+A bundled `uv` under `resources/bin` syncs into a writable userData Python env.
 
 **D16 — Qwen3 must answer, not think, on `/ask` — by default.**
 Qwen3 models produce a hidden reasoning trace when thinking is left on. The engine

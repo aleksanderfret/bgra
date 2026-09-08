@@ -341,7 +341,7 @@ refuses honestly; `pnpm verify` passes.
 
 ---
 
-## Stage 3B — First-run install gate
+## Stage 3B — First-run install gate ✅ **complete**
 
 **Goal:** a packaged Mac or Windows build cannot be used until the machine has Ollama
 and the models for the recommended profile. The user sees **why**, clicks once, and
@@ -355,6 +355,8 @@ can wait: a person who opens the `.dmg` must be able to get a working arbiter be
 we polish the PDF bar. Same screen on both platforms (the setup route already exists);
 do not split this into an NSIS page vs a Finder `.dmg` note.
 
+Plan: `docs/archive/stage-3b-first-run-install-gate.md`.
+
 - On every desktop launch, if the gate is not passed, show **only** this view. The
   rest of the app is unreachable. Closing the window is the only way out.
 - The copy lists what this computer needs, from the **already-chosen profile** (RAM,
@@ -364,10 +366,10 @@ do not split this into an NSIS page vs a Finder `.dmg` note.
   installer (not bundled inside `BGA.app`, so it is not part of our signature) and
   then pulls the profile models. The OS may still show its own confirmation for
   Ollama (Gatekeeper / UAC); that is expected and must be explained up front.
-- Until Ollama is installed **and** running **and** the profile models are present,
-  Continue stays disabled. The next launch shows the same view until the gate
-  passes; passing it is a stored flag plus a live check (deleting Ollama must bring
-  the wall back).
+- Until Ollama is installed **and** running **and** the profile models are present
+  **and** search is Ask-ready, Continue stays disabled. The next launch shows the
+  same view until the gate passes; passing it is a stored flag plus a live check
+  (deleting Ollama must bring the wall back).
 - `pnpm dev` in the browser stays ungated (no Electron bridge). This stage is the
   packaged / desktop-shell path.
 
@@ -375,6 +377,43 @@ do not split this into an NSIS page vs a Finder `.dmg` note.
 after the user confirms the OS prompt and the downloads finish, the next screen is
 the assistant; quitting mid-download and reopening resumes the same wall, not a
 half-ready UI; Mac and Windows present the same steps.
+
+---
+
+## Stage 3H — Uninstall and remove what the app downloaded
+
+**Goal:** a player can remove BGA **and** (if they choose) the things first-run
+put on the computer — without a terminal, and without assuming that dragging the
+app to Trash cleans anything else.
+
+Do this **after Stage 3B**. First-run is what creates Ollama, models, and app
+data; uninstall is the mirror. Dragging `BGA.app` to Trash on macOS only deletes
+the app bundle — it never runs our code — so Mac needs an **in-app** path.
+Windows can hook the normal uninstaller.
+
+- **Windows:** the NSIS (or equivalent) uninstall removes BGA and, with clear
+  prompts, the optional extras below — same choices as on Mac, not a silent wipe
+  of everything on the machine.
+- **Mac:** in the packaged app, a screen with a primary action like “Remove BGA
+  and downloaded files…” lists checkboxes the player understands:
+  - **BGA’s own data** (setup flag, library storage, local Python env) — default
+    on when uninstalling.
+  - **Downloaded models** (Ollama weights on disk) — off by default or behind an
+    explicit confirm; large and shared.
+  - **Ollama itself** — off by default with a plain warning that other apps may
+    use it; never remove it silently.
+- Copy stays in `en`/`pl`. No “open Terminal”, no “run this command”, no asking
+  the player to find folders by hand.
+- After confirm, quit related processes safely, delete only what was selected,
+  then quit. If Ollama or models were left on purpose, say so in one short line.
+- Do **not** treat Trash-drag as an uninstall hook on Mac — that path cannot run
+  our cleanup. The in-app (or DMG-bundled) remover is the supported way.
+
+**Acceptance:** on Windows, Apps & features → Uninstall walks through the same
+choices and leaves the machine as selected; on Mac, the in-app remover can wipe
+BGA data alone, or data + models, or data + models + Ollama, each with a clear
+confirm; a player who only deletes `BGA.app` is not promised cleanup (document
+that the in-app remover is required for a full wipe); `pnpm verify` passes.
 
 ---
 
@@ -746,7 +785,9 @@ Stage 3D
 table** — you can look back, and sound is optional. Stage 0A–0C (hardening, desktop
 window, release) are already done; they sit under the numbered product stages.
 Stage 3B is what makes that arbiter usable from the packaged app (Ollama + models
-behind a one-click gate). Stage 6 is worth doing right after 3 — before you start
+behind a one-click gate). Stage 3H is the mirror: remove the app and, when the
+player chooses, what first-run downloaded (Windows uninstall; Mac in-app remover
+with checkboxes — Trash alone cannot run cleanup). Stage 6 is worth doing right after 3 — before you start
 tuning prompts, because otherwise you are tuning by feel. Stage 6A (page layout)
 comes **after that measurement**: first learn how often columns and sidenotes cost
 us an answer, then decide whether a heavier import is worth it. Voice (5) and

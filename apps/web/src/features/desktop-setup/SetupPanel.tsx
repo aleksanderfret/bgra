@@ -5,7 +5,24 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DEFAULT_LOCALE, isLocale } from '@/i18n/settings';
-import { type DesktopSetupState, getDesktopApi } from '@/lib/desktop-bridge';
+import { type DesktopSetupState, getDesktopApi, type RuntimeProgress } from '@/lib/desktop-bridge';
+
+type Translate = ReturnType<typeof useTranslation>['t'];
+
+function runtimeErrorMessage(t: Translate, code: string): string {
+  switch (code) {
+    case 'download_failed':
+      return t('setup.runtime.error.download_failed');
+    case 'ollama_timeout':
+      return t('setup.runtime.error.ollama_timeout');
+    case 'pull_failed':
+      return t('setup.runtime.error.pull_failed');
+    case 'search_timeout':
+      return t('setup.runtime.error.search_timeout');
+    default:
+      return t('setup.runtime.error.runtime_failed');
+  }
+}
 
 export function SetupPanel() {
   const { t, i18n } = useTranslation();
@@ -14,9 +31,9 @@ export function SetupPanel() {
   const [state, setState] = useState<DesktopSetupState | null>(null);
   const [diagnosticsPath, setDiagnosticsPath] = useState<string | null>(null);
   const [browserOnly, setBrowserOnly] = useState(false);
-  const [pulling, setPulling] = useState(false);
-  const [pullError, setPullError] = useState<string | null>(null);
-  const [pullDone, setPullDone] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<RuntimeProgress | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
 
   useEffect(() => {
     const api = getDesktopApi();
@@ -25,7 +42,28 @@ export function SetupPanel() {
       return;
     }
     void api.getSetupState().then(setState);
-  }, []);
+    return api.onRuntimeProgress((event) => {
+      setProgress(event);
+      if (event.stage === 'error') {
+        setErrorCode(event.code);
+      }
+      if (event.stage === 'ready') {
+        setErrorCode(null);
+        void api
+          .getSetupState()
+          .then(async (next) => {
+            setState(next);
+            if (next.askReady) {
+              await api.markSetupComplete();
+              router.push(`/${locale}`);
+            }
+          })
+          .catch(() => {
+            /* stay on setup; player can retry */
+          });
+      }
+    });
+  }, [locale, router]);
 
   if (browserOnly) {
     return (
@@ -39,9 +77,28 @@ export function SetupPanel() {
     return <Text>{t('setup.loading')}</Text>;
   }
 
+  const api = getDesktopApi();
   const profileId = state.recommendation?.profileId ?? 'starter-32gb';
   const reason = state.recommendation?.reason ?? 'starter';
   const warningReason = reason === 'insufficient_memory' || reason === 'insufficient_disk';
+  const platform = state.machine?.platform;
+  const stageMessage = (() => {
+    if (progress === null) {
+      return null;
+    }
+    switch (progress.stage) {
+      case 'downloading_installer':
+        return t('setup.runtime.stage.downloading_installer');
+      case 'waiting_for_ollama':
+        return t('setup.runtime.stage.waiting_for_ollama');
+      case 'pulling_models':
+        return t('setup.runtime.stage.pulling_models');
+      case 'preparing_search':
+        return t('setup.runtime.stage.preparing_search');
+      default:
+        return null;
+    }
+  })();
 
   return (
     <Stack gap="lg">
@@ -78,111 +135,139 @@ export function SetupPanel() {
             {t('setup.profile.sharedRetrieval')}
           </Text>
           <Text size="sm">{t(`setup.reason.${reason}`)}</Text>
-          <Text size="sm">
-            {t('setup.profile.diskNeed', {
-              gib: state.recommendation?.approxDiskGiB ?? 0,
-            })}
-          </Text>
         </Stack>
       </Alert>
 
-      {state.ollamaPath === null ? (
-        <Alert color="orange" title={t('setup.ollama.missingTitle')}>
-          <Stack gap="sm">
-            <Text size="sm">{t('setup.ollama.missingBody')}</Text>
-            <Button
-              component="a"
-              href={state.ollamaDownloadUrl}
-              target="_blank"
-              rel="noreferrer"
-              variant="light"
-            >
-              {t('setup.ollama.download')}
-            </Button>
-          </Stack>
-        </Alert>
-      ) : (
-        <Alert color="teal" title={t('setup.ollama.foundTitle')}>
-          <Text size="sm">{t('setup.ollama.foundBody', { path: state.ollamaPath })}</Text>
-        </Alert>
-      )}
+      <Alert color="gray" title={t('setup.runtime.needsTitle')}>
+        <List spacing="xs" size="sm">
+          <List.Item>{t('setup.runtime.needsOllama')}</List.Item>
+          <List.Item>
+            {t('setup.runtime.needsChatModel', {
+              model: state.healthModels.llm || '—',
+            })}
+          </List.Item>
+          <List.Item>
+            {t('setup.runtime.needsEmbeddingModel', {
+              model: state.healthModels.embedding || '—',
+            })}
+          </List.Item>
+        </List>
+      </Alert>
 
-      <Alert color="gray" title={t('setup.models.title')}>
-        <Stack gap="sm">
-          <Text size="sm">{t('setup.models.body')}</Text>
+      {platform === 'darwin' ? (
+        <Alert color="yellow" title={t('setup.runtime.osPromptMacTitle')}>
+          <Text size="sm">{t('setup.runtime.osPromptMac')}</Text>
+          <Text size="sm" mt="xs">
+            {t('setup.runtime.macDragToApplications')}
+          </Text>
+          <Text size="sm" mt="xs">
+            {t('setup.runtime.ignoreOllamaTerminal')}
+          </Text>
+        </Alert>
+      ) : null}
+      {platform === 'win32' ? (
+        <Alert color="yellow" title={t('setup.runtime.osPromptWindowsTitle')}>
+          <Text size="sm">{t('setup.runtime.osPromptWindows')}</Text>
+        </Alert>
+      ) : null}
+
+      {stageMessage !== null ? (
+        <Text size="sm" c="dimmed">
+          {stageMessage}
+        </Text>
+      ) : null}
+
+      {errorCode !== null ? (
+        <Alert color="red" title={t('setup.runtime.errorTitle')}>
+          <Text size="sm">{runtimeErrorMessage(t, errorCode)}</Text>
+          <Button
+            mt="sm"
+            variant="light"
+            onClick={() => {
+              void api?.openExternalHttps(state.ollamaDownloadUrl);
+            }}
+          >
+            {t('setup.runtime.openDownloadPage')}
+          </Button>
+        </Alert>
+      ) : null}
+
+      {state.askReady ? (
+        <Alert color="teal" title={t('setup.runtime.readyTitle')}>
+          <Text size="sm">{t('setup.runtime.readyBody')}</Text>
+        </Alert>
+      ) : null}
+
+      <Group>
+        {state.askReady ? (
           <Button
             type="button"
-            loading={pulling}
-            disabled={state.ollamaPath === null || state.uvPath === null}
+            variant="filled"
+            disabled={busy}
             onClick={() => {
-              const api = getDesktopApi();
               if (api === null) {
                 return;
               }
-              setPulling(true);
-              setPullError(null);
+              void api.markSetupComplete().then(() => {
+                router.push(`/${locale}`);
+              });
+            }}
+          >
+            {t('setup.continue')}
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            loading={busy}
+            disabled={busy}
+            onClick={() => {
+              if (api === null) {
+                return;
+              }
+              setBusy(true);
+              setErrorCode(null);
               void api
-                .pullModels()
+                .ensureRuntime()
+                .then(() => api.markSetupComplete())
                 .then(() => {
-                  setPullDone(true);
+                  router.push(`/${locale}`);
                 })
-                .catch((error: unknown) => {
-                  setPullError(error instanceof Error ? error.message : String(error));
+                .catch(() => {
+                  /* progress event carries the error code */
                 })
                 .finally(() => {
-                  setPulling(false);
+                  setBusy(false);
                 });
             }}
           >
-            {t('setup.models.pull')}
+            {t('setup.runtime.primaryAction')}
           </Button>
-          {pullDone && (
-            <Text size="sm" c="teal">
-              {t('setup.models.pullDone')}
-            </Text>
-          )}
-          {pullError !== null && (
-            <Text size="sm" c="red">
-              {t('setup.models.pullFailed', { message: pullError })}
-            </Text>
-          )}
-        </Stack>
-      </Alert>
+        )}
+        {!state.askReady && !busy ? (
+          <Text size="sm" c="dimmed">
+            {t('setup.continueDisabledHint')}
+          </Text>
+        ) : null}
+      </Group>
 
       <Group>
         <Button
           type="button"
-          onClick={() => {
-            const api = getDesktopApi();
-            if (api === null) {
-              return;
-            }
-            void api.markSetupComplete().then(() => {
-              router.push(`/${locale}`);
-            });
-          }}
-        >
-          {t('setup.continue')}
-        </Button>
-        <Button
-          type="button"
           variant="default"
           onClick={() => {
-            const api = getDesktopApi();
-            if (api === null) {
-              return;
-            }
-            void api.saveDiagnostics().then((result) => setDiagnosticsPath(result.path));
+            void api?.saveDiagnostics().then((result) => {
+              setDiagnosticsPath(result.path);
+            });
           }}
         >
           {t('setup.diagnostics.save')}
         </Button>
+        {diagnosticsPath !== null ? (
+          <Text size="sm" c="dimmed">
+            {t('setup.diagnostics.saved', { path: diagnosticsPath })}
+          </Text>
+        ) : null}
       </Group>
-      {diagnosticsPath !== null && (
-        <Text size="sm" c="dimmed">
-          {t('setup.diagnostics.saved', { path: diagnosticsPath })}
-        </Text>
-      )}
     </Stack>
   );
 }

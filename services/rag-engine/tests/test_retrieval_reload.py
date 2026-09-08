@@ -55,6 +55,24 @@ def test_reload_is_noop_when_stack_already_ready(app: FastAPI, client: TestClien
     assert response.json() == {"started": False}
 
 
+def test_lifespan_skips_warm_when_env_set(storage: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("BGA_SKIP_RETRIEVAL_WARM", "1")
+    scheduled: list[str] = []
+
+    def fake_schedule(target: FastAPI, reranker_id: str) -> None:
+        scheduled.append(reranker_id)
+        return None
+
+    monkeypatch.setattr("rag_engine.main.schedule_retrieval_load", fake_schedule)
+    application = create_app()
+    application.dependency_overrides[get_settings] = lambda: Settings(storage_dir=storage)
+    with TestClient(application):
+        assert scheduled == []
+        assert application.state.retrieval_stack is None
+        assert application.state.retrieval_loading is False
+    application.dependency_overrides.clear()
+
+
 def test_reload_starts_when_search_failed(
     app: FastAPI, client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:

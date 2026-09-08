@@ -24,6 +24,7 @@ run('pnpm', ['--filter', 'web', 'build']);
 
 const serverJs = join(repoRoot, 'apps/web/.next/standalone/apps/web/server.js');
 const staticDir = join(repoRoot, 'apps/web/.next/static');
+const standaloneNodeModules = join(repoRoot, 'apps/web/.next/standalone/node_modules');
 
 if (!existsSync(serverJs)) {
   console.error(
@@ -35,9 +36,27 @@ if (!existsSync(staticDir)) {
   console.error(`Missing Next static assets at ${staticDir}.`);
   process.exit(1);
 }
+if (!existsSync(standaloneNodeModules)) {
+  console.error(
+    `Missing Next standalone node_modules at ${standaloneNodeModules}. Packaging would produce a blank window.`,
+  );
+  process.exit(1);
+}
 
 run('pnpm', ['--filter', 'desktop', 'run', 'package'], {
   CSC_IDENTITY_AUTO_DISCOVERY: 'false',
 });
+
+const packagedNodeModulesCandidates = [
+  join(repoRoot, 'apps/desktop/release/mac-arm64/BGA.app/Contents/Resources/repo/node_modules'),
+  join(repoRoot, 'apps/desktop/release/mac/BGA.app/Contents/Resources/repo/node_modules'),
+  join(repoRoot, 'apps/desktop/release/win-unpacked/resources/repo/node_modules'),
+];
+if (!packagedNodeModulesCandidates.some((candidate) => existsSync(candidate))) {
+  console.error(
+    'Packaged app is missing repo/node_modules (Next runtime). Check electron-builder extraResources.',
+  );
+  process.exit(1);
+}
 
 console.log('Desktop package finished under apps/desktop/release/.');

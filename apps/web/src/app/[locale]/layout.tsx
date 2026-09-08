@@ -6,6 +6,7 @@ import { Notifications } from '@mantine/notifications';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { DEFAULT_COLOR_SCHEME, theme } from '@/app/theme';
+import { DesktopGate } from '@/features/desktop-setup/DesktopGate';
 import { I18nProvider } from '@/i18n/I18nProvider';
 import { getTranslation } from '@/i18n/server';
 import { isLocale, LOCALES } from '@/i18n/settings';
@@ -46,7 +47,7 @@ export default async function RootLayout({ children, params }: LayoutProps<'/[lo
         <I18nProvider locale={locale}>
           <MantineProvider theme={theme} defaultColorScheme={DEFAULT_COLOR_SCHEME}>
             <Notifications />
-            {children}
+            <DesktopGate locale={locale}>{children}</DesktopGate>
           </MantineProvider>
         </I18nProvider>
       </body>

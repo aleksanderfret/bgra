@@ -1,25 +1,45 @@
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { app, BrowserWindow, dialog, ipcMain, session, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme, session, shell } from 'electron';
 import { BinaryNotFoundError, resolveBinary } from './binaries';
 import { type MachineSnapshot, type ProfileRecommendation, recommendProfile } from './capabilities';
-import type { DesktopSetupState } from './desktop-api';
+import type { DesktopSetupState, RuntimeProgress } from './desktop-api';
 import { writeDiagnosticsFile } from './diagnostics';
+import {
+  desktopLocale,
+  gatePassed,
+  type HealthProbe,
+  initialAppPath,
+  liveProbeOk,
+  parseHealthProbe,
+} from './gate';
+import { ensureMacHiddenCliApp } from './mac_hidden_app';
 import { readMachineSnapshot } from './machine';
+import {
+  downloadAllowlistedFile,
+  installerDestination,
+  OLLAMA_DOWNLOAD_PAGE,
+  ollamaInstallerUrl,
+} from './ollama_runtime';
 import { findFreePort } from './ports';
 import {
   engineArgs,
+  enginePythonArgs,
   type ManagedProcess,
   nextServerArgs,
+  resolveElectronNodeCommand,
   resolveEngineDir,
   resolveNextCli,
   resolveRepoRootFromDesktopPackage,
   resolveWebDir,
   spawnLogged,
   stopManaged,
+  waitForExit,
   waitForHttp,
+  waitForHttpWhileAlive,
 } from './processes';
+import { buildSplashHtml, readStartupCopy, splashDataUrl } from './splash';
 
 if (typeof app === 'undefined') {
   console.error(
@@ -29,11 +49,12 @@ if (typeof app === 'undefined') {
 }
 
 const isDev = !app.isPackaged;
-const OLLAMA_DOWNLOAD_URL = 'https://ollama.com/download';
 
 let mainWindow: BrowserWindow | null = null;
 let engineProcess: ManagedProcess | null = null;
 let nextProcess: ManagedProcess | null = null;
+let ollamaServeProcess: ManagedProcess | null = null;
+let ollamaServeOwned = false;
 let webPort = 3000;
 let enginePort = 8000;
 let machine: MachineSnapshot | null = null;
@@ -43,6 +64,11 @@ let uvPath: string | null = null;
 let engineLogPath: string | null = null;
 let nextLogPath: string | null = null;
 let dataDir = '';
+let uiLocale: 'en' | 'pl' = 'en';
+let lastProbe: HealthProbe | null = null;
+let ensureRuntimeBusy = false;
+let backendsReady = false;
+const windowsWithNavigationLock = new WeakSet<BrowserWindow>();
 
 function packageRoot(): string {
   return join(__dirname, '..');
@@ -55,17 +81,56 @@ function repoRoot(): string {
   return resolveRepoRootFromDesktopPackage(packageRoot());
 }
 
+function pythonEnvDir(): string {
+  return join(app.getPath('userData'), 'python-env');
+}
+
+function uvEnv(): NodeJS.ProcessEnv {
+  return {
+    ...process.env,
+    UV_PROJECT_ENVIRONMENT: pythonEnvDir(),
+  };
+}
+
 function bundledUvCandidate(): string | null {
   if (!app.isPackaged) {
     return null;
   }
-  const name = process.platform === 'win32' ? 'uv.exe' : 'uv';
-  const candidate = join(process.resourcesPath, 'bin', name);
-  return existsSync(candidate) ? candidate : null;
+  if (process.platform === 'win32') {
+    const candidate = join(process.resourcesPath, 'bin', 'uv.exe');
+    return existsSync(candidate) ? candidate : null;
+  }
+  const wrapped = join(process.resourcesPath, 'bin', 'BGAUv.app', 'Contents', 'MacOS', 'uv');
+  if (existsSync(wrapped)) {
+    return wrapped;
+  }
+  const legacy = join(process.resourcesPath, 'bin', 'uv');
+  return existsSync(legacy) ? legacy : null;
 }
 
 function setupCompletePath(): string {
   return join(app.getPath('userData'), 'setup-complete');
+}
+
+function setupCompleteFlagExists(): boolean {
+  return existsSync(setupCompletePath());
+}
+
+function writeSetupCompleteFlag(): void {
+  mkdirSync(app.getPath('userData'), { recursive: true });
+  writeFileSync(setupCompletePath(), '1', 'utf8');
+}
+
+function clearSetupCompleteFlag(): void {
+  if (setupCompleteFlagExists()) {
+    unlinkSync(setupCompletePath());
+  }
+}
+
+function emitRuntimeProgress(progress: RuntimeProgress): void {
+  for (const window of BrowserWindow.getAllWindows()) {
+    window.webContents.send('desktop:runtime-progress', progress);
+  }
 }
 
 async function resolveTools(): Promise<void> {
@@ -94,13 +159,250 @@ async function resolveTools(): Promise<void> {
   }
 }
 
-async function startBackend(): Promise<void> {
+async function syncPythonEnvironment(engineDir: string): Promise<void> {
+  if (uvPath === null) {
+    throw new Error('uv is required to sync the Python environment');
+  }
+  mkdirSync(pythonEnvDir(), { recursive: true });
+  const child = spawnLogged({
+    label: 'uv-sync',
+    command: uvPath,
+    args: ['sync', '--frozen', '--extra', 'retrieval', '--extra', 'ingest'],
+    cwd: engineDir,
+    env: uvEnv(),
+    logPath: join(app.getPath('userData'), 'logs', 'uv-sync.log'),
+  });
+  const code = await waitForExit(child.child);
+  if (code !== 0) {
+    throw new Error(`uv sync failed with exit code ${code}`);
+  }
+}
+
+async function fetchHealthProbe(): Promise<HealthProbe | null> {
+  try {
+    const response = await fetch(`http://127.0.0.1:${enginePort}/health`, {
+      signal: AbortSignal.timeout(3_000),
+    });
+    if (!response.ok) {
+      return null;
+    }
+    return parseHealthProbe(await response.json());
+  } catch {
+    return null;
+  }
+}
+
+async function refreshProbe(): Promise<HealthProbe | null> {
+  lastProbe = await fetchHealthProbe();
+  return lastProbe;
+}
+
+function currentGatePassed(): boolean {
+  if (lastProbe === null) {
+    return false;
+  }
+  return gatePassed({
+    setupCompleteFlag: setupCompleteFlagExists(),
+    probe: lastProbe,
+  });
+}
+
+function setupState(): DesktopSetupState {
+  const probe = lastProbe;
+  const askReady = probe !== null && liveProbeOk(probe);
+  return {
+    machine,
+    recommendation,
+    ollamaPath,
+    ollamaDownloadUrl: OLLAMA_DOWNLOAD_PAGE,
+    uvPath,
+    setupComplete: setupCompleteFlagExists(),
+    askReady,
+    gatePassed: currentGatePassed(),
+    missingModels: probe?.missingModels ?? [],
+    healthModels: {
+      llm: probe?.llm ?? '',
+      embedding: probe?.embedding ?? '',
+    },
+  };
+}
+
+async function ensureOllamaServeIfNeeded(): Promise<void> {
+  await resolveTools();
+  const probe = await refreshProbe();
+  if (probe?.ollama) {
+    return;
+  }
+  if (ollamaPath === null) {
+    return;
+  }
+  if (ollamaServeOwned && ollamaServeProcess !== null) {
+    return;
+  }
+  try {
+    // macOS: only open the real app. Spawning the bare `ollama` binary puts a
+    // blinking black "exec" icon in the Dock for as long as serve runs.
+    const ollamaApp = join('/Applications', 'Ollama.app');
+    if (process.platform === 'darwin' && existsSync(ollamaApp)) {
+      spawnLogged({
+        label: 'ollama-open',
+        command: 'open',
+        args: ['-a', 'Ollama'],
+        cwd: app.getPath('userData'),
+        env: { ...process.env },
+        logPath: join(app.getPath('userData'), 'logs', 'ollama-serve.log'),
+      });
+      return;
+    }
+    ollamaServeProcess = spawnLogged({
+      label: 'ollama-serve',
+      command: ollamaPath,
+      args: ['serve'],
+      cwd: app.getPath('userData'),
+      env: { ...process.env },
+      logPath: join(app.getPath('userData'), 'logs', 'ollama-serve.log'),
+    });
+    ollamaServeOwned = true;
+  } catch {
+    ollamaServeOwned = false;
+    ollamaServeProcess = null;
+  }
+}
+
+async function waitForOllamaApi(timeoutMs: number): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  emitRuntimeProgress({ stage: 'waiting_for_ollama' });
+  while (Date.now() < deadline) {
+    await resolveTools();
+    await ensureOllamaServeIfNeeded();
+    const probe = await refreshProbe();
+    if (probe?.ollama) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 2_000));
+  }
+  throw new Error('Timed out waiting for Ollama');
+}
+
+async function pullProfileModels(): Promise<void> {
+  if (uvPath === null) {
+    throw new Error('uv is not available');
+  }
+  emitRuntimeProgress({ stage: 'pulling_models' });
+  const engineDir = resolveEngineDir(repoRoot());
+  const profile = recommendation?.profileId ?? 'starter-32gb';
+  const child = spawnLogged({
+    label: 'pull-models',
+    command: uvPath,
+    args: ['run', 'python', '-m', 'rag_engine.pull_models', '--profile', profile],
+    cwd: engineDir,
+    env: {
+      ...uvEnv(),
+      BGA_MODEL_PROFILE: profile,
+      BGA_STORAGE_DIR: dataDir,
+    },
+    logPath: join(app.getPath('userData'), 'logs', 'pull-models.log'),
+  });
+  const code = await waitForExit(child.child);
+  if (code !== 0) {
+    throw new Error(`Model pull exited with code ${code}`);
+  }
+}
+
+async function waitForAskReady(timeoutMs: number): Promise<void> {
+  emitRuntimeProgress({ stage: 'preparing_search' });
+  const deadline = Date.now() + timeoutMs;
+  let lastReloadAt = 0;
+  while (Date.now() < deadline) {
+    const probe = await refreshProbe();
+    if (probe !== null && liveProbeOk(probe)) {
+      return;
+    }
+    const needsReload =
+      probe === null ||
+      (!probe.reranker && !probe.retrievalLoading && Date.now() - lastReloadAt > 5_000);
+    if (needsReload) {
+      lastReloadAt = Date.now();
+      try {
+        await fetch(`http://127.0.0.1:${enginePort}/retrieval/reload`, {
+          method: 'POST',
+          signal: AbortSignal.timeout(10_000),
+        });
+      } catch {
+        // Keep polling — the engine may still be starting.
+      }
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
+  }
+  throw new Error('Timed out waiting for search to become ready');
+}
+
+async function runEnsureRuntime(): Promise<void> {
+  if (ensureRuntimeBusy) {
+    throw new Error('Runtime setup is already running');
+  }
+  ensureRuntimeBusy = true;
+  try {
+    await resolveTools();
+    if (ollamaPath === null || !(await refreshProbe())?.ollama) {
+      if (ollamaPath === null) {
+        emitRuntimeProgress({ stage: 'downloading_installer' });
+        const destination = installerDestination(app.getPath('userData'), process.platform);
+        await downloadAllowlistedFile({
+          url: ollamaInstallerUrl(process.platform),
+          destinationPath: destination,
+          onProgress: (progress) => {
+            emitRuntimeProgress({
+              stage: 'downloading_installer',
+              receivedBytes: progress.receivedBytes,
+              totalBytes: progress.totalBytes ?? undefined,
+            });
+          },
+        });
+        const openError = await shell.openPath(destination);
+        if (openError) {
+          throw new Error(openError);
+        }
+      }
+      await waitForOllamaApi(15 * 60_000);
+    }
+    await pullProfileModels();
+    await waitForAskReady(20 * 60_000);
+    writeSetupCompleteFlag();
+    await refreshProbe();
+    emitRuntimeProgress({ stage: 'ready' });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '';
+    let code = 'runtime_failed';
+    if (message.includes('Timed out waiting for Ollama')) {
+      code = 'ollama_timeout';
+    } else if (message.includes('Timed out waiting for search')) {
+      code = 'search_timeout';
+    } else if (message.includes('Model pull')) {
+      code = 'pull_failed';
+    } else if (
+      message.includes('download') ||
+      message.includes('Installer') ||
+      message.includes('installer redirect') ||
+      message.includes('allowlist')
+    ) {
+      code = 'download_failed';
+    }
+    emitRuntimeProgress({ stage: 'error', code });
+    throw error;
+  } finally {
+    ensureRuntimeBusy = false;
+  }
+}
+
+async function startBackend(options: { skipRetrievalWarm: boolean }): Promise<void> {
   dataDir = join(app.getPath('userData'), 'storage');
   mkdirSync(dataDir, { recursive: true });
   mkdirSync(join(app.getPath('userData'), 'logs'), { recursive: true });
 
   machine = await readMachineSnapshot(dataDir);
   recommendation = recommendProfile(machine);
+  uiLocale = desktopLocale(app.getLocale());
 
   await resolveTools();
 
@@ -118,27 +420,48 @@ async function startBackend(): Promise<void> {
     throw new Error('uv is required to start the engine');
   }
 
+  await syncPythonEnvironment(engineDir);
+
   const profileEnv = recommendation?.profileId ?? 'starter-32gb';
+  const engineEnv: NodeJS.ProcessEnv = {
+    ...uvEnv(),
+    BGA_STORAGE_DIR: dataDir,
+    BGA_OLLAMA_URL: process.env.BGA_OLLAMA_URL ?? 'http://127.0.0.1:11434',
+    BGA_MODEL_PROFILE: process.env.BGA_MODEL_PROFILE ?? profileEnv,
+    ...(options.skipRetrievalWarm ? { BGA_SKIP_RETRIEVAL_WARM: '1' } : {}),
+  };
+
+  let engineCommand = uvPath;
+  let engineArgList = engineArgs(enginePort);
+  if (process.platform === 'darwin') {
+    const venvPython = join(pythonEnvDir(), 'bin', 'python');
+    engineCommand = ensureMacHiddenCliApp({
+      userDataDir: app.getPath('userData'),
+      appFileName: 'BGAEngine.app',
+      bundleId: 'local.bga.engine-helper',
+      bundleName: 'BGA Engine',
+      executableName: 'BGAEngine',
+      targetBinary: venvPython,
+      trampoline: 'exec-script',
+    });
+    engineArgList = enginePythonArgs(enginePort);
+  }
 
   engineProcess = spawnLogged({
     label: 'engine',
-    command: uvPath,
-    args: engineArgs(enginePort),
+    command: engineCommand,
+    args: engineArgList,
     cwd: engineDir,
-    env: {
-      ...process.env,
-      BGA_STORAGE_DIR: dataDir,
-      BGA_OLLAMA_URL: process.env.BGA_OLLAMA_URL ?? 'http://127.0.0.1:11434',
-      BGA_MODEL_PROFILE: process.env.BGA_MODEL_PROFILE ?? profileEnv,
-    },
+    env: engineEnv,
     logPath: engineLogPath,
   });
 
   if (isDev && process.env.BGA_WEB_URL) {
     const url = new URL(process.env.BGA_WEB_URL);
     webPort = Number(url.port || 3000);
-    await waitForHttp(`http://127.0.0.1:${webPort}/pl`, { timeoutMs: 5_000 });
+    await waitForHttp(`http://127.0.0.1:${webPort}/${uiLocale}`, { timeoutMs: 5_000 });
     await waitForHttp(`http://127.0.0.1:${enginePort}/health`, { timeoutMs: 60_000 });
+    await refreshProbe();
     return;
   }
 
@@ -151,7 +474,11 @@ async function startBackend(): Promise<void> {
     }
     nextProcess = spawnLogged({
       label: 'next',
-      command: process.execPath,
+      command: resolveElectronNodeCommand({
+        execPath: process.execPath,
+        platform: process.platform,
+        packaged: app.isPackaged,
+      }),
       args: [standaloneServer],
       cwd: webDir,
       env: {
@@ -174,7 +501,11 @@ async function startBackend(): Promise<void> {
 
     nextProcess = spawnLogged({
       label: 'next',
-      command: process.execPath,
+      command: resolveElectronNodeCommand({
+        execPath: process.execPath,
+        platform: process.platform,
+        packaged: app.isPackaged,
+      }),
       args: nextServerArgs({
         nextCli,
         hostname: '127.0.0.1',
@@ -194,24 +525,24 @@ async function startBackend(): Promise<void> {
     });
   }
 
-  // /health answers before the reranker finishes loading; the UI shows a preparing state.
-  await waitForHttp(`http://127.0.0.1:${enginePort}/health`, { timeoutMs: 60_000 });
-  await waitForHttp(`http://127.0.0.1:${webPort}/pl`, { timeoutMs: 60_000 });
-}
-
-function setupState(): DesktopSetupState {
-  return {
-    machine,
-    recommendation,
-    ollamaPath,
-    ollamaDownloadUrl: OLLAMA_DOWNLOAD_URL,
-    uvPath,
-    setupComplete: existsSync(setupCompletePath()),
-  };
+  await waitForHttpWhileAlive(`http://127.0.0.1:${enginePort}/health`, engineProcess, {
+    timeoutMs: 60_000,
+  });
+  if (nextProcess === null) {
+    throw new Error('Next.js process failed to start');
+  }
+  await waitForHttpWhileAlive(`http://127.0.0.1:${webPort}/${uiLocale}`, nextProcess, {
+    timeoutMs: 60_000,
+  });
+  await refreshProbe();
+  backendsReady = true;
 }
 
 function registerIpc(): void {
-  ipcMain.handle('desktop:get-setup-state', () => setupState());
+  ipcMain.handle('desktop:get-setup-state', async () => {
+    await refreshProbe();
+    return setupState();
+  });
 
   ipcMain.handle('desktop:save-diagnostics', async () => {
     const path = writeDiagnosticsFile(join(app.getPath('userData'), 'diagnostics'), {
@@ -226,62 +557,71 @@ function registerIpc(): void {
         `ollamaPath=${ollamaPath ?? 'missing'}`,
         `uvPath=${uvPath ?? 'missing'}`,
         `packaged=${app.isPackaged}`,
+        `gatePassed=${currentGatePassed()}`,
       ],
     });
     return { path };
   });
 
   ipcMain.handle('desktop:mark-setup-complete', async () => {
-    mkdirSync(app.getPath('userData'), { recursive: true });
-    writeFileSync(setupCompletePath(), '1', 'utf8');
+    await refreshProbe();
+    if (lastProbe === null || !liveProbeOk(lastProbe)) {
+      throw new Error('Setup is not complete until Ollama and search are ready');
+    }
+    writeSetupCompleteFlag();
     return setupState();
   });
 
-  ipcMain.handle('desktop:open-external', async (_event, url: string) => {
-    if (url.startsWith('https://')) {
-      await shell.openExternal(url);
+  ipcMain.handle('desktop:open-external-https', async (_event, url: string) => {
+    if (typeof url !== 'string' || !url.startsWith('https://')) {
+      throw new Error('Only https URLs can be opened');
     }
+    await shell.openExternal(url);
   });
 
-  ipcMain.handle('desktop:pull-models', async (event) => {
-    if (uvPath === null) {
-      throw new Error('uv is not available');
-    }
-    const engineDir = resolveEngineDir(repoRoot());
-    const profile = recommendation?.profileId ?? 'starter-32gb';
-    const child = spawnLogged({
-      label: 'pull-models',
-      command: uvPath,
-      args: ['run', 'python', '-m', 'rag_engine.pull_models', '--profile', profile],
-      cwd: engineDir,
-      env: {
-        ...process.env,
-        BGA_MODEL_PROFILE: profile,
-        BGA_STORAGE_DIR: dataDir,
-      },
-      logPath: join(app.getPath('userData'), 'logs', 'pull-models.log'),
-    });
+  ipcMain.handle('desktop:ensure-runtime', async () => {
+    await runEnsureRuntime();
+    await refreshProbe();
+    return { ok: true as const };
+  });
 
-    child.child.stdout?.on('data', (chunk: Buffer) => {
-      event.sender.send('desktop:pull-models-progress', chunk.toString());
-    });
-
-    await new Promise<void>((resolve, reject) => {
-      child.child.on('exit', (code) => {
-        if (code === 0) {
-          resolve();
-        } else {
-          reject(new Error(`Model pull exited with code ${code}`));
-        }
-      });
-      child.child.on('error', reject);
-    });
-
-    return { ok: true };
+  ipcMain.handle('desktop:pull-models', async () => {
+    await pullProfileModels();
+    return { ok: true as const };
   });
 }
 
-function createWindow(): void {
+function installNavigationLock(window: BrowserWindow): void {
+  if (windowsWithNavigationLock.has(window)) {
+    return;
+  }
+  windowsWithNavigationLock.add(window);
+  const setupPrefix = `http://127.0.0.1:${webPort}/${uiLocale}/setup`;
+  window.webContents.on('will-navigate', (event, url) => {
+    if (currentGatePassed()) {
+      return;
+    }
+    if (!url.startsWith(setupPrefix)) {
+      event.preventDefault();
+      void window.loadURL(setupPrefix);
+    }
+  });
+  window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+}
+
+function i18nLocalesDir(): string {
+  if (app.isPackaged) {
+    return join(process.resourcesPath, 'i18n');
+  }
+  return join(repoRoot(), 'apps/web/src/i18n/locales');
+}
+
+function createWindow(): Promise<void> {
+  if (mainWindow !== null) {
+    mainWindow.show();
+    return Promise.resolve();
+  }
+
   mainWindow = new BrowserWindow({
     width: 1100,
     height: 800,
@@ -294,16 +634,36 @@ function createWindow(): void {
     },
   });
 
-  const path = existsSync(setupCompletePath()) ? '/pl' : '/pl/setup';
-  void mainWindow.loadURL(`http://127.0.0.1:${webPort}${path}`);
-
-  mainWindow.once('ready-to-show', () => {
-    mainWindow?.show();
+  const copy = readStartupCopy(i18nLocalesDir(), uiLocale);
+  const html = buildSplashHtml({
+    copy,
+    dark: nativeTheme.shouldUseDarkColors,
+    locale: uiLocale,
   });
-
+  const shown = new Promise<void>((resolve) => {
+    mainWindow?.once('ready-to-show', () => {
+      mainWindow?.show();
+      resolve();
+    });
+  });
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
+  void mainWindow.loadURL(splashDataUrl(html));
+  return shown;
+}
+
+async function loadAppPage(): Promise<void> {
+  if (mainWindow === null) {
+    await createWindow();
+  }
+  const window = mainWindow;
+  if (window === null) {
+    throw new Error('Main window failed to open');
+  }
+  const path = initialAppPath({ locale: uiLocale, gatePassed: currentGatePassed() });
+  installNavigationLock(window);
+  await window.loadURL(`http://127.0.0.1:${webPort}${path}`);
 }
 
 function installMicPermissionHandler(): void {
@@ -315,8 +675,13 @@ function installMicPermissionHandler(): void {
 function shutdown(): void {
   stopManaged(nextProcess);
   stopManaged(engineProcess);
+  if (ollamaServeOwned) {
+    stopManaged(ollamaServeProcess);
+  }
   nextProcess = null;
   engineProcess = null;
+  ollamaServeProcess = null;
+  ollamaServeOwned = false;
 }
 
 const gotLock = app.requestSingleInstanceLock();
@@ -335,6 +700,8 @@ if (!gotLock) {
   app.whenReady().then(async () => {
     registerIpc();
     installMicPermissionHandler();
+    uiLocale = desktopLocale(app.getLocale());
+    const splashShown = createWindow();
 
     try {
       if (isDev && process.env.BGA_WEB_URL) {
@@ -346,10 +713,31 @@ if (!gotLock) {
         const url = new URL(process.env.BGA_WEB_URL);
         webPort = Number(url.port || 3000);
         enginePort = Number(process.env.BGA_ENGINE_PORT ?? 8000);
+        await refreshProbe();
+        backendsReady = true;
       } else {
-        await startBackend();
+        // First consent is the Install button. After that (flag set, or Ollama
+        // already on the machine from a prior install) start runtime alone and
+        // open the assistant — never make the player re-tap Install.
+        await resolveTools();
+        const returningPlayer = setupCompleteFlagExists() || ollamaPath !== null;
+        await startBackend({ skipRetrievalWarm: !returningPlayer });
+        if (returningPlayer) {
+          try {
+            await runEnsureRuntime();
+          } catch {
+            // Keep the flag so reopen still retries automatically. Only clear
+            // when Ollama itself was removed from the machine.
+            await resolveTools();
+            if (ollamaPath === null) {
+              clearSetupCompleteFlag();
+            }
+          }
+        }
+        backendsReady = true;
       }
-      createWindow();
+      await splashShown;
+      await loadAppPage();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       dialog.showErrorBox('BGA failed to start', message);
@@ -370,7 +758,12 @@ if (!gotLock) {
 
   app.on('activate', () => {
     if (mainWindow === null && app.isReady()) {
-      createWindow();
+      void createWindow().then(() => {
+        if (backendsReady) {
+          return loadAppPage();
+        }
+        return undefined;
+      });
     }
   });
 }

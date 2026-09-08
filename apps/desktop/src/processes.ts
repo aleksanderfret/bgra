@@ -1,5 +1,5 @@
 import { type ChildProcess, spawn } from 'node:child_process';
-import { createWriteStream, type WriteStream } from 'node:fs';
+import { createWriteStream, existsSync, type WriteStream } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 export interface ManagedProcess {
@@ -62,6 +62,27 @@ export async function waitForHttp(
   throw new Error(`Timed out waiting for ${url} after ${options.timeoutMs}ms`);
 }
 
+/** Like waitForHttp, but fails immediately if a child process exits first. */
+export async function waitForHttpWhileAlive(
+  url: string,
+  managed: ManagedProcess,
+  options: { timeoutMs: number; intervalMs?: number } = { timeoutMs: 60_000 },
+): Promise<void> {
+  const exitPromise = new Promise<never>((_resolve, reject) => {
+    const onExit = (code: number | null, signal: NodeJS.Signals | null) => {
+      reject(
+        new Error(`${managed.label} exited before becoming ready (code=${code} signal=${signal})`),
+      );
+    };
+    if (managed.child.exitCode !== null) {
+      onExit(managed.child.exitCode, managed.child.signalCode);
+      return;
+    }
+    managed.child.once('exit', onExit);
+  });
+  await Promise.race([waitForHttp(url, options), exitPromise]);
+}
+
 export function stopManaged(process: ManagedProcess | null): void {
   if (process === null || process.child.killed) {
     return;
@@ -69,8 +90,42 @@ export function stopManaged(process: ManagedProcess | null): void {
   process.child.kill('SIGTERM');
 }
 
+export async function waitForExit(child: ChildProcess): Promise<number> {
+  return new Promise((resolve, reject) => {
+    child.on('exit', (code) => {
+      resolve(code ?? 1);
+    });
+    child.on('error', reject);
+  });
+}
+
 export function engineArgs(port: number): string[] {
   return ['run', 'uvicorn', 'rag_engine.main:app', '--host', '127.0.0.1', '--port', String(port)];
+}
+
+export function enginePythonArgs(port: number): string[] {
+  return ['-m', 'uvicorn', 'rag_engine.main:app', '--host', '127.0.0.1', '--port', String(port)];
+}
+
+/** Packaged Next must not spawn Contents/MacOS/BGA — that registers a second bouncing Dock app. */
+export function resolveElectronNodeCommand(options: {
+  execPath: string;
+  platform: NodeJS.Platform;
+  packaged: boolean;
+}): string {
+  if (options.platform !== 'darwin' || !options.packaged) {
+    return options.execPath;
+  }
+  const helper = join(
+    dirname(options.execPath),
+    '..',
+    'Frameworks',
+    'BGA Helper.app',
+    'Contents',
+    'MacOS',
+    'BGA Helper',
+  );
+  return existsSync(helper) ? helper : options.execPath;
 }
 
 export function nextServerArgs(options: {
