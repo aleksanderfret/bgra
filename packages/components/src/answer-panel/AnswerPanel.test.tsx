@@ -94,7 +94,7 @@ describe('AnswerPanel', () => {
     expect(screen.queryByText('to nie powinno się pokazać')).not.toBeInTheDocument();
   });
 
-  it('keeps the technical detail visible next to the translated error', () => {
+  it('hides the English log detail from the player', () => {
     render(
       <AnswerPanel
         state={stateWith({
@@ -103,7 +103,22 @@ describe('AnswerPanel', () => {
       />,
     );
 
-    expect(screen.getByText('Engine responded with HTTP 503.')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent(pl.answer.error.http_error);
+    expect(screen.queryByText('Engine responded with HTTP 503.')).not.toBeInTheDocument();
+  });
+
+  it('prefers a speech miss over the yellow “no basis in the documents” alert', () => {
+    render(
+      <AnswerPanel
+        state={stateWith({
+          groundedness: 'insufficient_evidence',
+          notice: { code: 'speech_empty', params: {} },
+        })}
+      />,
+    );
+
+    expect(screen.getByText(pl.notice.speech_empty)).toBeInTheDocument();
+    expect(screen.queryByText(pl.answer.insufficientEvidence.title)).not.toBeInTheDocument();
   });
 
   it('falls back to a generic sentence for a code it has no wording for', () => {

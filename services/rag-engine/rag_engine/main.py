@@ -17,7 +17,7 @@ from .ingest.pipeline import (
 )
 from .mac_dock import hide_cli_from_macos_dock
 from .retrieval.service import try_load
-from .routers import ask, games, health, ingest, lesson
+from .routers import ask, games, health, ingest, lesson, speech
 from .settings import Settings, ensure_storage_writable, get_settings
 
 logger = logging.getLogger(__name__)
@@ -172,6 +172,7 @@ def create_app() -> FastAPI:
     app.include_router(ingest.router)
     app.include_router(ask.router)
     app.include_router(lesson.router)
+    app.include_router(speech.router)
 
     app.mount(
         "/static/assets",

@@ -80,6 +80,8 @@ module = [
     "mlx_whisper.*",
     "faster_whisper",
     "faster_whisper.*",
+    "piper",
+    "piper.*",
     "lancedb",
     "lancedb.*",
     "sentence_transformers",

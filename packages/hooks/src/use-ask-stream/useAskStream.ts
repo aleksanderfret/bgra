@@ -13,9 +13,20 @@ import {
 } from '@bga/utils/answer-state';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+export interface AskAudioFrame {
+  sequence: number;
+  mimeType: string;
+  dataBase64: string;
+}
+
+export interface AskOptions {
+  audio?: Blob;
+  onAudio?: (frame: AskAudioFrame) => void;
+}
+
 export interface UseAskStream {
   state: AnswerState;
-  ask: (request: AskRequest) => Promise<void>;
+  ask: (request: AskRequest, options?: AskOptions) => Promise<void>;
   cancel: () => void;
 }
 
@@ -29,8 +40,6 @@ export const useAskStream = (): UseAskStream => {
   const abortRef = useRef<AbortController | null>(null);
   const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // A pending flush belongs to the answer that scheduled it. Left running, it
-  // would repaint a cancelled or superseded answer 50 ms later.
   const stopFlushing = useCallback((): void => {
     if (flushTimerRef.current !== null) {
       clearTimeout(flushTimerRef.current);
@@ -41,14 +50,12 @@ export const useAskStream = (): UseAskStream => {
   useEffect(() => stopFlushing, [stopFlushing]);
 
   const ask = useCallback(
-    async (request: AskRequest): Promise<void> => {
+    async (request: AskRequest, options?: AskOptions): Promise<void> => {
       abortRef.current?.abort();
       stopFlushing();
       const controller = new AbortController();
       abortRef.current = controller;
 
-      // Local copy so tokens in one network chunk apply in order; `setState`
-      // updater batching would not.
       let current = startAnswer();
       setState(current);
 
@@ -58,10 +65,15 @@ export const useAskStream = (): UseAskStream => {
       };
 
       const apply = (event: AssistantEvent): void => {
+        if (event.type === 'audio') {
+          options?.onAudio?.({
+            sequence: event.sequence,
+            mimeType: event.mimeType,
+            dataBase64: event.dataBase64,
+          });
+          return;
+        }
         current = reduceAssistantEvent(current, event);
-        // Every frame that is not a token changes what is on screen — sources
-        // before the first word, an error instead of the answer — and showing
-        // it late would be wrong, not just slow.
         if (event.type === 'token') {
           flushTimerRef.current ??= setTimeout(flush, TOKEN_FLUSH_MS);
           return;
@@ -70,12 +82,33 @@ export const useAskStream = (): UseAskStream => {
       };
 
       try {
-        const response = await fetch('/api/engine/ask', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify(request),
-          signal: controller.signal,
-        });
+        let response: Response;
+        if (options?.audio !== undefined) {
+          const form = new FormData();
+          form.set('gameId', request.gameId);
+          form.set('mode', request.mode);
+          form.set('speak', request.speak === true ? 'true' : 'false');
+          form.set('locale', request.locale ?? 'en');
+          if (request.expansionIds !== undefined && request.expansionIds.length > 0) {
+            form.set('expansionIds', JSON.stringify(request.expansionIds));
+          }
+          if (request.question.length > 0) {
+            form.set('question', request.question);
+          }
+          form.set('audio', options.audio, 'utterance.wav');
+          response = await fetch('/api/engine/ask', {
+            method: 'POST',
+            body: form,
+            signal: controller.signal,
+          });
+        } else {
+          response = await fetch('/api/engine/ask', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(request),
+            signal: controller.signal,
+          });
+        }
 
         if (!response.ok || response.body === null) {
           apply({
@@ -97,8 +130,6 @@ export const useAskStream = (): UseAskStream => {
           chunk = await reader.read();
         }
 
-        // No `done` frame means the engine died mid-answer; otherwise the
-        // spinner never stops.
         if (current.isStreaming) {
           apply({
             type: 'error',

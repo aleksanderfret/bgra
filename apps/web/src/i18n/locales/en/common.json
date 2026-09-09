@@ -108,6 +108,10 @@
     "offline": {
       "title": "The assistant did not start",
       "body": "Close the app and open it again."
+    },
+    "speechMissing": {
+      "title": "Spoken answers are not ready yet",
+      "body": "The microphone and spoken voice need one more download on this computer. Open Setup and finish installing, then try hold-to-talk again."
     }
   },
   "startup": {
@@ -141,7 +145,8 @@
   "language": {
     "label": "Interface language",
     "pl": "Polski",
-    "en": "English"
+    "en": "English",
+    "ensuringVoice": "Preparing the spoken voice for this language…"
   },
   "colorScheme": {
     "label": "Color scheme",
@@ -177,6 +182,14 @@
       "regionLabel": "Conversation about this game",
       "playerLabel": "Your question",
       "saveFailed": "Couldn’t save this conversation on this computer. The latest answers may disappear if you close the app."
+    },
+    "voice": {
+      "readAloud": "Read aloud",
+      "holdToTalk": "Hold to talk",
+      "holding": "Listening…",
+      "micDenied": "Microphone access was denied. Allow it in system settings, then try again.",
+      "micUnavailable": "Couldn’t reach the microphone. Check that it is connected and try again.",
+      "unsupported": "This browser can’t use the microphone here."
     }
   },
   "stage": {
@@ -212,7 +225,9 @@
       "malformed_frame": "The engine sent a frame that is not valid JSON.",
       "unknown_event": "The engine sent a frame that does not match the event contract.",
       "generation_timeout": "The model stopped producing words. Ask again, or check that Ollama is still running.",
-      "model_missing": "A required local model is not installed. Download the models for this profile, then ask again."
+      "model_missing": "A required local model is not installed. Download the models for this profile, then ask again.",
+      "speech_unavailable": "Speech tools are not installed on this computer yet. Finish setup, then try the microphone again.",
+      "speech_failed": "I couldn’t understand that recording. Hold the mic and try once more."
     }
   },
   "documentKind": {
@@ -234,7 +249,9 @@
     "lesson_expired": "This lesson has ended or timed out. Start a new one when you are ready.",
     "lesson_game_mismatch": "This lesson belongs to a different game. Start a new lesson for the game you selected.",
     "lesson_busy": "I am still finishing the previous step. Wait a moment, then continue.",
-    "lesson_complete": "That was the last part of this lesson. You can start again anytime, or ask a question."
+    "lesson_complete": "That was the last part of this lesson. You can start again anytime, or ask a question.",
+    "speech_empty": "I didn’t catch any words. Hold the mic and ask again a little louder.",
+    "speech_invalid_audio": "That recording couldn’t be used. Hold the mic and try again."
   },
   "setup": {
     "title": "First-run setup",

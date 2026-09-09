@@ -241,3 +241,21 @@ def test_lesson_active_response_fields_match() -> None:
     python_fields = {to_camel(name) for name in LessonActiveResponse.model_fields}
 
     assert ts_fields == python_fields
+
+
+def test_ensure_voice_request_fields_match() -> None:
+    from rag_engine.contract import EnsureVoiceRequest
+
+    ts_fields = _interface_fields(_source(), "EnsureVoiceRequest")
+    python_fields = {to_camel(name) for name in EnsureVoiceRequest.model_fields}
+
+    assert ts_fields == python_fields
+
+
+def test_ensure_voice_response_fields_match() -> None:
+    from rag_engine.contract import EnsureVoiceResponse
+
+    ts_fields = _interface_fields(_source(), "EnsureVoiceResponse")
+    python_fields = {to_camel(name) for name in EnsureVoiceResponse.model_fields}
+
+    assert ts_fields == python_fields

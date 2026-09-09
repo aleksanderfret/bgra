@@ -75,6 +75,20 @@ describe('createAssistantEventDecoder', () => {
     expect(decoder.push(frame({ type: 'reboot_the_table', text: 'hi' }))[0]?.type).toBe('error');
     // Known discriminator, missing required payload.
     expect(decoder.push(frame({ type: 'token' }))[0]?.type).toBe('error');
+    expect(
+      decoder.push(frame({ type: 'audio', sequence: 1, mimeType: 'audio/wav' }))[0]?.type,
+    ).toBe('error');
+  });
+
+  it('accepts a well-formed audio frame', () => {
+    const decoder = createAssistantEventDecoder();
+    const audio = {
+      type: 'audio',
+      sequence: 1,
+      mimeType: 'audio/wav',
+      dataBase64: 'AAAA',
+    };
+    expect(decoder.push(frame(audio))).toEqual([audio]);
   });
 
   it('swallows the plain-text [DONE] sentinel', () => {

@@ -341,7 +341,8 @@ What you can already do, and what is still on the way. The numbered engineering 
 
 **Next at the table**
 
-- [ ] Ask out loud and hear the answer; the text stays on screen either way.
+- [ ] Ask out loud and hear the answer on this computer (Mac and Windows); optional read-aloud; text stays on screen either way.
+- [ ] Same voice on a tablet at home (HTTPS + door on the network).
 
 **Later**
 

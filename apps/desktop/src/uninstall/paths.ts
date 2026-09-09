@@ -66,6 +66,10 @@ export function pathsForSelection(options: {
     for (const repo of ownedHuggingFaceRepos()) {
       applicationPaths.push(join(hubRoot, huggingfaceRepoToHubDirName(repo)));
     }
+    // faster-whisper pulls this snapshot on Windows/Linux; not listed in profiles.
+    applicationPaths.push(
+      join(hubRoot, huggingfaceRepoToHubDirName('Systran/faster-whisper-large-v3-turbo')),
+    );
   }
 
   return {

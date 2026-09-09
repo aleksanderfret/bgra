@@ -12,6 +12,8 @@ export const ERROR_CODES = [
   'unknown_event',
   'generation_timeout',
   'model_missing',
+  'speech_unavailable',
+  'speech_failed',
 ] as const;
 
 export const NOTICE_CODES = [
@@ -21,4 +23,6 @@ export const NOTICE_CODES = [
   'retrieval_loading',
   'checking_sources_carefully',
   'preparing_assistant',
+  'speech_empty',
+  'speech_invalid_audio',
 ] as const;

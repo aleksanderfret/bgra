@@ -13,6 +13,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import JSONResponse, StreamingResponse
+from pydantic import ValidationError
 
 from rag_engine.contract import (
     DoneEvent,
@@ -30,7 +31,7 @@ from rag_engine.contract import (
     RetrievedSource,
     SourcesEvent,
     StatusEvent,
-    TokenEvent,
+    TranscriptEvent,
 )
 from rag_engine.engines.embed import OllamaEmbedder
 from rag_engine.engines.generation_lock import generation_semaphore
@@ -66,6 +67,11 @@ from rag_engine.retrieval.sources import to_retrieved_source
 from rag_engine.retrieval.think import should_think
 from rag_engine.retrieval.types import RetrievedChunk
 from rag_engine.settings import Settings, get_settings
+from rag_engine.speech import (
+    SpeechExtraMissingError,
+    WavValidationError,
+    transcribe_wav_bytes,
+)
 from rag_engine.sse import SSE_HEADERS, SSE_MEDIA_TYPE, encode_comment, encode_event
 from rag_engine.storage_paths import (
     InvalidGameIdError,
@@ -91,6 +97,12 @@ def _stack_from(http_request: Request) -> RetrievalStack | None:
 
 def _retrieval_loading(http_request: Request) -> bool:
     return bool(getattr(http_request.app.state, "retrieval_loading", False))
+
+
+def _parse_bool(value: str | None, default: bool = False) -> bool:
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _invalid_expansions_response(error: ValueError) -> JSONResponse:
@@ -167,8 +179,13 @@ async def _stream_llm(
     hits: list[RetrievedChunk],
     messages: list[dict[str, str]],
     token_parts: list[str],
+    speak: bool = False,
+    locale: str = "en",
 ) -> AsyncIterator[tuple[str, Groundedness | None]]:
     """Yield (sse_frame, done_groundedness_or_None). Done frame carries groundedness."""
+    from rag_engine.speech import parse_app_locale
+    from rag_engine.speech.stream_speak import speak_alongside_tokens
+
     generation_failed = False
     warm_task: asyncio.Task[None] | None = None
     try:
@@ -199,17 +216,27 @@ async def _stream_llm(
         yield encode_event(StatusEvent(stage="generating")), None
         yield encode_comment("generating"), None
 
-        async for text in generate_stream(
-            settings.ollama_url,
-            settings.profile.llm,
-            messages,
-            context_tokens=settings.profile.context_tokens,
-            think=think,
+        async def token_stream() -> AsyncIterator[str]:
+            async for text in generate_stream(
+                settings.ollama_url,
+                settings.profile.llm,
+                messages,
+                context_tokens=settings.profile.context_tokens,
+                think=think,
+            ):
+                token_parts.append(text)
+                yield text
+
+        async for frame in speak_alongside_tokens(
+            token_stream(),
+            speak=speak,
+            storage_dir=settings.storage_dir,
+            locale=parse_app_locale(locale),
+            is_disconnected=http_request.is_disconnected,
         ):
             if await http_request.is_disconnected():
                 return
-            token_parts.append(text)
-            yield encode_event(TokenEvent(text=text)), None
+            yield frame, None
     except GenerationTimeoutError:
         generation_failed = True
         logger.warning("Lesson generation timed out for model %s", settings.profile.llm)
@@ -304,6 +331,8 @@ async def _stream_unit(
     session: LessonSession,
     unit_index: int,
     kind: Literal["unit"],
+    speak: bool = False,
+    locale: str = "en",
 ) -> AsyncIterator[str]:
     storage_dir = settings.storage_dir
     unit = session.syllabus[unit_index]
@@ -422,6 +451,8 @@ async def _stream_unit(
             hits=hits,
             messages=messages,
             token_parts=token_parts,
+            speak=speak,
+            locale=locale,
         ):
             yield frame
             if done_g is not None:
@@ -456,6 +487,8 @@ async def _stream_digression(
     settings: Settings,
     session: LessonSession,
     question: str,
+    speak: bool = False,
+    locale: str = "en",
 ) -> AsyncIterator[str]:
     storage_dir = settings.storage_dir
     game_ids = active_game_ids(session.game_id, session.expansion_ids)
@@ -568,6 +601,8 @@ async def _stream_digression(
             hits=hits,
             messages=messages,
             token_parts=token_parts,
+            speak=speak,
+            locale=locale,
         ):
             yield frame
             if done_g is not None:
@@ -676,6 +711,8 @@ async def _stream_start(
             session=session,
             unit_index=0,
             kind="unit",
+            speak=payload.speak,
+            locale=payload.locale,
         ):
             yield frame
     finally:
@@ -718,6 +755,8 @@ async def _stream_continue(
             session=session,
             unit_index=next_index,
             kind="unit",
+            speak=payload.speak,
+            locale=payload.locale,
         ):
             yield frame
     finally:
@@ -755,6 +794,8 @@ async def _stream_repeat(
             session=session,
             unit_index=session.unit_index,
             kind="unit",
+            speak=payload.speak,
+            locale=payload.locale,
         ):
             yield frame
     finally:
@@ -765,6 +806,8 @@ async def _stream_ask(
     payload: LessonAskRequest,
     settings: Settings,
     http_request: Request,
+    *,
+    audio_wav: bytes | None = None,
 ) -> AsyncIterator[str]:
     session, notice = _load_usable_session(settings.storage_dir, payload.session_id)
     if notice == "lesson_busy" and session is not None:
@@ -778,13 +821,60 @@ async def _stream_ask(
         yield encode_event(DoneEvent(answer_id=uuid4().hex, groundedness="insufficient_evidence"))
         return
 
+    question = payload.question
+    if audio_wav is not None:
+        yield encode_event(StatusEvent(stage="transcribing"))
+        try:
+            question = await asyncio.to_thread(
+                transcribe_wav_bytes,
+                audio_wav,
+                profile_stt=settings.profile.stt,
+            )
+        except WavValidationError:
+            yield encode_event(NoticeEvent(code="speech_invalid_audio", params={}))
+            yield encode_event(SourcesEvent(sources=[]))
+            yield encode_event(
+                DoneEvent(answer_id=uuid4().hex, groundedness="insufficient_evidence")
+            )
+            return
+        except SpeechExtraMissingError:
+            yield encode_event(
+                ErrorEvent(code="speech_unavailable", message="Speech extra is not installed.")
+            )
+            yield encode_event(SourcesEvent(sources=[]))
+            yield encode_event(
+                DoneEvent(answer_id=uuid4().hex, groundedness="insufficient_evidence")
+            )
+            return
+        except Exception:
+            logger.exception("Lesson digression STT failed")
+            yield encode_event(
+                ErrorEvent(code="speech_failed", message="Speech recognition failed.")
+            )
+            yield encode_event(SourcesEvent(sources=[]))
+            yield encode_event(
+                DoneEvent(answer_id=uuid4().hex, groundedness="insufficient_evidence")
+            )
+            return
+
+        yield encode_event(TranscriptEvent(text=question))
+        if not question.strip():
+            yield encode_event(NoticeEvent(code="speech_empty", params={}))
+            yield encode_event(SourcesEvent(sources=[]))
+            yield encode_event(
+                DoneEvent(answer_id=uuid4().hex, groundedness="insufficient_evidence")
+            )
+            return
+
     _generating_sessions.add(session.session_id)
     try:
         async for frame in _stream_digression(
             http_request=http_request,
             settings=settings,
             session=session,
-            question=payload.question,
+            question=question,
+            speak=payload.speak,
+            locale=payload.locale,
         ):
             yield frame
     finally:
@@ -836,12 +926,63 @@ async def lesson_repeat(
 
 @router.post("/lesson/ask", response_model=None)
 async def lesson_ask(
-    payload: LessonAskRequest,
     http_request: Request,
     settings: Annotated[Settings, Depends(get_settings)],
-) -> StreamingResponse:
+) -> StreamingResponse | JSONResponse:
+    content_type = (http_request.headers.get("content-type") or "").lower()
+    audio_wav: bytes | None = None
+
+    if "multipart/form-data" in content_type:
+        from rag_engine.speech.wav import MAX_WAV_BYTES
+
+        try:
+            form = await http_request.form(max_part_size=MAX_WAV_BYTES)
+        except Exception:
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "type": "error",
+                    "code": "speech_invalid_audio",
+                    "message": "Audio upload exceeds the allowed size.",
+                },
+            )
+        session_id = str(form.get("sessionId") or "")
+        speak = _parse_bool(str(form.get("speak")) if form.get("speak") is not None else None)
+        locale = str(form.get("locale") or "en")
+        question_field = form.get("question")
+        question = str(question_field) if isinstance(question_field, str) else ""
+        upload = form.get("audio")
+        if hasattr(upload, "read"):
+            audio_wav = await upload.read()  # type: ignore[union-attr]
+            if not audio_wav:
+                audio_wav = None
+        if audio_wav is None and not question.strip():
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "type": "error",
+                    "code": "missing_question",
+                    "message": "Provide question text or an audio WAV upload.",
+                },
+            )
+        try:
+            payload = LessonAskRequest(
+                session_id=session_id,
+                question=question.strip() or ".",
+                speak=speak,
+                locale=locale,
+            )
+        except ValidationError as error:
+            return JSONResponse(status_code=422, content={"detail": error.errors()})
+    else:
+        body = await http_request.json()
+        try:
+            payload = LessonAskRequest.model_validate(body)
+        except ValidationError as error:
+            return JSONResponse(status_code=422, content={"detail": error.errors()})
+
     return StreamingResponse(
-        _stream_ask(payload, settings, http_request),
+        _stream_ask(payload, settings, http_request, audio_wav=audio_wav),
         media_type=SSE_MEDIA_TYPE,
         headers=SSE_HEADERS,
     )

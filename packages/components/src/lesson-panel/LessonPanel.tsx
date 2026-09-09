@@ -2,11 +2,14 @@
 
 import type { GameSummary, LessonSession, LessonTurn, RetrievedSource } from '@bga/api-contract';
 import { AnswerPanel } from '@bga/components/answer-panel';
+import { useAudioQueue } from '@bga/hooks/use-audio-queue';
 import { useEngineReadiness } from '@bga/hooks/use-engine-readiness';
+import { useHoldToTalk } from '@bga/hooks/use-hold-to-talk';
 import { useLessonStream } from '@bga/hooks/use-lesson-stream';
 import { isBlockingNotice, streamingStatusKey } from '@bga/utils/answer-state';
 import { GAMES_CHANGED_EVENT } from '@bga/utils/desktop-bridge';
 import { isGameSummaryList } from '@bga/utils/game-summary';
+import { loadReadAloudPreference, saveReadAloudPreference } from '@bga/utils/voice-prefs';
 import {
   Badge,
   Box,
@@ -17,6 +20,7 @@ import {
   ScrollArea,
   Select,
   Stack,
+  Switch,
   Text,
   Textarea,
   Title,
@@ -128,7 +132,8 @@ const unitTitleFor = (session: LessonSession, turn: LessonTurn): string | null =
 };
 
 export const LessonPanel: FC = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const locale = i18n.language === 'pl' ? 'pl' : 'en';
   const [games, setGames] = useState<GameSummary[] | null>(null);
   const [gameId, setGameId] = useState<string | null>(null);
   const enginePhase = useEngineReadiness();
@@ -136,6 +141,7 @@ export const LessonPanel: FC = () => {
   const [expansionsCleared, setExpansionsCleared] = useState(false);
   const [digressionOpen, setDigressionOpen] = useState(false);
   const [digressionQuestion, setDigressionQuestion] = useState('');
+  const [readAloud, setReadAloud] = useState(loadReadAloudPreference);
   const expansionsStatusId = useId();
   const {
     state,
@@ -148,12 +154,34 @@ export const LessonPanel: FC = () => {
     cancel,
     syncActive,
   } = useLessonStream();
+  const { isPlaying, enqueue, stop: stopAudio } = useAudioQueue();
   const logEndRef = useRef<HTMLDivElement>(null);
   const autoContinueRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wasStreamingRef = useRef(false);
   const lastUnitActionRef = useRef(false);
   const pendingAutoContinueRef = useRef(false);
   const continueInFlightRef = useRef(false);
+  const readAloudRef = useRef(readAloud);
+  readAloudRef.current = readAloud;
+  const enqueueIfReadAloud = (frame: {
+    sequence: number;
+    mimeType: string;
+    dataBase64: string;
+  }): void => {
+    if (readAloudRef.current) {
+      enqueue(frame);
+    }
+  };
+  const voiceOptionsRef = useRef({
+    speak: readAloud,
+    locale: locale as 'en' | 'pl',
+    onAudio: enqueueIfReadAloud,
+  });
+  voiceOptionsRef.current = {
+    speak: readAloudRef.current,
+    locale: locale as 'en' | 'pl',
+    onAudio: enqueueIfReadAloud,
+  };
 
   const clearAutoContinue = (): void => {
     if (autoContinueRef.current !== null) {
@@ -256,6 +284,14 @@ export const LessonPanel: FC = () => {
       }
     }
 
+    if (isPlaying) {
+      if (autoContinueRef.current !== null) {
+        clearTimeout(autoContinueRef.current);
+        autoContinueRef.current = null;
+      }
+      return;
+    }
+
     if (!pendingAutoContinueRef.current || digressionOpen) {
       return;
     }
@@ -266,12 +302,11 @@ export const LessonPanel: FC = () => {
       return;
     }
 
-    pendingAutoContinueRef.current = false;
     if (autoContinueRef.current !== null) {
-      clearTimeout(autoContinueRef.current);
-      autoContinueRef.current = null;
+      return;
     }
     const advanceSessionId = sessionId;
+    pendingAutoContinueRef.current = false;
     autoContinueRef.current = setTimeout(() => {
       autoContinueRef.current = null;
       if (continueInFlightRef.current) {
@@ -279,7 +314,7 @@ export const LessonPanel: FC = () => {
       }
       continueInFlightRef.current = true;
       lastUnitActionRef.current = true;
-      void continueSession(advanceSessionId);
+      void continueSession(advanceSessionId, voiceOptionsRef.current);
     }, AUTO_CONTINUE_MS);
   }, [
     state.isStreaming,
@@ -287,6 +322,7 @@ export const LessonPanel: FC = () => {
     state.groundedness,
     state.notice,
     digressionOpen,
+    isPlaying,
     session,
     sessionId,
     continueSession,
@@ -347,43 +383,47 @@ export const LessonPanel: FC = () => {
     if (!canStart || gameId === null) {
       return;
     }
+    stopAudio();
     clearAutoContinue();
     setDigressionOpen(false);
     setDigressionQuestion('');
     lastUnitActionRef.current = true;
-    void start(gameId, expansionIds);
+    void start(gameId, expansionIds, voiceOptionsRef.current);
   };
 
   const handleResume = (): void => {
     if (!canResume || sessionId === null) {
       return;
     }
+    stopAudio();
     clearAutoContinue();
     setDigressionOpen(false);
     lastUnitActionRef.current = true;
     continueInFlightRef.current = true;
-    void continueSession(sessionId);
+    void continueSession(sessionId, voiceOptionsRef.current);
   };
 
   const handleContinue = (): void => {
     if (continueInFlightRef.current || sessionId === null || state.isStreaming) {
       return;
     }
+    stopAudio();
     clearAutoContinue();
     setDigressionOpen(false);
     lastUnitActionRef.current = true;
     continueInFlightRef.current = true;
-    void continueSession(sessionId);
+    void continueSession(sessionId, voiceOptionsRef.current);
   };
 
   const handleRepeat = (): void => {
     if (sessionId === null || state.isStreaming) {
       return;
     }
+    stopAudio();
     clearAutoContinue();
     setDigressionOpen(false);
     lastUnitActionRef.current = true;
-    void repeat(sessionId);
+    void repeat(sessionId, voiceOptionsRef.current);
   };
 
   const handleAskQuestionToggle = (): void => {
@@ -391,17 +431,50 @@ export const LessonPanel: FC = () => {
     setDigressionOpen((open) => !open);
   };
 
+  const handleReadAloudChange = (checked: boolean): void => {
+    readAloudRef.current = checked;
+    setReadAloud(checked);
+    saveReadAloudPreference(checked);
+    if (!checked) {
+      stopAudio();
+    }
+  };
+
   const submitDigression = (): void => {
     if (sessionId === null || digressionQuestion.trim().length === 0 || state.isStreaming) {
       return;
     }
+    stopAudio();
     clearAutoContinue();
     lastUnitActionRef.current = false;
     const question = digressionQuestion.trim();
     setDigressionQuestion('');
     setDigressionOpen(false);
-    void ask(sessionId, question);
+    void ask(sessionId, question, voiceOptionsRef.current);
   };
+
+  const submitVoiceDigression = (wav: Blob): void => {
+    if (sessionId === null || state.isStreaming || !hasActiveLesson) {
+      return;
+    }
+    stopAudio();
+    clearAutoContinue();
+    lastUnitActionRef.current = false;
+    setDigressionOpen(false);
+    setDigressionQuestion('');
+    void ask(sessionId, '.', { ...voiceOptionsRef.current, audio: wav });
+  };
+
+  const canVoiceAsk = engineReady && hasActiveLesson && sessionId !== null && !state.isStreaming;
+  const holdToTalk = useHoldToTalk({
+    disabled: !canVoiceAsk,
+    onHoldStart: () => {
+      stopAudio();
+      cancel();
+      clearAutoContinue();
+    },
+    onRecordingComplete: submitVoiceDigression,
+  });
 
   const onDigressionSubmit = (event: SubmitEvent<HTMLFormElement>): void => {
     event.preventDefault();
@@ -420,6 +493,7 @@ export const LessonPanel: FC = () => {
   };
 
   const handleCancel = (): void => {
+    stopAudio();
     clearAutoContinue();
     cancel();
   };
@@ -501,6 +575,14 @@ export const LessonPanel: FC = () => {
         </Text>
       </Group>
 
+      <Switch
+        label={t('rulesChat.voice.readAloud')}
+        checked={readAloud}
+        onChange={(event) => {
+          handleReadAloudChange(event.currentTarget.checked);
+        }}
+      />
+
       {session !== null && progressTotal > 0 && (
         <Text size="sm" c="dimmed" role="status">
           {t('teach.progress', { current: progressCurrent, total: progressTotal })}
@@ -539,6 +621,32 @@ export const LessonPanel: FC = () => {
               onClick={handleAskQuestionToggle}
             >
               {t('teach.askQuestion')}
+            </Button>
+            <Button
+              type="button"
+              variant={holdToTalk.isHolding ? 'filled' : 'light'}
+              disabled={!canVoiceAsk || !holdToTalk.isSupported}
+              onPointerDown={(event) => {
+                event.preventDefault();
+                event.currentTarget.setPointerCapture(event.pointerId);
+                holdToTalk.onPressStart();
+              }}
+              onPointerUp={(event) => {
+                if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+                  event.currentTarget.releasePointerCapture(event.pointerId);
+                }
+                holdToTalk.onPressEnd();
+              }}
+              onPointerCancel={(event) => {
+                if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+                  event.currentTarget.releasePointerCapture(event.pointerId);
+                }
+                holdToTalk.onPressEnd();
+              }}
+            >
+              {holdToTalk.isHolding
+                ? t('rulesChat.voice.holding')
+                : t('rulesChat.voice.holdToTalk')}
             </Button>
           </Group>
           {!digressionOpen && (

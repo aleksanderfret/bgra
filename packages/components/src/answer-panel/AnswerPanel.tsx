@@ -1,6 +1,11 @@
 'use client';
 
-import { type AnswerState, isBlockingNotice, selectVisibleFigures } from '@bga/utils/answer-state';
+import {
+  type AnswerState,
+  isBlockingNotice,
+  selectVisibleFigures,
+  shouldShowInsufficientEvidence,
+} from '@bga/utils/answer-state';
 import { Alert, Badge, Box, Image, Paper, Stack, Text, Title } from '@mantine/core';
 import type { FC } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -34,14 +39,9 @@ export const AnswerPanel: FC<AnswerPanelProps> = ({ state, live }) => {
   if (state.error !== null) {
     return (
       <Alert color="red" title={t('answer.error.title')} role="alert">
-        <Stack gap={4}>
-          <Text size="sm">
-            {t(`answer.error.${state.error.code}`, { defaultValue: t('answer.error.unknown') })}
-          </Text>
-          <Text size="xs" c="dimmed">
-            {state.error.message}
-          </Text>
-        </Stack>
+        <Text size="sm">
+          {t(`answer.error.${state.error.code}`, { defaultValue: t('answer.error.unknown') })}
+        </Text>
       </Alert>
     );
   }
@@ -54,7 +54,7 @@ export const AnswerPanel: FC<AnswerPanelProps> = ({ state, live }) => {
         </Text>
       )}
 
-      {state.groundedness === 'insufficient_evidence' && (
+      {shouldShowInsufficientEvidence(state) && (
         <Alert color="yellow" title={t('answer.insufficientEvidence.title')} role="alert">
           {t('answer.insufficientEvidence.body')}
         </Alert>

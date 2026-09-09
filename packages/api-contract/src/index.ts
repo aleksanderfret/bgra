@@ -15,6 +15,8 @@ export {
   DOC_KEY_PATTERN,
   DOCUMENT_AUTHORITY,
   type DocumentKind,
+  type EnsureVoiceRequest,
+  type EnsureVoiceResponse,
   GAME_ID_PATTERN,
   type GameDocumentSummary,
   type GameSummary,

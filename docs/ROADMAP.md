@@ -583,40 +583,59 @@ chrome; `pnpm verify` passes.
 
 ---
 
-## Stage 5 — Voice
+## Stage 5 — Voice (local)
 
-**Goal:** a conversation without a keyboard. Speech is an extra pair of ears and a
-mouth on the **same written thread** from Stage 3D — never a voice-only mode.
+**Goal:** a conversation without a keyboard on this computer. Speech is an extra pair
+of ears and a mouth on the **same written thread** from Stage 3D — never a voice-only
+mode. This slice is **localhost / Electron only** (`127.0.0.1`). Tablet, LAN bind,
+mkcert HTTPS, and enforcing CSP are **Stage 5B**.
 
 - `uv sync --extra speech`
 - Speech-to-text behind one interface (`rag_engine.speech.SpeechToText`):
   **`mlx-whisper` on macOS (Apple Silicon)** and **`faster-whisper` on Windows/Linux**.
   The desktop decision O1 requires voice on both platforms; do not call mlx directly
   from routers.
-- Push-to-talk in the browser / Electron window (`MediaRecorder`); the `transcript`
-  frame shows what it heard before it answers, and that text lands in the thread as
-  the player's turn
-- The spoken answer is the assistant turn already on screen, read aloud. If the
-  player cannot listen, they still have the written message to scroll back to
-- Piper with a Polish voice, audio streamed **sentence by sentence** — not after the
-  whole answer is generated
-- **A local HTTPS setup is required** (`mkcert`) for a tablet on the home network —
-  `getUserMedia` does not work over HTTP outside `localhost` (decision Z4). Inside
-  Electron on `http://127.0.0.1` the mic works without mkcert, but still needs the
-  Electron permission handler and `NSMicrophoneUsageDescription`.
+- Hold-to-talk in the browser / Electron window (16 kHz mono WAV from the page; Space
+  works except while focus is in a text field). The `transcript` frame shows what it
+  heard before it answers, and that text lands in the thread as the player's turn
+- Optional “Read aloud” (default **off**). When on, Piper speaks completed sentences
+  **while tokens still stream** (`audio` SSE frames). New hold or new typed send stops
+  playback immediately
+- Piper voices: Polish `pl_PL-bass-high`, English `en_US-lessac-medium`. OS/UI locale
+  picks the first voice; switching language downloads the other in-app
+  (`POST /speech/ensure-voice`)
+- Learn mode uses the same speak/locale path; the 8s auto-advance waits until the
+  stream is done **and** the audio queue is idle
+- Recorded audio goes through the same proxy as everything else; `Permissions-Policy`
+  already limits the microphone to this origin. Electron still needs the permission
+  handler and `NSMicrophoneUsageDescription`.
+
+> **Footnote:** if interrupting mid-answer proves unreliable over SSE, a later
+> WebSocket audio channel may replace the `audio` frames — not required for Stage 5
+> acceptance.
+
+**Acceptance:** a spoken question produces a spoken answer on **both macOS and
+Windows**; the first sound arrives before the model finishes generating; the same
+words stay in the thread so they can be read later; read-aloud off stays silent;
+switching language prepares the matching Piper voice in the app.
+
+---
+
+## Stage 5B — Voice on the home network (tablet)
+
+**Goal:** the same voice UX on a tablet at the table, with a locked door on the LAN.
+
+- A local HTTPS setup (`mkcert`) — `getUserMedia` does not work over HTTP outside
+  `localhost` (decision Z4)
 - Opening the LAN interface is **one change with the access check**, not a step before
   it: Next.js stops binding `127.0.0.1` (D9) only in the same commit that fills in
-  `assertMayReachEngine` (D10). The Python engine stays on `127.0.0.1` either way.
+  `assertMayReachEngine` (D10). The Python engine stays on `127.0.0.1` either way
 - With HTTPS in place, the report-only CSP becomes enforcing, and `Strict-Transport-
   Security` is added. Mantine's inline styles and `ColorSchemeScript` need nonces first,
-  which is why the policy is only recording today.
-- Recorded audio goes through the same proxy as everything else; `Permissions-Policy`
-  already limits the microphone to this origin
+  which is why the policy is only recording today
 
-**Acceptance:** a spoken question produces a spoken answer on **both macOS and Windows**;
-the first sound arrives before the model finishes generating; the same words stay in the
-thread so they can be read later; **the microphone works on the tablet**, not only on
-the Mac; and a request from the tablet without credentials is refused by the proxy.
+**Acceptance:** the microphone works on the tablet, not only on the Mac; a request
+from the tablet without credentials is refused by the proxy.
 
 ---
 

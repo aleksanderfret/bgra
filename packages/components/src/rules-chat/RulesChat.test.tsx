@@ -354,7 +354,17 @@ describe('RulesChat', () => {
     expect(second).not.toHaveProperty('history');
     expect(second.question).toBe('When does it end?');
     expect(second.mode).toBe('arbitrate');
+    expect(second.speak).toBe(false);
+    expect(second.locale).toBe('en');
   });
 });
 
-const ASK_BODY_KEYS = new Set(['gameId', 'question', 'mode', 'expansionIds', 'sessionId']);
+const ASK_BODY_KEYS = new Set([
+  'gameId',
+  'question',
+  'mode',
+  'expansionIds',
+  'sessionId',
+  'speak',
+  'locale',
+]);

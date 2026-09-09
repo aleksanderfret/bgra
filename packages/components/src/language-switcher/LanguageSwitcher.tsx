@@ -1,10 +1,10 @@
 'use client';
 
-import { DEFAULT_LOCALE, isLocale, LOCALES } from '@bga/utils/locale';
+import { DEFAULT_LOCALE, isLocale, LOCALES, type Locale } from '@bga/utils/locale';
 import { withLocale } from '@bga/utils/locale-routing';
-import { SegmentedControl, Stack, Text } from '@mantine/core';
+import { Group, Loader, SegmentedControl, Stack, Text } from '@mantine/core';
 import { usePathname, useRouter } from 'next/navigation';
-import { type FC, useId } from 'react';
+import { type FC, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export const LanguageSwitcher: FC = () => {
@@ -12,13 +12,31 @@ export const LanguageSwitcher: FC = () => {
   const labelId = useId();
   const router = useRouter();
   const pathname = usePathname();
+  const [ensuring, setEnsuring] = useState(false);
 
   const active = isLocale(i18n.language) ? i18n.language : DEFAULT_LOCALE;
 
   const handleLocaleChange = (value: string): void => {
-    if (isLocale(value) && value !== active) {
-      router.replace(withLocale(pathname, value));
+    if (!isLocale(value) || value === active) {
+      return;
     }
+    const next: Locale = value;
+    // Switch the UI immediately; prepare the spoken voice in the background.
+    router.replace(withLocale(pathname, next));
+    setEnsuring(true);
+    void (async () => {
+      try {
+        await fetch('/api/engine/speech/ensure-voice', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ locale: next }),
+        });
+      } catch {
+        // Speak may notice if the voice is still missing.
+      } finally {
+        setEnsuring(false);
+      }
+    })();
   };
 
   return (
@@ -36,6 +54,14 @@ export const LanguageSwitcher: FC = () => {
           label: <span lang={locale}>{t(`language.${locale}`)}</span>,
         }))}
       />
+      {ensuring && (
+        <Group gap={6} wrap="nowrap" role="status" aria-live="polite">
+          <Loader size="xs" />
+          <Text size="xs" c="dimmed">
+            {t('language.ensuringVoice')}
+          </Text>
+        </Group>
+      )}
     </Stack>
   );
 };

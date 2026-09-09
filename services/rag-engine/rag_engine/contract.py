@@ -69,6 +69,10 @@ class AskRequest(WireModel):
     mode: AnswerMode = "arbitrate"
     session_id: str | None = None
     expansion_ids: list[str] = Field(default_factory=list)
+    #: When true, Piper speaks completed sentences while tokens stream.
+    speak: bool = False
+    #: UI locale for the Piper voice (`en` or `pl`). Defaults to English.
+    locale: str = "en"
 
 
 class LessonSyllabusUnit(WireModel):
@@ -105,15 +109,31 @@ class LessonSession(WireModel):
 class LessonStartRequest(WireModel):
     game_id: str = Field(pattern=GAME_ID_PATTERN)
     expansion_ids: list[str] = Field(default_factory=list)
+    speak: bool = False
+    locale: str = "en"
 
 
 class LessonSessionRequest(WireModel):
     session_id: str
+    speak: bool = False
+    locale: str = "en"
 
 
 class LessonAskRequest(WireModel):
     session_id: str
     question: str = Field(min_length=1, max_length=2000)
+    speak: bool = False
+    locale: str = "en"
+
+
+class EnsureVoiceRequest(WireModel):
+    locale: str = "en"
+
+
+class EnsureVoiceResponse(WireModel):
+    ready: bool
+    voice: str
+    locale: str
 
 
 class LessonActiveResponse(WireModel):

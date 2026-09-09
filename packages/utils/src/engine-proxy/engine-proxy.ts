@@ -33,6 +33,9 @@ export const routeKind = (segments: string[]): EngineRouteKind => {
       return 'asset';
     case 'ingest':
       return segments[1] === 'pdf' ? 'stream' : 'long';
+    case 'speech':
+      // Piper download can take minutes on first language switch.
+      return 'long';
     default:
       return 'api';
   }

@@ -71,6 +71,10 @@ export interface AskRequest {
    * means base rules only.
    */
   expansionIds?: string[];
+  /** When true, the engine speaks completed sentences while tokens stream. */
+  speak?: boolean;
+  /** UI locale for the spoken voice (`en` or `pl`). */
+  locale?: 'en' | 'pl';
 }
 
 export type PipelineStage =
@@ -127,20 +131,36 @@ export interface LessonSession {
 export interface LessonStartRequest {
   gameId: string;
   expansionIds?: string[];
+  speak?: boolean;
+  locale?: 'en' | 'pl';
 }
 
 /** Continue, repeat, or resolve the active lesson by server-issued id. */
 export interface LessonSessionRequest {
   sessionId: string;
+  speak?: boolean;
+  locale?: 'en' | 'pl';
 }
 
 export interface LessonAskRequest {
   sessionId: string;
   question: string;
+  speak?: boolean;
+  locale?: 'en' | 'pl';
 }
 
 export interface LessonActiveResponse {
   session: LessonSession | null;
+}
+
+export interface EnsureVoiceRequest {
+  locale: 'en' | 'pl';
+}
+
+export interface EnsureVoiceResponse {
+  ready: boolean;
+  voice: string;
+  locale: 'en' | 'pl';
 }
 
 export type AssistantEvent =

@@ -17,14 +17,31 @@ import {
 import { isLessonActiveResponse } from '@bga/utils/lesson-session';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+export interface LessonAudioFrame {
+  sequence: number;
+  mimeType: string;
+  dataBase64: string;
+}
+
+export interface LessonStreamOptions {
+  speak?: boolean;
+  locale?: 'en' | 'pl';
+  audio?: Blob;
+  onAudio?: (frame: LessonAudioFrame) => void;
+}
+
 export interface UseLessonStream {
   state: AnswerState;
   sessionId: string | null;
   session: LessonSession | null;
-  start: (gameId: string, expansionIds?: readonly string[]) => Promise<void>;
-  continue: (sessionId: string) => Promise<void>;
-  repeat: (sessionId: string) => Promise<void>;
-  ask: (sessionId: string, question: string) => Promise<void>;
+  start: (
+    gameId: string,
+    expansionIds?: readonly string[],
+    options?: LessonStreamOptions,
+  ) => Promise<void>;
+  continue: (sessionId: string, options?: LessonStreamOptions) => Promise<void>;
+  repeat: (sessionId: string, options?: LessonStreamOptions) => Promise<void>;
+  ask: (sessionId: string, question: string, options?: LessonStreamOptions) => Promise<void>;
   cancel: () => void;
   syncActive: (gameId: string) => Promise<LessonSession | null>;
 }
@@ -80,6 +97,7 @@ export const useLessonStream = (): UseLessonStream => {
     async (
       path: string,
       body: LessonStartRequest | LessonSessionRequest | LessonAskRequest,
+      options?: LessonStreamOptions,
     ): Promise<void> => {
       abortRef.current?.abort();
       stopFlushing();
@@ -95,6 +113,14 @@ export const useLessonStream = (): UseLessonStream => {
       };
 
       const apply = (event: AssistantEvent): void => {
+        if (event.type === 'audio') {
+          options?.onAudio?.({
+            sequence: event.sequence,
+            mimeType: event.mimeType,
+            dataBase64: event.dataBase64,
+          });
+          return;
+        }
         current = reduceAssistantEvent(current, event);
         if (event.type === 'token') {
           flushTimerRef.current ??= setTimeout(flush, TOKEN_FLUSH_MS);
@@ -104,12 +130,29 @@ export const useLessonStream = (): UseLessonStream => {
       };
 
       try {
-        const response = await fetch(path, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify(body),
-          signal: controller.signal,
-        });
+        let response: Response;
+        if (options?.audio !== undefined && path.endsWith('/lesson/ask')) {
+          const form = new FormData();
+          form.set('sessionId', (body as LessonAskRequest).sessionId);
+          form.set('speak', options.speak === true ? 'true' : 'false');
+          form.set('locale', options.locale ?? 'en');
+          if ((body as LessonAskRequest).question.length > 0) {
+            form.set('question', (body as LessonAskRequest).question);
+          }
+          form.set('audio', options.audio, 'utterance.wav');
+          response = await fetch(path, {
+            method: 'POST',
+            body: form,
+            signal: controller.signal,
+          });
+        } else {
+          response = await fetch(path, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(body),
+            signal: controller.signal,
+          });
+        }
 
         if (!response.ok || response.body === null) {
           apply({
@@ -159,37 +202,58 @@ export const useLessonStream = (): UseLessonStream => {
   );
 
   const start = useCallback(
-    async (gameId: string, expansionIds?: readonly string[]): Promise<void> => {
+    async (
+      gameId: string,
+      expansionIds?: readonly string[],
+      options?: LessonStreamOptions,
+    ): Promise<void> => {
       syncGameIdRef.current = gameId;
-      const body: LessonStartRequest = { gameId };
+      const body: LessonStartRequest = {
+        gameId,
+        speak: options?.speak,
+        locale: options?.locale,
+      };
       if (expansionIds !== undefined && expansionIds.length > 0) {
         body.expansionIds = [...expansionIds];
       }
-      await runStream('/api/engine/lesson/start', body);
+      await runStream('/api/engine/lesson/start', body, options);
     },
     [runStream],
   );
 
   const continueSession = useCallback(
-    async (sessionId: string): Promise<void> => {
-      const body: LessonSessionRequest = { sessionId };
-      await runStream('/api/engine/lesson/continue', body);
+    async (sessionId: string, options?: LessonStreamOptions): Promise<void> => {
+      const body: LessonSessionRequest = {
+        sessionId,
+        speak: options?.speak,
+        locale: options?.locale,
+      };
+      await runStream('/api/engine/lesson/continue', body, options);
     },
     [runStream],
   );
 
   const repeat = useCallback(
-    async (sessionId: string): Promise<void> => {
-      const body: LessonSessionRequest = { sessionId };
-      await runStream('/api/engine/lesson/repeat', body);
+    async (sessionId: string, options?: LessonStreamOptions): Promise<void> => {
+      const body: LessonSessionRequest = {
+        sessionId,
+        speak: options?.speak,
+        locale: options?.locale,
+      };
+      await runStream('/api/engine/lesson/repeat', body, options);
     },
     [runStream],
   );
 
   const ask = useCallback(
-    async (sessionId: string, question: string): Promise<void> => {
-      const body: LessonAskRequest = { sessionId, question };
-      await runStream('/api/engine/lesson/ask', body);
+    async (sessionId: string, question: string, options?: LessonStreamOptions): Promise<void> => {
+      const body: LessonAskRequest = {
+        sessionId,
+        question,
+        speak: options?.speak,
+        locale: options?.locale,
+      };
+      await runStream('/api/engine/lesson/ask', body, options);
     },
     [runStream],
   );

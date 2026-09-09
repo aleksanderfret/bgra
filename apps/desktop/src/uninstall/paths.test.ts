@@ -76,6 +76,13 @@ describe('pathsForSelection', () => {
           'hub',
           'models--mlx-community--whisper-large-v3-turbo',
         ),
+        join(
+          homeDir,
+          '.cache',
+          'huggingface',
+          'hub',
+          'models--Systran--faster-whisper-large-v3-turbo',
+        ),
       ]),
     );
   });

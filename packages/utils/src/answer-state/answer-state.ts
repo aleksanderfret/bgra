@@ -122,6 +122,9 @@ export const selectVisibleFigures = (state: AnswerState): VisibleFigure[] => {
 /** Notices that describe a wait, so the status line says them instead of the stage. */
 const WAIT_NOTICES = ['checking_sources_carefully', 'preparing_assistant'] as const;
 
+/** Mic / WAV failures — not "the rulebook had nothing". */
+const SPEECH_NOTICES = ['speech_empty', 'speech_invalid_audio'] as const;
+
 type WaitNotice = (typeof WAIT_NOTICES)[number];
 
 const waitNoticeOf = (state: AnswerState): WaitNotice | undefined => {
@@ -143,4 +146,19 @@ export const streamingStatusKey = (
 
 export const isBlockingNotice = (code: string): boolean => {
   return !WAIT_NOTICES.some((wait) => wait === code);
+};
+
+export const isSpeechNotice = (code: string): boolean => {
+  return SPEECH_NOTICES.some((speech) => speech === code);
+};
+
+/** Prefer speech wording over the yellow "no basis in the documents" alert. */
+export const shouldShowInsufficientEvidence = (state: AnswerState): boolean => {
+  if (state.groundedness !== 'insufficient_evidence') {
+    return false;
+  }
+  if (state.notice !== null && isSpeechNotice(state.notice.code)) {
+    return false;
+  }
+  return true;
 };

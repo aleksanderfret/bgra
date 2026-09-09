@@ -19,6 +19,7 @@ describe('routeKind', () => {
     expect(routeKind(['games'])).toBe('api');
     expect(routeKind(['ingest', 'pdf'])).toBe('stream');
     expect(routeKind(['ingest', 'reindex'])).toBe('long');
+    expect(routeKind(['speech', 'ensure-voice'])).toBe('long');
     expect(routeKind([])).toBe('api');
   });
 });

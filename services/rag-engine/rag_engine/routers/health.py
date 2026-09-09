@@ -6,6 +6,8 @@ from ..contract import HealthReport, RetrievalReloadResponse
 from ..engines.llm import OllamaUnreachableError, installed_ollama_tags
 from ..pull_models import ollama_fields
 from ..settings import Settings, get_settings
+from ..speech import voice_for_locale, voice_is_ready
+from ..speech.backend import speech_backend_name
 
 router = APIRouter(tags=["system"])
 
@@ -51,6 +53,27 @@ async def read_health(
     retrieval_loading = bool(getattr(request.app.state, "retrieval_loading", False))
     layout_ingest = bool(getattr(request.app.state, "layout_ingest", False))
     storage_ok = settings.storage_dir.is_dir()
+    profile_voice = voice_for_locale("pl" if profile.tts_voice.startswith("pl_") else "en")
+    # Prefer the profile's configured Piper id when it matches a known voice file.
+    tts_ready = voice_is_ready(settings.storage_dir, profile.tts_voice) or voice_is_ready(
+        settings.storage_dir, profile_voice
+    )
+    try:
+        import piper  # noqa: F401
+
+        speech_tts_pkg = True
+    except ImportError:
+        speech_tts_pkg = False
+    try:
+        if speech_backend_name() == "mlx-whisper":
+            import mlx_whisper  # noqa: F401
+        else:
+            import faster_whisper  # noqa: F401
+
+        speech_stt_pkg = True
+    except ImportError:
+        speech_stt_pkg = False
+
     components = {
         "ollama": ollama_up,
         "storage": storage_ok,
@@ -58,6 +81,8 @@ async def read_health(
         "reranker": retrieval_ready,
         "retrieval_loading": retrieval_loading,
         "layout_ingest": layout_ingest,
+        "speech_stt": speech_stt_pkg,
+        "speech_tts": speech_tts_pkg and tts_ready,
     }
     models: dict[str, str] = {
         "profile": settings.model_profile,

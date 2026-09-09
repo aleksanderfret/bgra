@@ -108,6 +108,10 @@
     "offline": {
       "title": "Asystent się nie uruchomił",
       "body": "Zamknij aplikację i otwórz ją ponownie."
+    },
+    "speechMissing": {
+      "title": "Odpowiedzi na głos nie są jeszcze gotowe",
+      "body": "Mikrofon i głos mówiony wymagają jeszcze jednego pobrania na tym komputerze. Otwórz Instalację i dokończ ją, a potem spróbuj przytrzymać mikrofon ponownie."
     }
   },
   "startup": {
@@ -141,7 +145,8 @@
   "language": {
     "label": "Język interfejsu",
     "pl": "Polski",
-    "en": "English"
+    "en": "English",
+    "ensuringVoice": "Przygotowuję głos mówiony dla tego języka…"
   },
   "colorScheme": {
     "label": "Motyw",
@@ -177,6 +182,14 @@
       "regionLabel": "Rozmowa o tej grze",
       "playerLabel": "Twoje pytanie",
       "saveFailed": "Nie udało się zapisać tej rozmowy na tym komputerze. Ostatnie odpowiedzi mogą zniknąć, jeśli zamkniesz aplikację."
+    },
+    "voice": {
+      "readAloud": "Czytaj na głos",
+      "holdToTalk": "Przytrzymaj, aby mówić",
+      "holding": "Słucham…",
+      "micDenied": "Odmówiono dostępu do mikrofonu. Włącz go w ustawieniach systemu i spróbuj ponownie.",
+      "micUnavailable": "Nie udało się użyć mikrofonu. Sprawdź, czy jest podłączony, i spróbuj ponownie.",
+      "unsupported": "Ta przeglądarka nie obsługuje mikrofonu w tym miejscu."
     }
   },
   "stage": {
@@ -212,7 +225,9 @@
       "malformed_frame": "Silnik przysłał ramkę, która nie jest poprawnym JSON-em.",
       "unknown_event": "Silnik przysłał ramkę niezgodną z kontraktem zdarzeń.",
       "generation_timeout": "Model przestał dopisywać słowa. Zadaj pytanie jeszcze raz albo sprawdź, czy Ollama nadal działa.",
-      "model_missing": "Brakuje wymaganego lokalnego modelu. Pobierz modele dla tego profilu i zapytaj ponownie."
+      "model_missing": "Brakuje wymaganego lokalnego modelu. Pobierz modele dla tego profilu i zapytaj ponownie.",
+      "speech_unavailable": "Narzędzia mowy nie są jeszcze zainstalowane na tym komputerze. Dokończ instalację i spróbuj mikrofonu ponownie.",
+      "speech_failed": "Nie udało się rozpoznać nagrania. Przytrzymaj mikrofon i spróbuj jeszcze raz."
     }
   },
   "documentKind": {
@@ -234,7 +249,9 @@
     "lesson_expired": "Ta lekcja się skończyła albo wygasła. Zacznij nową, kiedy będziesz gotowy.",
     "lesson_game_mismatch": "Ta lekcja dotyczy innej gry. Zacznij nową lekcję dla wybranej gry.",
     "lesson_busy": "Nadal kończę poprzedni krok. Poczekaj chwilę i kontynuuj.",
-    "lesson_complete": "To była ostatnia część tej lekcji. Możesz zacząć od nowa w każdej chwili albo zadać pytanie."
+    "lesson_complete": "To była ostatnia część tej lekcji. Możesz zacząć od nowa w każdej chwili albo zadać pytanie.",
+    "speech_empty": "Nie usłyszałem żadnych słów. Przytrzymaj mikrofon i zapytaj jeszcze raz, trochę głośniej.",
+    "speech_invalid_audio": "Tego nagrania nie dało się użyć. Przytrzymaj mikrofon i spróbuj ponownie."
   },
   "setup": {
     "title": "Pierwsze uruchomienie",
