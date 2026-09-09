@@ -380,19 +380,18 @@ half-ready UI; Mac and Windows present the same steps.
 
 ---
 
-## Stage 3H — Uninstall and remove what the app downloaded
+## Stage 3H — Uninstall and remove what the app downloaded ✅ **complete**
 
 **Goal:** a player can remove BGA **and** (if they choose) the things first-run
 put on the computer — without a terminal, and without assuming that dragging the
 app to Trash cleans anything else.
 
-Do this **after Stage 3B**. First-run is what creates Ollama, models, and app
-data; uninstall is the mirror. Dragging `BGA.app` to Trash on macOS only deletes
-the app bundle — it never runs our code — so Mac needs an **in-app** path.
-Windows hooks Apps & features → Uninstall.
+Done after Stage 3B. First-run is what creates Ollama, models, and app data;
+uninstall is the mirror. Dragging `BGA.app` to Trash on macOS only deletes the
+app bundle — it never runs our code — so Mac needs an **in-app** path. Windows
+hooks Apps & features → Uninstall.
 
-Plan: `docs/archive/stage-3h-uninstall.md` (working draft also under
-`docs/superpowers/plans/stage-3h-uninstall.md`).
+Plan: `docs/archive/stage-3h-uninstall.md`.
 
 - **Always:** remove the BGA program (Windows install dir after the UI exits;
   Mac `BGA.app` + Uninstall helper via deferred delete after quit).
@@ -795,14 +794,14 @@ re-read once with a layout-aware importer; the banner says so while that runs.
 **at the table** — you can look back, and sound is optional. Stage 0A–0C (hardening, desktop
 window, release) are already done; they sit under the numbered product stages.
 Stage 3B is what makes that arbiter usable from the packaged app (Ollama + models
-behind a one-click gate). Stage 3H is the mirror: remove the app and, when the
+behind a one-click gate). **Stage 3H is done:** remove the app and, when the
 player chooses, what first-run downloaded (Windows uninstall; Mac in-app remover
-with checkboxes — Trash alone cannot run cleanup). Stage 6 is worth doing right after 3 — before you start
-tuning prompts, because otherwise you are tuning by feel. Stage 6A (page layout)
-comes **after that measurement**: first learn how often columns and sidenotes cost
-us an answer, then decide whether a heavier import is worth it. Voice (5) and
-images (7) polish the experience; they are not a condition of usefulness. Online
-lookup (8) comes last because the app should be fully useful offline first —
-internet is a convenience, not a requirement. Stage 9 (context window) and 9A
-(when models sit in RAM) wait until that product exists; growing the window or
-rewriting load/unload earlier is guessing.
+with checkboxes — Trash alone cannot run cleanup). Stage 6 is worth doing right
+after 3 — before you start tuning prompts, because otherwise you are tuning by
+feel. Stage 6A (page layout) comes **after that measurement**: first learn how
+often columns and sidenotes cost us an answer, then decide whether a heavier
+import is worth it. Voice (5) and images (7) polish the experience; they are not
+a condition of usefulness. Online lookup (8) comes last because the app should be
+fully useful offline first — internet is a convenience, not a requirement.
+Stage 9 (context window) and 9A (when models sit in RAM) wait until that product
+exists; growing the window or rewriting load/unload earlier is guessing.

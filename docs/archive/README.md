@@ -33,12 +33,6 @@ here because nothing was built between Stage 2 and that work.
 | [stage-3d-conversation-thread.md](stage-3d-conversation-thread.md) | 3D — scrollable per-game thread | Implemented |
 | [stage-3h-uninstall.md](stage-3h-uninstall.md) | 3H — uninstall with Data / Application / models / Ollama choices | Implemented (smoke Mac + Windows before release) |
 
-Stage 3B (first-run install gate) plan:
-[`stage-3b-first-run-install-gate.md`](stage-3b-first-run-install-gate.md).
-
-Working draft while implementing 3H:
-[`docs/superpowers/plans/stage-3h-uninstall.md`](../superpowers/plans/stage-3h-uninstall.md).
-
 ## Not included
 
 - npm → pnpm migration drafts found in the same Cursor plans folder. This repo

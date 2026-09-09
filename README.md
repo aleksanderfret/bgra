@@ -334,11 +334,12 @@ What you can already do, and what is still on the way. The numbered engineering 
 - [x] After an update, a game already in your library just works — no dropping the PDF again.
 - [x] The first time you open the downloaded app, it sets itself up. No terminal.
 - [x] Read busy pages (two columns, side boxes) without losing the note next to the rule.
+- [x] Watch a real progress bar while a rulebook is being added.
+- [x] Scroll back through earlier questions for that game.
+- [x] Remove the app and, if you choose, the downloads it left behind — without a terminal.
 
 **Next at the table**
 
-- [ ] Watch a real progress bar while a rulebook is being added.
-- [ ] Scroll back through earlier questions for that game.
 - [ ] Learn a new game step by step, not only settle a fight mid-session.
 - [ ] Ask out loud and hear the answer; the text stays on screen either way.
 
