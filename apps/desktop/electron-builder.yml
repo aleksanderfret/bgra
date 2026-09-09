@@ -81,7 +81,9 @@ dmg:
     - x: 130
       y: 400
       type: file
-      path: BGA Uninstall.app
+      # Relative to apps/desktop (electron-builder cwd). dmgbuild does not
+      # resolve bare names via buildResources the way older appdmg did.
+      path: packaging/BGA Uninstall.app
 win:
   target:
     - nsis
