@@ -1,10 +1,12 @@
 'use client';
 
 import type { AnswerMode, GameSummary } from '@bga/api-contract';
-import { AnswerPanel } from '@bga/components/answer-panel';
+import { ConversationLog } from '@bga/components/conversation-log';
 import { useAskStream } from '@bga/hooks/use-ask-stream';
+import { useConversationThread } from '@bga/hooks/use-conversation-thread';
 import { useEngineReadiness } from '@bga/hooks/use-engine-readiness';
 import { streamingStatusKey } from '@bga/utils/answer-state';
+import { selectExchanges } from '@bga/utils/conversation-thread';
 import { GAMES_CHANGED_EVENT } from '@bga/utils/desktop-bridge';
 import { isGameSummaryList } from '@bga/utils/game-summary';
 import {
@@ -25,6 +27,7 @@ import {
   type SubmitEvent,
   useEffect,
   useId,
+  useRef,
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -64,8 +67,13 @@ export const RulesChat: FC = () => {
   const [expansionsCleared, setExpansionsCleared] = useState(false);
   const [mode, setMode] = useState<AnswerMode>('teach');
   const [question, setQuestion] = useState('');
+  const [activeExchangeId, setActiveExchangeId] = useState<string | null>(null);
   const expansionsStatusId = useId();
   const { state, ask, cancel } = useAskStream();
+  const { thread, lastSaveSucceeded, beginExchange, updateAnswer, dropExchange } =
+    useConversationThread(gameId);
+  const wasStreamingRef = useRef(false);
+  const screenExchanges = selectExchanges(thread, 'screen');
 
   useEffect(() => {
     let cancelled = false;
@@ -107,14 +115,34 @@ export const RulesChat: FC = () => {
     };
   }, [enginePhase]);
 
+  useEffect(() => {
+    if (activeExchangeId === null) {
+      wasStreamingRef.current = false;
+      return;
+    }
+    updateAnswer(activeExchangeId, state);
+    if (state.isStreaming) {
+      wasStreamingRef.current = true;
+      return;
+    }
+    if (wasStreamingRef.current) {
+      wasStreamingRef.current = false;
+      setActiveExchangeId(null);
+    }
+  }, [activeExchangeId, state, updateAnswer]);
+
   const baseGames = (games ?? []).filter((game) => game.baseGameId === null);
   const expansionsForBase =
     gameId === null ? [] : (games ?? []).filter((game) => game.baseGameId === gameId);
+  const picksLocked = state.isStreaming;
 
   const canAsk =
     enginePhase === 'ready' && gameId !== null && question.trim().length > 0 && !state.isStreaming;
 
   const onBaseGameChange = (next: string | null): void => {
+    if (state.isStreaming) {
+      return;
+    }
     setGameId(next);
     if (expansionIds.length > 0) {
       setExpansionIds([]);
@@ -134,13 +162,29 @@ export const RulesChat: FC = () => {
     });
   };
 
+  const handleCancel = (): void => {
+    cancel();
+    if (activeExchangeId !== null) {
+      dropExchange(activeExchangeId);
+      setActiveExchangeId(null);
+    }
+  };
+
   const submitQuestion = (): void => {
     if (!canAsk || gameId === null) {
       return;
     }
+    const questionText = question.trim();
+    const id = beginExchange({
+      question: questionText,
+      mode,
+      expansionIds: [...expansionIds],
+    });
+    setActiveExchangeId(id);
+    setQuestion('');
     void ask({
       gameId,
-      question: question.trim(),
+      question: questionText,
       mode,
       expansionIds: expansionIds.length > 0 ? expansionIds : undefined,
     });
@@ -182,7 +226,7 @@ export const RulesChat: FC = () => {
             data={baseGames.map((game) => ({ value: game.gameId, label: game.title }))}
             value={gameId}
             onChange={onBaseGameChange}
-            disabled={games === null || baseGames.length === 0}
+            disabled={games === null || baseGames.length === 0 || picksLocked}
             aria-busy={games === null}
             aria-describedby={expansionsCleared ? expansionsStatusId : undefined}
             searchable
@@ -206,7 +250,7 @@ export const RulesChat: FC = () => {
                   expansionId={expansion.gameId}
                   title={expansion.title}
                   checked={expansionIds.includes(expansion.gameId)}
-                  disabled={state.isStreaming}
+                  disabled={picksLocked}
                   onToggle={toggleExpansion}
                 />
               ))}
@@ -220,8 +264,11 @@ export const RulesChat: FC = () => {
             onChange={handleModeChange}
             data={MODES.map((value) => ({ value, label: t(`rulesChat.mode.${value}`) }))}
             fullWidth
+            disabled={picksLocked}
           />
         </Fieldset>
+
+        <ConversationLog exchanges={screenExchanges} />
 
         <Textarea
           label={t('rulesChat.question.label')}
@@ -238,7 +285,7 @@ export const RulesChat: FC = () => {
             {t('rulesChat.submit')}
           </Button>
           {state.isStreaming && (
-            <Button type="button" variant="subtle" color="gray" onClick={cancel}>
+            <Button type="button" variant="subtle" color="gray" onClick={handleCancel}>
               {t('rulesChat.cancel')}
             </Button>
           )}
@@ -247,7 +294,11 @@ export const RulesChat: FC = () => {
           </Text>
         </Group>
 
-        <AnswerPanel state={state} />
+        {!lastSaveSucceeded && (
+          <Text size="sm" c="dimmed" role="status">
+            {t('rulesChat.thread.saveFailed')}
+          </Text>
+        )}
       </Stack>
     </form>
   );

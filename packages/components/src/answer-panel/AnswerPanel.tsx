@@ -7,11 +7,29 @@ import { useTranslation } from 'react-i18next';
 
 export interface AnswerPanelProps {
   state: AnswerState;
+  live?: boolean;
 }
 
-export const AnswerPanel: FC<AnswerPanelProps> = ({ state }) => {
+interface AnswerTextProps {
+  text: string;
+  live: boolean;
+  label: string;
+}
+
+const AnswerText: FC<AnswerTextProps> = ({ text, live, label }) => (
+  <Box aria-live={live ? 'polite' : undefined} aria-label={live ? label : undefined}>
+    {text.length > 0 && (
+      <Paper withBorder p="md" radius="md">
+        <Text style={{ whiteSpace: 'pre-wrap' }}>{text}</Text>
+      </Paper>
+    )}
+  </Box>
+);
+
+export const AnswerPanel: FC<AnswerPanelProps> = ({ state, live }) => {
   const { t } = useTranslation();
   const figures = selectVisibleFigures(state);
+  const isLive = live === true;
 
   if (state.error !== null) {
     return (
@@ -53,13 +71,7 @@ export const AnswerPanel: FC<AnswerPanelProps> = ({ state }) => {
         </Paper>
       )}
 
-      <Box role="log" aria-live="polite" aria-label={t('answer.regionLabel')}>
-        {state.text.length > 0 && (
-          <Paper withBorder p="md" radius="md">
-            <Text style={{ whiteSpace: 'pre-wrap' }}>{state.text}</Text>
-          </Paper>
-        )}
-      </Box>
+      <AnswerText text={state.text} live={isLive} label={t('answer.regionLabel')} />
 
       {figures.length > 0 && (
         <Stack gap="xs">

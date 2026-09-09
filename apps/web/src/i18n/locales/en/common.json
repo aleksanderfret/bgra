@@ -103,7 +103,12 @@
     },
     "submit": "Ask",
     "cancel": "Cancel",
-    "formLabel": "Ask a rules question"
+    "formLabel": "Ask a rules question",
+    "thread": {
+      "regionLabel": "Conversation about this game",
+      "playerLabel": "Your question",
+      "saveFailed": "Couldn’t save this conversation on this computer. The latest answers may disappear if you close the app."
+    }
   },
   "stage": {
     "transcribing": "Transcribing the question…",

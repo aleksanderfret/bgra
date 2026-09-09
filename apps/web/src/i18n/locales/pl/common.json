@@ -103,7 +103,12 @@
     },
     "submit": "Zapytaj",
     "cancel": "Anuluj",
-    "formLabel": "Zadaj pytanie o zasady"
+    "formLabel": "Zadaj pytanie o zasady",
+    "thread": {
+      "regionLabel": "Rozmowa o tej grze",
+      "playerLabel": "Twoje pytanie",
+      "saveFailed": "Nie udało się zapisać tej rozmowy na tym komputerze. Ostatnie odpowiedzi mogą zniknąć, jeśli zamkniesz aplikację."
+    }
   },
   "stage": {
     "transcribing": "Rozpoznaję pytanie…",

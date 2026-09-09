@@ -450,31 +450,35 @@ player-facing strings.
 
 ---
 
-## Stage 3D — Conversation thread
+## Stage 3D — Conversation thread ✅ **complete**
 
 **Goal:** the rules assistant is a **chat you can scroll**, not a form that forgets the
 last answer. At the table you need to look back: someone did not hear, the room is too
 loud to play sound, or the same ruling comes up two turns later. Voice (Stage 5) reads
 these same messages aloud — it never replaces the written thread.
 
-Do this **after Stage 3** (answers must be grounded first) and **before Stage 4 and 5**.
-Teaching is a conversation; speech is the same conversation spoken. Today the Ask screen
-replaces the previous answer on every submit.
+Plan: `docs/superpowers/plans/stage-3d-conversation-thread.md`. Do this **after Stage 3**
+(answers must be grounded first) and **before Stage 4 and 5**. Teaching is a
+conversation; speech is the same conversation spoken.
 
 - A new question **appends** a player / assistant pair. The earlier turns stay on
   screen and can be scrolled.
-- Each **game** has its own thread, stored on this computer with that game. Choosing
-  the game again loads that thread. Switching games switches threads — Azul never
-  shows Wingspan's answers.
+- Each **game** has its own thread. The library (PDFs, search index) lives under
+  `BGA_STORAGE_DIR`. The conversation lives in the renderer as `bga.thread.v1.<gameId>`
+  — same computer, keyed by that game, not a file next to the rulebook. Clearing site
+  data loses the chat, not the PDFs. Choosing the game again loads that thread.
+  Switching games switches threads — Azul never shows Wingspan's answers. Game,
+  expansions, and mode are locked while an answer is still being written.
 - Written text is always on screen, including when the answer is also spoken. Sound
   off, or no headphones, still leaves a complete answer to read.
-- History is the **player's notes**, not a rules document. Do **not** ingest past
-  answers as `documentKind: "faq"`. Official FAQ outranks the rulebook; a wrong chat
-  answer must not become the law the next time retrieval runs.
-- Optional later, still in this stage if cheap: if a new question is very similar to
-  an earlier turn, the UI can point at that turn ("you asked something like this").
-  A fresh answer still comes from the rulebook unless the player only wanted to
-  re-read what was already said.
+- History is the **player's notes**, not a rules document. It is never ingested as
+  `documentKind: "faq"`. `/ask` still receives only the current question (no prior
+  turns). `selectExchanges(..., 'prompt' | 'archive')` returns `[]` until Stage 9
+  writes the cut rule. Do not raise `num_ctx` here.
+- If the conversation cannot be saved on this computer, the composer shows an in-app
+  status — not a terminal command.
+- The optional “you asked something like this” pointer is **deferred** (not in this
+  stage). A fresh answer still comes from the rulebook.
 
 **Acceptance:** a second question leaves the first visible; quitting and reopening the
 same game shows the thread; another game's thread is not mixed in; with sound off the
@@ -781,9 +785,8 @@ is done:** if search never started, the UI says so and keeps Ask (and PDF import
 off — not “offline”, not an endless “preparing”; Try again re-runs the load in-app.
 **Stage 3G is done:** list questions keep every named section, and dense pages are
 re-read once with a layout-aware importer; the banner says so while that runs.
-Stage 3D
-(the scrollable, per-game thread) is what makes that arbiter usable **at the
-table** — you can look back, and sound is optional. Stage 0A–0C (hardening, desktop
+**Stage 3D is the scrollable, per-game thread** that makes that arbiter usable
+**at the table** — you can look back, and sound is optional. Stage 0A–0C (hardening, desktop
 window, release) are already done; they sit under the numbered product stages.
 Stage 3B is what makes that arbiter usable from the packaged app (Ollama + models
 behind a one-click gate). Stage 3H is the mirror: remove the app and, when the
