@@ -389,31 +389,37 @@ app to Trash cleans anything else.
 Do this **after Stage 3B**. First-run is what creates Ollama, models, and app
 data; uninstall is the mirror. Dragging `BGA.app` to Trash on macOS only deletes
 the app bundle — it never runs our code — so Mac needs an **in-app** path.
-Windows can hook the normal uninstaller.
+Windows hooks Apps & features → Uninstall.
 
-- **Windows:** the NSIS (or equivalent) uninstall removes BGA and, with clear
-  prompts, the optional extras below — same choices as on Mac, not a silent wipe
-  of everything on the machine.
-- **Mac:** in the packaged app, a screen with a primary action like “Remove BGA
-  and downloaded files…” lists checkboxes the player understands:
-  - **BGA’s own data** (setup flag, library storage, local Python env) — default
-    on when uninstalling.
-  - **Downloaded models** (Ollama weights on disk) — off by default or behind an
-    explicit confirm; large and shared.
-  - **Ollama itself** — off by default with a plain warning that other apps may
-    use it; never remove it silently.
-- Copy stays in `en`/`pl`. No “open Terminal”, no “run this command”, no asking
-  the player to find folders by hand.
-- After confirm, quit related processes safely, delete only what was selected,
-  then quit. If Ollama or models were left on purpose, say so in one short line.
-- Do **not** treat Trash-drag as an uninstall hook on Mac — that path cannot run
-  our cleanup. The in-app (or DMG-bundled) remover is the supported way.
+Plan: `docs/archive/stage-3h-uninstall.md` (working draft also under
+`docs/superpowers/plans/stage-3h-uninstall.md`).
 
-**Acceptance:** on Windows, Apps & features → Uninstall walks through the same
-choices and leaves the machine as selected; on Mac, the in-app remover can wipe
-BGA data alone, or data + models, or data + models + Ollama, each with a clear
-confirm; a player who only deletes `BGA.app` is not promised cleanup (document
-that the in-app remover is required for a full wipe); `pnpm verify` passes.
+- **Always:** remove the BGA program (Windows install dir after the UI exits;
+  Mac `BGA.app` + Uninstall helper via deferred delete after quit).
+- **Four checkboxes, all default off** (same UI on Mac and Windows):
+  - **Game data** — library (`storage`), reserved `player/` settings, chat history.
+  - **App runtime** — Python env, logs, setup flag, downloads, helpers, `hf-cache`
+    (and scoped legacy Hugging Face hub dirs for BGA-owned repos). Does **not**
+    wipe Chromium chat storage unless Game data is also selected.
+  - **Assistant language models** — only Ollama tags from BGA profiles (allowlist
+    parity with `settings.py`), never a wipe of all `~/.ollama`.
+  - **Ollama** — remove the Ollama app with a plain warning; never silent.
+- **Windows:** NSIS launches the same Electron uninstall UI (`--bga-uninstall`);
+  cancel aborts so Program Files is not deleted; NSIS removes the install dir
+  only after a successful UI exit.
+- **Mac:** in-app “Remove BGA…” (Home and Setup) **and** `BGA Uninstall.app`
+  (best-effort copy to Applications on first launch; also on the DMG). Trash-drag
+  is not a cleanup hook.
+- **Linux:** same types/IPC/UI skeleton; no packaged acceptance in this stage.
+- Copy stays in `en`/`pl`. No “open Terminal”, no folder treasure hunts.
+- After confirm: stop processes, apply selections, show what was left on purpose,
+  quit, then deferred program removal.
+
+**Acceptance:** on Windows, Apps & features → Uninstall shows the same choices and
+leaves the machine as selected (cancel leaves the install); on Mac, in-app or
+BGA Uninstall can remove program-only or any combination of data / runtime /
+models / Ollama, each with a clear confirm; a player who only deletes `BGA.app`
+is not promised cleanup; `pnpm verify` passes; Mac + Windows smoke before release.
 
 ---
 

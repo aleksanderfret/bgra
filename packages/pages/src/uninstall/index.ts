@@ -1,0 +1,1 @@
+export { UninstallPage } from './UninstallPage';

@@ -7,6 +7,58 @@
     "title": "Board game rules assistant",
     "subtitle": "Answers come only from the rulebooks, FAQs and errata indexed on this computer."
   },
+  "uninstall": {
+    "title": "Remove BGA",
+    "subtitle": "BGA will be removed from this computer. Choose what else to delete.",
+    "open": "Remove BGA…",
+    "intro": "The BGA program is always removed. Everything below is optional and off by default.",
+    "continue": "Continue",
+    "desktopOnly": {
+      "title": "Desktop app only",
+      "body": "Removing BGA and its downloads is available in the desktop app, not in the browser.",
+      "back": "Back to the assistant"
+    },
+    "macTrash": {
+      "title": "Dragging to Trash is not enough",
+      "body": "Putting BGA in the Trash only removes the app icon. Use this screen (or BGA Uninstall) to clear downloads and data you choose."
+    },
+    "option": {
+      "data": "Game data",
+      "dataHelp": "Rulebooks, parsed pages, chat history, and future player settings.",
+      "application": "App runtime files",
+      "applicationHelp": "Python environment, logs, setup flags, downloads, and search helpers — not your game library.",
+      "models": "Assistant language models",
+      "modelsHelp": "Only the models BGA downloaded for answering rules questions — not every model on this computer.",
+      "ollama": "Ollama",
+      "ollamaHelp": "The Ollama app itself. Other programs may use it."
+    },
+    "ollama": {
+      "warningTitle": "Other apps may need Ollama",
+      "warning": "Removing Ollama can break other tools that use it on this computer. Leave it installed unless you are sure."
+    },
+    "confirm": {
+      "title": "Confirm removal",
+      "programAlways": "BGA itself will be removed.",
+      "alsoSelected": "You also asked to remove:",
+      "back": "Back",
+      "run": "Remove now"
+    },
+    "done": {
+      "title": "Removal finished",
+      "body": "BGA is closing. These stay on this computer because you left them unchecked:"
+    },
+    "left": {
+      "data": "Game data",
+      "application": "App runtime files",
+      "models": "Assistant language models",
+      "ollama": "Ollama"
+    },
+    "error": {
+      "title": "Something did not finish",
+      "failed": "Removal could not start. Close other BGA windows and try again.",
+      "partial": "Some selected items could not be removed. Check the list of what was left on purpose."
+    }
+  },
   "rulebooks": {
     "title": "Rulebooks",
     "subtitle": "Load your own publisher PDFs on this computer. Nothing from someone else’s library is bundled."

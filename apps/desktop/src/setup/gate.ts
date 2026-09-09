@@ -83,8 +83,40 @@ export function desktopLocale(appLocale: string): 'en' | 'pl' {
   return 'en';
 }
 
-export function initialAppPath(options: { locale: 'en' | 'pl'; gatePassed: boolean }): string {
+export function argvHasUninstallFlag(argv: readonly string[]): boolean {
+  return argv.includes('--bga-uninstall');
+}
+
+export function initialAppPath(options: {
+  locale: 'en' | 'pl';
+  gatePassed: boolean;
+  uninstallMode?: boolean;
+}): string {
+  if (options.uninstallMode) {
+    return `/${options.locale}/uninstall`;
+  }
   return options.gatePassed ? `/${options.locale}` : `/${options.locale}/setup`;
+}
+
+/** Paths the gated window may open before Ask is ready. */
+export function isAllowedWhenGated(url: string, locale: 'en' | 'pl'): boolean {
+  if (!/^http:\/\/127\.0\.0\.1:\d+/.test(url)) {
+    return false;
+  }
+  const withoutOrigin = url.replace(/^http:\/\/127\.0\.0\.1:\d+/, '');
+  const pathOnly = withoutOrigin.split('?')[0] ?? withoutOrigin;
+  return isGatedAllowedPath(pathOnly, locale);
+}
+
+export function isGatedAllowedPath(path: string, locale: 'en' | 'pl'): boolean {
+  const setup = `/${locale}/setup`;
+  const uninstall = `/${locale}/uninstall`;
+  return (
+    path === setup ||
+    path.startsWith(`${setup}/`) ||
+    path === uninstall ||
+    path.startsWith(`${uninstall}/`)
+  );
 }
 
 export function splashActivityFromProbe(probe: HealthProbe): SplashActivityCode | null {

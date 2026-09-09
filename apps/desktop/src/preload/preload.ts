@@ -10,6 +10,8 @@ const api: DesktopApi = {
   openExternalHttps: (url: string): Promise<void> =>
     ipcRenderer.invoke('desktop:open-external-https', url),
   pullModels: (): Promise<{ ok: true }> => ipcRenderer.invoke('desktop:pull-models'),
+  getUninstallPreview: () => ipcRenderer.invoke('desktop:get-uninstall-preview'),
+  runUninstall: (selection) => ipcRenderer.invoke('desktop:run-uninstall', selection),
   onRuntimeProgress: (handler: (event: RuntimeProgress) => void): (() => void) => {
     const listener = (_event: Electron.IpcRendererEvent, payload: RuntimeProgress): void => {
       handler(payload);

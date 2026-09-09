@@ -1,0 +1,10 @@
+{
+  "huggingfaceRepos": ["BAAI/bge-reranker-v2-m3", "mlx-community/whisper-large-v3-turbo"],
+  "ollamaTags": [
+    "bge-m3",
+    "qwen2.5vl:7b",
+    "qwen3:30b-a3b-instruct-2507-q4_K_M",
+    "qwen3:32b",
+    "qwen3:8b"
+  ]
+}

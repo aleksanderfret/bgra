@@ -54,6 +54,16 @@ describe('SetupPanel', () => {
       onRuntimeProgress: () => () => undefined,
       openExternalHttps: async () => undefined,
       pullModels: async () => ({ ok: true as const }),
+      getUninstallPreview: async () => ({
+        platform: 'darwin' as const,
+        defaults: {
+          removeData: false,
+          removeApplication: false,
+          removeLlmModels: false,
+          removeOllama: false,
+        },
+      }),
+      runUninstall: async () => ({ steps: [], allSelectedOk: true }),
     };
     render(<SetupPanel />, 'en');
     expect(await screen.findByRole('status')).toHaveTextContent(en.activity.preparing_search);

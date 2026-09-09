@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  argvHasUninstallFlag,
   desktopLocale,
   gatePassed,
   initialAppPath,
+  isAllowedWhenGated,
   liveProbeOk,
   packagingUvRelativePath,
   parseHealthProbe,
@@ -88,6 +90,29 @@ describe('desktopLocale / initialAppPath', () => {
   it('sends gated launches to setup', () => {
     expect(initialAppPath({ locale: 'en', gatePassed: false })).toBe('/en/setup');
     expect(initialAppPath({ locale: 'pl', gatePassed: true })).toBe('/pl');
+  });
+
+  it('sends uninstall mode to the uninstall route even when gated', () => {
+    expect(initialAppPath({ locale: 'en', gatePassed: false, uninstallMode: true })).toBe(
+      '/en/uninstall',
+    );
+  });
+});
+
+describe('argvHasUninstallFlag / isAllowedWhenGated', () => {
+  it('detects the uninstall CLI flag', () => {
+    expect(argvHasUninstallFlag(['electron', '.'])).toBe(false);
+    expect(argvHasUninstallFlag(['electron', '.', '--bga-uninstall'])).toBe(true);
+  });
+
+  it('allows setup and uninstall under the gate with path boundaries', () => {
+    expect(isAllowedWhenGated('http://127.0.0.1:3000/en/setup', 'en')).toBe(true);
+    expect(isAllowedWhenGated('http://127.0.0.1:3000/en/uninstall', 'en')).toBe(true);
+    expect(isAllowedWhenGated('http://127.0.0.1:3000/en/uninstall?x=1', 'en')).toBe(true);
+    expect(isAllowedWhenGated('http://127.0.0.1:3000/en', 'en')).toBe(false);
+    expect(isAllowedWhenGated('http://127.0.0.1:3000/pl/uninstall', 'en')).toBe(false);
+    expect(isAllowedWhenGated('http://127.0.0.1:3000/en/uninstall-evil', 'en')).toBe(false);
+    expect(isAllowedWhenGated('http://127.0.0.1:3000/en/setup-extra', 'en')).toBe(false);
   });
 });
 

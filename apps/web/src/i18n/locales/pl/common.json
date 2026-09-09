@@ -7,6 +7,58 @@
     "title": "Asystent zasad gier planszowych",
     "subtitle": "Odpowiedzi pochodzą wyłącznie z instrukcji, FAQ i errat wczytanych na tym komputerze."
   },
+  "uninstall": {
+    "title": "Usuń BGA",
+    "subtitle": "BGA zniknie z tego komputera. Wybierz, co jeszcze skasować.",
+    "open": "Usuń BGA…",
+    "intro": "Program BGA jest zawsze usuwany. Poniższe opcje są dobrowolne i domyślnie wyłączone.",
+    "continue": "Dalej",
+    "desktopOnly": {
+      "title": "Tylko aplikacja na komputerze",
+      "body": "Usuwanie BGA i pobranych plików jest dostępne w aplikacji na komputerze, nie w przeglądarce.",
+      "back": "Wróć do asystenta"
+    },
+    "macTrash": {
+      "title": "Przeciągnięcie do Kosza nie wystarczy",
+      "body": "Kosz usuwa tylko ikonę aplikacji. Użyj tego ekranu (albo BGA Uninstall), żeby wyczyścić pobrane rzeczy według Twojego wyboru."
+    },
+    "option": {
+      "data": "Dane gier",
+      "dataHelp": "Instrukcje, przetworzone strony, historia rozmów i przyszłe ustawienia gracza.",
+      "application": "Pliki środowiska aplikacji",
+      "applicationHelp": "Środowisko Pythona, logi, flagi instalacji, pobrane instalatory i pomocnicze pliki wyszukiwania — bez biblioteki gier.",
+      "models": "Modele językowe asystenta",
+      "modelsHelp": "Tylko modele pobrane przez BGA do odpowiadania na pytania o zasady — nie wszystkie modele na komputerze.",
+      "ollama": "Ollama",
+      "ollamaHelp": "Sama aplikacja Ollama. Inne programy mogą jej używać."
+    },
+    "ollama": {
+      "warningTitle": "Inne aplikacje mogą potrzebować Ollamy",
+      "warning": "Usunięcie Ollamy może zepsuć inne narzędzia na tym komputerze. Zostaw ją, jeśli nie jesteś pewien."
+    },
+    "confirm": {
+      "title": "Potwierdź usunięcie",
+      "programAlways": "Samo BGA zostanie usunięte.",
+      "alsoSelected": "Dodatkowo wybrałeś:",
+      "back": "Wstecz",
+      "run": "Usuń teraz"
+    },
+    "done": {
+      "title": "Usuwanie zakończone",
+      "body": "BGA się zamyka. To zostaje na komputerze, bo nie było zaznaczone:"
+    },
+    "left": {
+      "data": "Dane gier",
+      "application": "Pliki środowiska aplikacji",
+      "models": "Modele językowe asystenta",
+      "ollama": "Ollama"
+    },
+    "error": {
+      "title": "Coś się nie dokończyło",
+      "failed": "Nie udało się rozpocząć usuwania. Zamknij inne okna BGA i spróbuj ponownie.",
+      "partial": "Części wybranych rzeczy nie udało się usunąć. Sprawdź listę tego, co zostawiono celowo."
+    }
+  },
   "rulebooks": {
     "title": "Instrukcje",
     "subtitle": "Wczytujesz własne PDF-y wydawcy na tym komputerze. Nic z cudzej biblioteki nie jest dołączone."

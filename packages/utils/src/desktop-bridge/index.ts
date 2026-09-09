@@ -10,4 +10,8 @@ export {
   type ModelProfileId,
   type OkResult,
   type RuntimeProgress,
+  type UninstallPreviewPayload,
+  type UninstallReportPayload,
+  type UninstallSelectionPayload,
+  type UninstallStepPayload,
 } from './desktop-bridge';

@@ -31,9 +31,13 @@ here because nothing was built between Stage 2 and that work.
 | [stage-3b-first-run-install-gate.md](stage-3b-first-run-install-gate.md) | 3B — first-run Ollama + models wall on packaged desktop | Implemented (smoke Mac + Windows before release) |
 | [stage-3g-rulebook-import-understanding.md](stage-3g-rulebook-import-understanding.md) | 3G — section coverage (list questions) and a gated page-layout reader | Implemented |
 | [stage-3d-conversation-thread.md](stage-3d-conversation-thread.md) | 3D — scrollable per-game thread | Implemented |
+| [stage-3h-uninstall.md](stage-3h-uninstall.md) | 3H — uninstall with Data / Application / models / Ollama choices | Implemented (smoke Mac + Windows before release) |
 
 Stage 3B (first-run install gate) plan:
 [`stage-3b-first-run-install-gate.md`](stage-3b-first-run-install-gate.md).
+
+Working draft while implementing 3H:
+[`docs/superpowers/plans/stage-3h-uninstall.md`](../superpowers/plans/stage-3h-uninstall.md).
 
 ## Not included
 
