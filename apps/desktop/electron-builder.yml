@@ -70,6 +70,18 @@ mac:
   entitlementsInherit: packaging/entitlements.mac.plist
   extendInfo:
     NSMicrophoneUsageDescription: BGA needs the microphone for push-to-talk questions about board game rules.
+dmg:
+  contents:
+    - x: 130
+      y: 220
+    - x: 410
+      y: 220
+      type: link
+      path: /Applications
+    - x: 130
+      y: 400
+      type: file
+      path: BGA Uninstall.app
 win:
   target:
     - nsis
@@ -77,4 +89,5 @@ win:
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
+  include: packaging/uninstall.nsh
 electronVersion: 35.7.5

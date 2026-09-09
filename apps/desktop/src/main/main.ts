@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, session, shell } from 'electron';
 import type { DesktopSetupState, RuntimeProgress } from '../ipc/desktop-api';
 import { BinaryNotFoundError, resolveBinary } from '../runtime/binaries';
+import { engineUvSyncArgs } from '../runtime/engine-uv-extras';
 import {
   downloadAllowlistedFile,
   installerDestination,
@@ -29,10 +30,12 @@ import {
 } from '../runtime/processes';
 import { writeDiagnosticsFile } from '../setup/diagnostics';
 import {
+  argvHasUninstallFlag,
   desktopLocale,
   gatePassed,
   type HealthProbe,
   initialAppPath,
+  isAllowedWhenGated,
   liveProbeOk,
   parseHealthProbe,
   splashActivityFromProbe,
@@ -51,7 +54,19 @@ import {
   recommendProfile,
 } from '../system/capabilities';
 import { ensureMacHiddenCliApp } from '../system/mac_hidden_app';
+import {
+  copyMacUninstallHelperToApplications,
+  writeMacUninstallHelperApp,
+} from '../system/mac_uninstall_helper';
 import { readMachineSnapshot } from '../system/machine';
+import { spawnDeferredDelete } from '../uninstall/deferred-delete';
+import {
+  macAppBundleFromExecPath,
+  removeOllamaApplication,
+  removeOwnedOllamaModels,
+} from '../uninstall/remove-ollama';
+import { runUninstall } from '../uninstall/run-uninstall';
+import { defaultUninstallSelection, parseUninstallSelection } from '../uninstall/selection';
 
 if (typeof app === 'undefined') {
   console.error(
@@ -61,6 +76,10 @@ if (typeof app === 'undefined') {
 }
 
 const isDev = !app.isPackaged;
+const uninstallMode = argvHasUninstallFlag(process.argv);
+const uninstallViaNsis = process.env.BGA_UNINSTALL_VIA_NSIS === '1';
+/** Set only after the player confirms and runUninstall finishes (success or partial). */
+let uninstallFlowFinished = false;
 
 let mainWindow: BrowserWindow | null = null;
 let engineProcess: ManagedProcess | null = null;
@@ -92,6 +111,23 @@ function repoRoot(): string {
     return join(process.resourcesPath, 'repo');
   }
   return resolveRepoRootFromDesktopPackage(packageRoot());
+}
+
+function ensureMacUninstallHelperInstalled(): void {
+  if (!app.isPackaged || process.platform !== 'darwin') {
+    return;
+  }
+  try {
+    const helpersDir = join(app.getPath('userData'), 'helpers');
+    const source = writeMacUninstallHelperApp({
+      destinationDir: helpersDir,
+      bgaExecPath: process.execPath,
+      version: app.getVersion(),
+    });
+    copyMacUninstallHelperToApplications({ sourceApp: source });
+  } catch {
+    // Best-effort — in-app remover and DMG copy remain available.
+  }
 }
 
 function pythonEnvDir(): string {
@@ -197,7 +233,7 @@ async function syncPythonEnvironment(engineDir: string): Promise<void> {
   const child = spawnLogged({
     label: 'uv-sync',
     command: uvPath,
-    args: ['sync', '--frozen', '--extra', 'retrieval', '--extra', 'ingest'],
+    args: engineUvSyncArgs(),
     cwd: engineDir,
     env: uvEnv(),
     logPath: join(app.getPath('userData'), 'logs', 'uv-sync.log'),
@@ -331,6 +367,7 @@ async function pullProfileModels(): Promise<void> {
       ...uvEnv(),
       BGA_MODEL_PROFILE: profile,
       BGA_STORAGE_DIR: dataDir,
+      HF_HOME: join(app.getPath('userData'), 'hf-cache'),
     },
     logPath: join(app.getPath('userData'), 'logs', 'pull-models.log'),
   });
@@ -461,6 +498,7 @@ async function startBackend(options: { skipRetrievalWarm: boolean }): Promise<vo
     BGA_STORAGE_DIR: dataDir,
     BGA_OLLAMA_URL: process.env.BGA_OLLAMA_URL ?? 'http://127.0.0.1:11434',
     BGA_MODEL_PROFILE: process.env.BGA_MODEL_PROFILE ?? profileEnv,
+    HF_HOME: join(app.getPath('userData'), 'hf-cache'),
     ...(options.skipRetrievalWarm ? { BGA_SKIP_RETRIEVAL_WARM: '1' } : {}),
   };
 
@@ -576,6 +614,93 @@ async function startBackend(options: { skipRetrievalWarm: boolean }): Promise<vo
   backendsReady = true;
 }
 
+/** Uninstall UI needs Next only — no engine, uv sync, or retrieval warm. */
+async function startUninstallUi(): Promise<void> {
+  pushSplashActivity('checking_computer');
+  mkdirSync(join(app.getPath('userData'), 'logs'), { recursive: true });
+  uiLocale = desktopLocale(app.getLocale());
+  await resolveTools();
+  webPort = await findFreePort(3000);
+  const root = repoRoot();
+  const webDir = resolveWebDir(root);
+  nextLogPath = join(app.getPath('userData'), 'logs', 'next.log');
+
+  if (isDev && process.env.BGA_WEB_URL) {
+    const url = new URL(process.env.BGA_WEB_URL);
+    webPort = Number(url.port || 3000);
+    await waitForHttp(`http://127.0.0.1:${webPort}/${uiLocale}`, { timeoutMs: 5_000 });
+    backendsReady = true;
+    return;
+  }
+
+  if (app.isPackaged) {
+    const standaloneServer = join(webDir, 'server.js');
+    if (!existsSync(standaloneServer)) {
+      throw new Error(
+        `Packaged Next server missing at ${standaloneServer}. Rebuild with output: 'standalone'.`,
+      );
+    }
+    nextProcess = spawnLogged({
+      label: 'next',
+      command: resolveElectronNodeCommand({
+        execPath: process.execPath,
+        platform: process.platform,
+        packaged: app.isPackaged,
+      }),
+      args: [standaloneServer],
+      cwd: webDir,
+      env: {
+        ...process.env,
+        ELECTRON_RUN_AS_NODE: '1',
+        HOSTNAME: '127.0.0.1',
+        PORT: String(webPort),
+        RAG_ENGINE_URL: `http://127.0.0.1:${enginePort}`,
+        NODE_ENV: 'production',
+      },
+      logPath: nextLogPath,
+    });
+  } else {
+    const nextCli = resolveNextCli(webDir);
+    if (!existsSync(nextCli)) {
+      throw new Error(
+        `Next.js CLI not found at ${nextCli}. Run pnpm install && pnpm --filter web build first.`,
+      );
+    }
+    nextProcess = spawnLogged({
+      label: 'next',
+      command: resolveElectronNodeCommand({
+        execPath: process.execPath,
+        platform: process.platform,
+        packaged: app.isPackaged,
+      }),
+      args: nextServerArgs({
+        nextCli,
+        hostname: '127.0.0.1',
+        port: webPort,
+        webDir,
+      }),
+      cwd: webDir,
+      env: {
+        ...process.env,
+        ELECTRON_RUN_AS_NODE: '1',
+        HOSTNAME: '127.0.0.1',
+        PORT: String(webPort),
+        RAG_ENGINE_URL: `http://127.0.0.1:${enginePort}`,
+        NODE_ENV: 'production',
+      },
+      logPath: nextLogPath,
+    });
+  }
+
+  if (nextProcess === null) {
+    throw new Error('Next.js process failed to start');
+  }
+  await waitForHttpWhileAlive(`http://127.0.0.1:${webPort}/${uiLocale}`, nextProcess, {
+    timeoutMs: 60_000,
+  });
+  backendsReady = true;
+}
+
 function registerIpc(): void {
   ipcMain.handle('desktop:get-setup-state', async () => {
     await refreshProbe();
@@ -627,6 +752,61 @@ function registerIpc(): void {
     await pullProfileModels();
     return { ok: true as const };
   });
+
+  ipcMain.handle('desktop:get-uninstall-preview', async () => {
+    const platform =
+      process.platform === 'darwin' || process.platform === 'win32' || process.platform === 'linux'
+        ? process.platform
+        : 'linux';
+    return { platform, defaults: defaultUninstallSelection() };
+  });
+
+  ipcMain.handle('desktop:run-uninstall', async (_event, raw: unknown) => {
+    const selection = parseUninstallSelection(raw);
+    if (selection === null) {
+      throw new Error('Invalid uninstall selection');
+    }
+    await resolveTools();
+    const report = await runUninstall(selection, {
+      userDataDir: app.getPath('userData'),
+      homeDir: homedir(),
+      stopProcesses: () => {
+        shutdown();
+      },
+      clearChromiumChat: async () => {
+        await session.defaultSession.clearStorageData({
+          storages: ['localstorage', 'indexdb', 'cookies'],
+        });
+      },
+      removeOllamaModels: async (tags) => removeOwnedOllamaModels({ ollamaPath, tags }),
+      removeOllamaApp: async () => removeOllamaApplication({ platform: process.platform }),
+      scheduleProgramRemoval: (deferredPaths) => {
+        const paths: string[] = [...deferredPaths];
+        if (uninstallViaNsis) {
+          // NSIS removes the install directory after a successful UI exit (code 0).
+        } else if (app.isPackaged && process.platform === 'darwin') {
+          paths.push(macAppBundleFromExecPath(process.execPath));
+          paths.push(join('/Applications', 'BGA Uninstall.app'));
+        } else if (app.isPackaged && process.platform === 'win32') {
+          paths.push(join(process.execPath, '..'));
+        }
+        if (paths.length > 0) {
+          spawnDeferredDelete({
+            platform: process.platform,
+            pid: process.pid,
+            paths,
+          });
+        }
+        return { id: 'schedule_program_removal', ok: true };
+      },
+    });
+    // Intentional run finished — NSIS must remove Program Files even if some extras failed.
+    uninstallFlowFinished = true;
+    setTimeout(() => {
+      app.exit(0);
+    }, 800);
+    return report;
+  });
 }
 
 function installNavigationLock(window: BrowserWindow): void {
@@ -634,14 +814,13 @@ function installNavigationLock(window: BrowserWindow): void {
     return;
   }
   windowsWithNavigationLock.add(window);
-  const setupPrefix = `http://127.0.0.1:${webPort}/${uiLocale}/setup`;
   window.webContents.on('will-navigate', (event, url) => {
-    if (currentGatePassed()) {
+    if (uninstallMode || currentGatePassed()) {
       return;
     }
-    if (!url.startsWith(setupPrefix)) {
+    if (!isAllowedWhenGated(url, uiLocale)) {
       event.preventDefault();
-      void window.loadURL(setupPrefix);
+      void window.loadURL(`http://127.0.0.1:${webPort}/${uiLocale}/setup`);
     }
   });
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
@@ -702,7 +881,11 @@ async function loadAppPage(): Promise<void> {
   if (window === null) {
     throw new Error('Main window failed to open');
   }
-  const path = initialAppPath({ locale: uiLocale, gatePassed: currentGatePassed() });
+  const path = initialAppPath({
+    locale: uiLocale,
+    gatePassed: currentGatePassed(),
+    uninstallMode,
+  });
   installNavigationLock(window);
   await window.loadURL(`http://127.0.0.1:${webPort}${path}`);
 }
@@ -729,7 +912,19 @@ const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
 } else {
-  app.on('second-instance', () => {
+  app.on('second-instance', (_event, argv) => {
+    if (argvHasUninstallFlag(argv)) {
+      if (mainWindow) {
+        if (mainWindow.isMinimized()) {
+          mainWindow.restore();
+        }
+        mainWindow.focus();
+        if (backendsReady) {
+          void mainWindow.loadURL(`http://127.0.0.1:${webPort}/${uiLocale}/uninstall`);
+        }
+      }
+      return;
+    }
     if (mainWindow) {
       if (mainWindow.isMinimized()) {
         mainWindow.restore();
@@ -745,7 +940,11 @@ if (!gotLock) {
     const splashShown = createWindow();
 
     try {
-      if (isDev && process.env.BGA_WEB_URL) {
+      if (uninstallMode) {
+        await startUninstallUi();
+        await splashShown;
+        await loadAppPage();
+      } else if (isDev && process.env.BGA_WEB_URL) {
         dataDir = join(app.getPath('userData'), 'storage');
         mkdirSync(dataDir, { recursive: true });
         machine = await readMachineSnapshot(dataDir);
@@ -756,6 +955,8 @@ if (!gotLock) {
         enginePort = Number(process.env.BGA_ENGINE_PORT ?? 8000);
         await refreshProbe();
         backendsReady = true;
+        await splashShown;
+        await loadAppPage();
       } else {
         // First consent is the Install button. After that (flag set, or Ollama
         // already on the machine from a prior install) start runtime alone and
@@ -785,9 +986,8 @@ if (!gotLock) {
         }
         backendsReady = true;
       }
-      if (isDev && process.env.BGA_WEB_URL) {
-        await splashShown;
-        await loadAppPage();
+      if (!uninstallMode) {
+        ensureMacUninstallHelperInstalled();
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -799,9 +999,17 @@ if (!gotLock) {
 
   app.on('before-quit', () => {
     shutdown();
+    // Apps & features → Uninstall: closing the UI without confirming must Abort NSIS.
+    if ((uninstallMode || uninstallViaNsis) && !uninstallFlowFinished) {
+      app.exit(1);
+    }
   });
 
   app.on('window-all-closed', () => {
+    if ((uninstallMode || uninstallViaNsis) && !uninstallFlowFinished) {
+      app.exit(1);
+      return;
+    }
     if (process.platform !== 'darwin') {
       app.quit();
     }

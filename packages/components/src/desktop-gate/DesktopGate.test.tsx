@@ -20,6 +20,16 @@ describe('DesktopGate', () => {
       onRuntimeProgress: () => () => undefined,
       openExternalHttps: async () => undefined,
       pullModels: async () => ({ ok: true as const }),
+      getUninstallPreview: async () => ({
+        platform: 'darwin' as const,
+        defaults: {
+          removeData: false,
+          removeApplication: false,
+          removeLlmModels: false,
+          removeOllama: false,
+        },
+      }),
+      runUninstall: async () => ({ steps: [], allSelectedOk: true }),
     };
     render(
       <DesktopGate locale="en">

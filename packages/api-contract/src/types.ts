@@ -71,12 +71,97 @@ export interface AskRequest {
    * means base rules only.
    */
   expansionIds?: string[];
+  /** When true, the engine speaks completed sentences while tokens stream. */
+  speak?: boolean;
+  /** UI locale for the spoken voice (`en` or `pl`). */
+  locale?: 'en' | 'pl';
 }
 
-export type PipelineStage = 'transcribing' | 'retrieving' | 'reranking' | 'generating' | 'speaking';
+export type PipelineStage =
+  | 'planning'
+  | 'transcribing'
+  | 'retrieving'
+  | 'reranking'
+  | 'generating'
+  | 'speaking';
 
 /** `insufficient_evidence` is a valid answer, not an error. */
 export type Groundedness = 'grounded' | 'partial' | 'insufficient_evidence';
+
+/** Soft pedagogical spine labels — guidance for planning, not a fixed 5-slot lesson. */
+export type LessonSpineHint = 'goal' | 'theme' | 'mechanics' | 'turn' | 'sample_move';
+
+export type LessonSessionStatus = 'planning' | 'active' | 'paused' | 'completed' | 'expired';
+
+export type LessonTurnKind = 'plan' | 'unit' | 'digression';
+
+export interface LessonSyllabusUnit {
+  unitId: string;
+  title: string;
+  sectionRefs: string[];
+  spineHint?: LessonSpineHint | null;
+}
+
+export interface LessonTurn {
+  id: string;
+  kind: LessonTurnKind;
+  unitId?: string | null;
+  question?: string | null;
+  text: string;
+  sources: RetrievedSource[];
+  groundedness: Groundedness;
+}
+
+/**
+ * Server-owned teaching session. `sessionId` is issued by the engine (D13),
+ * never chosen by the client.
+ */
+export interface LessonSession {
+  sessionId: string;
+  gameId: string;
+  expansionIds: string[];
+  syllabus: LessonSyllabusUnit[];
+  unitIndex: number;
+  status: LessonSessionStatus;
+  updatedAt: string;
+  expiresAt: string;
+  turns: LessonTurn[];
+}
+
+export interface LessonStartRequest {
+  gameId: string;
+  expansionIds?: string[];
+  speak?: boolean;
+  locale?: 'en' | 'pl';
+}
+
+/** Continue, repeat, or resolve the active lesson by server-issued id. */
+export interface LessonSessionRequest {
+  sessionId: string;
+  speak?: boolean;
+  locale?: 'en' | 'pl';
+}
+
+export interface LessonAskRequest {
+  sessionId: string;
+  question: string;
+  speak?: boolean;
+  locale?: 'en' | 'pl';
+}
+
+export interface LessonActiveResponse {
+  session: LessonSession | null;
+}
+
+export interface EnsureVoiceRequest {
+  locale: 'en' | 'pl';
+}
+
+export interface EnsureVoiceResponse {
+  ready: boolean;
+  voice: string;
+  locale: 'en' | 'pl';
+}
 
 export type AssistantEvent =
   | { type: 'status'; stage: PipelineStage }

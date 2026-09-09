@@ -18,6 +18,16 @@ from rag_engine.contract import (
     HealthReport,
     IngestEvent,
     IngestStage,
+    LessonActiveResponse,
+    LessonAskRequest,
+    LessonSession,
+    LessonSessionRequest,
+    LessonSessionStatus,
+    LessonSpineHint,
+    LessonStartRequest,
+    LessonSyllabusUnit,
+    LessonTurn,
+    LessonTurnKind,
     PipelineStage,
     RetrievalReloadResponse,
     RetrievedSource,
@@ -162,5 +172,90 @@ def test_every_ingest_event_exists_on_both_sides() -> None:
 def test_retrieval_reload_response_fields_match() -> None:
     ts_fields = _interface_fields(_source(), "RetrievalReloadResponse")
     python_fields = {to_camel(name) for name in RetrievalReloadResponse.model_fields}
+
+    assert ts_fields == python_fields
+
+
+def test_lesson_spine_hints_match() -> None:
+    ts_hints = _quoted(_declaration(_source(), "export type LessonSpineHint ="))
+
+    assert ts_hints == set(get_args(LessonSpineHint))
+
+
+def test_lesson_session_statuses_match() -> None:
+    ts_statuses = _quoted(_declaration(_source(), "export type LessonSessionStatus ="))
+
+    assert ts_statuses == set(get_args(LessonSessionStatus))
+
+
+def test_lesson_turn_kinds_match() -> None:
+    ts_kinds = _quoted(_declaration(_source(), "export type LessonTurnKind ="))
+
+    assert ts_kinds == set(get_args(LessonTurnKind))
+
+
+def test_lesson_syllabus_unit_fields_match() -> None:
+    ts_fields = _interface_fields(_source(), "LessonSyllabusUnit")
+    python_fields = {to_camel(name) for name in LessonSyllabusUnit.model_fields}
+
+    assert ts_fields == python_fields
+
+
+def test_lesson_turn_fields_match() -> None:
+    ts_fields = _interface_fields(_source(), "LessonTurn")
+    python_fields = {to_camel(name) for name in LessonTurn.model_fields}
+
+    assert ts_fields == python_fields
+
+
+def test_lesson_session_fields_match() -> None:
+    ts_fields = _interface_fields(_source(), "LessonSession")
+    python_fields = {to_camel(name) for name in LessonSession.model_fields}
+
+    assert ts_fields == python_fields
+
+
+def test_lesson_start_request_fields_match() -> None:
+    ts_fields = _interface_fields(_source(), "LessonStartRequest")
+    python_fields = {to_camel(name) for name in LessonStartRequest.model_fields}
+
+    assert ts_fields == python_fields
+
+
+def test_lesson_session_request_fields_match() -> None:
+    ts_fields = _interface_fields(_source(), "LessonSessionRequest")
+    python_fields = {to_camel(name) for name in LessonSessionRequest.model_fields}
+
+    assert ts_fields == python_fields
+
+
+def test_lesson_ask_request_fields_match() -> None:
+    ts_fields = _interface_fields(_source(), "LessonAskRequest")
+    python_fields = {to_camel(name) for name in LessonAskRequest.model_fields}
+
+    assert ts_fields == python_fields
+
+
+def test_lesson_active_response_fields_match() -> None:
+    ts_fields = _interface_fields(_source(), "LessonActiveResponse")
+    python_fields = {to_camel(name) for name in LessonActiveResponse.model_fields}
+
+    assert ts_fields == python_fields
+
+
+def test_ensure_voice_request_fields_match() -> None:
+    from rag_engine.contract import EnsureVoiceRequest
+
+    ts_fields = _interface_fields(_source(), "EnsureVoiceRequest")
+    python_fields = {to_camel(name) for name in EnsureVoiceRequest.model_fields}
+
+    assert ts_fields == python_fields
+
+
+def test_ensure_voice_response_fields_match() -> None:
+    from rag_engine.contract import EnsureVoiceResponse
+
+    ts_fields = _interface_fields(_source(), "EnsureVoiceResponse")
+    python_fields = {to_camel(name) for name in EnsureVoiceResponse.model_fields}
 
     assert ts_fields == python_fields

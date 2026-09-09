@@ -30,6 +30,18 @@ export function isAssistantEvent(value: unknown): value is AssistantEvent {
   if (type === 'figure') {
     return typeof (value as { sourceId?: unknown }).sourceId === 'string';
   }
+  if (type === 'audio') {
+    const sequence = (value as { sequence?: unknown }).sequence;
+    const mimeType = (value as { mimeType?: unknown }).mimeType;
+    const dataBase64 = (value as { dataBase64?: unknown }).dataBase64;
+    return (
+      typeof sequence === 'number' &&
+      Number.isFinite(sequence) &&
+      typeof mimeType === 'string' &&
+      typeof dataBase64 === 'string' &&
+      dataBase64.length > 0
+    );
+  }
   return true;
 }
 

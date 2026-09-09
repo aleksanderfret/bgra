@@ -44,5 +44,6 @@ describe('prefixLocale', () => {
   it('defaults to Polish when no locale is given', () => {
     expect(prefixLocale('/')).toBe('/pl');
     expect(prefixLocale('/rulebooks')).toBe('/pl/rulebooks');
+    expect(prefixLocale('/teach')).toBe('/pl/teach');
   });
 });

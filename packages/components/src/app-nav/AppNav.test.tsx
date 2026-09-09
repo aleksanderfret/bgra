@@ -17,12 +17,21 @@ describe('AppNav', () => {
     replace.mockClear();
   });
 
-  it('names the main views control and highlights the assistant', () => {
+  it('names the main views control and highlights questions on home', () => {
     render(<AppNav />, 'en');
 
     expect(screen.getByRole('navigation', { name: en.appNav.label })).toBeInTheDocument();
-    expect(screen.getByRole('radio', { name: en.appNav.assistant })).toBeChecked();
+    expect(screen.getByRole('radio', { name: en.appNav.questions })).toBeChecked();
+    expect(screen.getByRole('radio', { name: en.appNav.teach })).not.toBeChecked();
     expect(screen.getByRole('radio', { name: en.appNav.rulebooks })).not.toBeChecked();
+  });
+
+  it('opens the learn view when the user picks it', async () => {
+    render(<AppNav />, 'en');
+
+    await userEvent.click(screen.getByRole('radio', { name: en.appNav.teach }));
+
+    expect(push).toHaveBeenCalledWith('/en/teach');
   });
 
   it('opens the rulebooks view when the user picks it', async () => {

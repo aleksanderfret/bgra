@@ -69,9 +69,20 @@ def pull_huggingface_snapshot(repo_id: str, progress: ProgressCallback | None) -
 
 def pull_piper_voice(voice: str, progress: ProgressCallback | None) -> None:
     _log(f"ensuring Piper voice is available: {voice}", progress)
-    # piper-tts downloads on first synthesis; we only record the intent here so
-    # the desktop UI can show a step. A real download hook lands with stage 5.
-    _log(f"piper voice {voice} will be fetched on first use in stage 5", progress)
+    # pull_models runs before Settings.storage_dir is always the service storage;
+    # voices land under the same tree the engine uses at runtime.
+    from rag_engine.settings import get_settings
+    from rag_engine.speech.voices import (
+        TTS_VOICE_EN,
+        TTS_VOICE_PL,
+        ensure_piper_voice,
+    )
+
+    storage = get_settings().storage_dir
+    locale = "pl" if voice == TTS_VOICE_PL else "en"
+    if voice not in {TTS_VOICE_PL, TTS_VOICE_EN}:
+        locale = "en" if "en_" in voice or voice.startswith("en") else "pl"
+    ensure_piper_voice(storage, locale, progress=progress)  # type: ignore[arg-type]
 
 
 def ollama_fields(profile: ModelProfile) -> list[tuple[str, str]]:
@@ -120,8 +131,16 @@ def pull_profile(
         # Reranker is always needed for stage 3; pull it up-front so first ask
         # does not freeze while sentence-transformers downloads ~GB of weights.
         pull_huggingface_snapshot(profile.reranker, progress)
-        if profile.stt.startswith("mlx-community/") or "/" in profile.stt:
-            pull_huggingface_snapshot(profile.stt, progress)
+        from rag_engine.speech.backend import speech_backend_name, stt_model_id
+
+        stt_id = stt_model_id(profile_stt=profile.stt)
+        if speech_backend_name() == "mlx-whisper" or "/" in stt_id:
+            pull_huggingface_snapshot(stt_id, progress)
+        elif speech_backend_name() == "faster-whisper":
+            # Prefetch the HF snapshot so first mic use is not a silent multi-GB wait.
+            fw_repo = f"Systran/faster-whisper-{stt_id}"
+            _log(f"pulling faster-whisper weights: {fw_repo}", progress)
+            pull_huggingface_snapshot(fw_repo, progress)
         pull_piper_voice(profile.tts_voice, progress)
 
     _log("Done.", progress)

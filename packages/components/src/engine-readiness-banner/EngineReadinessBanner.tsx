@@ -1,14 +1,46 @@
 'use client';
 
 import { useEngineReadiness } from '@bga/hooks/use-engine-readiness';
+import { isEngineHealthSnapshot } from '@bga/utils/engine-readiness';
 import { Alert, Button, Stack } from '@mantine/core';
-import { type FC, useState } from 'react';
+import { type FC, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export const EngineReadinessBanner: FC = () => {
   const { t } = useTranslation();
   const phase = useEngineReadiness();
   const [retrying, setRetrying] = useState(false);
+  const [speechMissing, setSpeechMissing] = useState(false);
+
+  useEffect(() => {
+    if (phase !== 'ready') {
+      setSpeechMissing(false);
+      return;
+    }
+    let cancelled = false;
+    const checkSpeech = async (): Promise<void> => {
+      try {
+        const response = await fetch('/api/engine/health');
+        if (!response.ok) {
+          return;
+        }
+        const payload: unknown = await response.json();
+        if (!isEngineHealthSnapshot(payload) || cancelled) {
+          return;
+        }
+        const stt = payload.components.speech_stt;
+        const tts = payload.components.speech_tts;
+        // Only warn when health explicitly reports false (older engines omit keys).
+        setSpeechMissing(stt === false || tts === false);
+      } catch {
+        // Keep silent; questions still work without speech.
+      }
+    };
+    void checkSpeech();
+    return () => {
+      cancelled = true;
+    };
+  }, [phase]);
 
   const handleRetrySearch = (): void => {
     setRetrying(true);
@@ -22,7 +54,14 @@ export const EngineReadinessBanner: FC = () => {
   };
 
   if (phase === 'ready') {
-    return null;
+    if (!speechMissing) {
+      return null;
+    }
+    return (
+      <Alert color="yellow" title={t('engineReadiness.speechMissing.title')} role="status">
+        {t('engineReadiness.speechMissing.body')}
+      </Alert>
+    );
   }
 
   if (phase === 'reading_layout') {

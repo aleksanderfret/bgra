@@ -109,8 +109,6 @@ describe('RulesChat', () => {
     });
     expect(screen.getByRole('button', { name: en.rulesChat.submit })).toBeInTheDocument();
     expect(screen.getByRole('group', { name: en.rulesChat.game.label })).toBeInTheDocument();
-    expect(screen.getByRole('group', { name: en.rulesChat.mode.legend })).toBeInTheDocument();
-    expect(screen.getByRole('radio', { name: en.rulesChat.mode.teach })).toBeInTheDocument();
     expect(screen.getByText(en.rulesChat.game.description)).toBeInTheDocument();
   });
 
@@ -326,7 +324,7 @@ describe('RulesChat', () => {
     expect(await screen.findByText('Azul answer.')).toBeInTheDocument();
   });
 
-  it('posts a question-only Ask body with no prior turns', async () => {
+  it('posts a question-only Ask body with arbitrate mode and no prior turns', async () => {
     const fetchMock = readyLibraryFetch(['First ruling.', 'Second ruling.']);
     vi.stubGlobal('fetch', fetchMock);
 
@@ -355,7 +353,18 @@ describe('RulesChat', () => {
     expect(second).not.toHaveProperty('thread');
     expect(second).not.toHaveProperty('history');
     expect(second.question).toBe('When does it end?');
+    expect(second.mode).toBe('arbitrate');
+    expect(second.speak).toBe(false);
+    expect(second.locale).toBe('en');
   });
 });
 
-const ASK_BODY_KEYS = new Set(['gameId', 'question', 'mode', 'expansionIds', 'sessionId']);
+const ASK_BODY_KEYS = new Set([
+  'gameId',
+  'question',
+  'mode',
+  'expansionIds',
+  'sessionId',
+  'speak',
+  'locale',
+]);

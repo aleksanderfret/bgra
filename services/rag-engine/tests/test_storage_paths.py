@@ -5,6 +5,7 @@ import pytest
 from rag_engine.storage_paths import (
     InvalidDocKeyError,
     InvalidGameIdError,
+    InvalidSessionIdError,
     StoragePathEscapeError,
     assert_game_id,
     assert_under_storage,
@@ -12,8 +13,13 @@ from rag_engine.storage_paths import (
     document_dir,
     game_assets_dir,
     index_dir,
+    lesson_active_pointer_path,
+    lesson_archive_dir,
+    lesson_session_path,
+    lesson_sessions_dir,
     page_image_url,
     page_png_path,
+    player_dir,
     slugify_doc_key,
 )
 
@@ -51,6 +57,38 @@ def test_paths_stay_under_storage(tmp_path: Path) -> None:
 
     index = index_dir(storage)
     assert index == (storage / "index").resolve()
+
+
+def test_player_lesson_paths_stay_under_storage(tmp_path: Path) -> None:
+    storage = tmp_path / "storage"
+    storage.mkdir()
+    session_id = "a" * 32
+
+    assert player_dir(storage) == (storage / "player").resolve()
+    assert lesson_sessions_dir(storage) == (storage / "player" / "lessons" / "sessions").resolve()
+    assert (
+        lesson_session_path(storage, session_id)
+        == (storage / "player" / "lessons" / "sessions" / f"{session_id}.json").resolve()
+    )
+    assert (
+        lesson_active_pointer_path(storage, "azul")
+        == (storage / "player" / "lessons" / "active" / "azul.json").resolve()
+    )
+    assert (
+        lesson_archive_dir(storage, "azul")
+        == (storage / "player" / "lessons" / "archive" / "azul").resolve()
+    )
+
+
+@pytest.mark.parametrize(
+    "session_id",
+    ["", "..", "../evil", "a/b", "not-hex", "A" * 32, "a" * 31, "a" * 33],
+)
+def test_lesson_session_path_rejects_unsafe_ids(tmp_path: Path, session_id: str) -> None:
+    storage = tmp_path / "storage"
+    storage.mkdir()
+    with pytest.raises(InvalidSessionIdError):
+        lesson_session_path(storage, session_id)
 
 
 def test_assert_under_storage_rejects_escape(tmp_path: Path) -> None:

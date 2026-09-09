@@ -1,22 +1,26 @@
 'use client';
 
-import type { AnswerMode, GameSummary } from '@bga/api-contract';
+import type { GameSummary } from '@bga/api-contract';
+import { AnswerPanel } from '@bga/components/answer-panel';
 import { ConversationLog } from '@bga/components/conversation-log';
 import { useAskStream } from '@bga/hooks/use-ask-stream';
+import { useAudioQueue } from '@bga/hooks/use-audio-queue';
 import { useConversationThread } from '@bga/hooks/use-conversation-thread';
 import { useEngineReadiness } from '@bga/hooks/use-engine-readiness';
-import { streamingStatusKey } from '@bga/utils/answer-state';
+import { useHoldToTalk } from '@bga/hooks/use-hold-to-talk';
+import { type AnswerState, isBlockingNotice, streamingStatusKey } from '@bga/utils/answer-state';
 import { selectExchanges } from '@bga/utils/conversation-thread';
 import { GAMES_CHANGED_EVENT } from '@bga/utils/desktop-bridge';
 import { isGameSummaryList } from '@bga/utils/game-summary';
+import { loadReadAloudPreference, saveReadAloudPreference } from '@bga/utils/voice-prefs';
 import {
   Button,
   Checkbox,
   Fieldset,
   Group,
-  SegmentedControl,
   Select,
   Stack,
+  Switch,
   Text,
   Textarea,
 } from '@mantine/core';
@@ -24,6 +28,7 @@ import {
   type ChangeEvent,
   type FC,
   type KeyboardEvent,
+  type PointerEvent,
   type SubmitEvent,
   useEffect,
   useId,
@@ -31,10 +36,6 @@ import {
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-
-const MODES: readonly AnswerMode[] = ['teach', 'arbitrate'];
-
-const isAnswerMode = (value: string): value is AnswerMode => MODES.some((mode) => mode === value);
 
 interface ExpansionCheckboxProps {
   expansionId: string;
@@ -59,21 +60,37 @@ const ExpansionCheckbox: FC<ExpansionCheckboxProps> = ({
 };
 
 export const RulesChat: FC = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const locale = i18n.language === 'pl' ? 'pl' : 'en';
   const [games, setGames] = useState<GameSummary[] | null>(null);
   const [gameId, setGameId] = useState<string | null>(null);
   const enginePhase = useEngineReadiness();
   const [expansionIds, setExpansionIds] = useState<string[]>([]);
   const [expansionsCleared, setExpansionsCleared] = useState(false);
-  const [mode, setMode] = useState<AnswerMode>('teach');
   const [question, setQuestion] = useState('');
   const [activeExchangeId, setActiveExchangeId] = useState<string | null>(null);
+  const [readAloud, setReadAloud] = useState(loadReadAloudPreference);
+  const [voiceFailure, setVoiceFailure] = useState<AnswerState | null>(null);
   const expansionsStatusId = useId();
   const { state, ask, cancel } = useAskStream();
+  const { enqueue, stop: stopAudio } = useAudioQueue();
   const { thread, lastSaveSucceeded, beginExchange, updateAnswer, dropExchange } =
     useConversationThread(gameId);
   const wasStreamingRef = useRef(false);
+  const voicePendingRef = useRef(false);
+  const readAloudRef = useRef(readAloud);
+  readAloudRef.current = readAloud;
   const screenExchanges = selectExchanges(thread, 'screen');
+
+  const enqueueIfReadAloud = (frame: {
+    sequence: number;
+    mimeType: string;
+    dataBase64: string;
+  }): void => {
+    if (readAloudRef.current) {
+      enqueue(frame);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -116,8 +133,41 @@ export const RulesChat: FC = () => {
   }, [enginePhase]);
 
   useEffect(() => {
+    if (
+      voicePendingRef.current &&
+      state.transcript !== null &&
+      activeExchangeId === null &&
+      state.transcript.trim().length > 0
+    ) {
+      voicePendingRef.current = false;
+      setVoiceFailure(null);
+      const id = beginExchange({
+        question: state.transcript,
+        mode: 'arbitrate',
+        expansionIds: [...expansionIds],
+      });
+      setActiveExchangeId(id);
+    }
+  }, [activeExchangeId, beginExchange, expansionIds, state.transcript]);
+
+  useEffect(() => {
+    if (voicePendingRef.current && state.isStreaming) {
+      wasStreamingRef.current = true;
+    }
+    if (
+      voicePendingRef.current &&
+      !state.isStreaming &&
+      (state.transcript === null || state.transcript.trim().length === 0)
+    ) {
+      voicePendingRef.current = false;
+      const failed =
+        state.error !== null || (state.notice !== null && isBlockingNotice(state.notice.code));
+      setVoiceFailure(failed ? state : null);
+    }
     if (activeExchangeId === null) {
-      wasStreamingRef.current = false;
+      if (!voicePendingRef.current) {
+        wasStreamingRef.current = false;
+      }
       return;
     }
     updateAnswer(activeExchangeId, state);
@@ -135,15 +185,17 @@ export const RulesChat: FC = () => {
   const expansionsForBase =
     gameId === null ? [] : (games ?? []).filter((game) => game.baseGameId === gameId);
   const picksLocked = state.isStreaming;
-
-  const canAsk =
-    enginePhase === 'ready' && gameId !== null && question.trim().length > 0 && !state.isStreaming;
+  const engineReady = enginePhase === 'ready';
+  const canTextAsk =
+    engineReady && gameId !== null && question.trim().length > 0 && !state.isStreaming;
+  const canVoiceAsk = engineReady && gameId !== null && !state.isStreaming;
 
   const onBaseGameChange = (next: string | null): void => {
     if (state.isStreaming) {
       return;
     }
     setGameId(next);
+    setVoiceFailure(null);
     if (expansionIds.length > 0) {
       setExpansionIds([]);
       setExpansionsCleared(true);
@@ -163,31 +215,102 @@ export const RulesChat: FC = () => {
   };
 
   const handleCancel = (): void => {
+    stopAudio();
     cancel();
+    voicePendingRef.current = false;
+    setVoiceFailure(null);
     if (activeExchangeId !== null) {
       dropExchange(activeExchangeId);
       setActiveExchangeId(null);
     }
   };
 
+  const handleReadAloudChange = (checked: boolean): void => {
+    readAloudRef.current = checked;
+    setReadAloud(checked);
+    saveReadAloudPreference(checked);
+    if (!checked) {
+      stopAudio();
+    }
+  };
+
   const submitQuestion = (): void => {
-    if (!canAsk || gameId === null) {
+    if (!canTextAsk || gameId === null) {
       return;
     }
+    stopAudio();
+    voicePendingRef.current = false;
+    setVoiceFailure(null);
     const questionText = question.trim();
     const id = beginExchange({
       question: questionText,
-      mode,
+      mode: 'arbitrate',
       expansionIds: [...expansionIds],
     });
     setActiveExchangeId(id);
     setQuestion('');
-    void ask({
-      gameId,
-      question: questionText,
-      mode,
-      expansionIds: expansionIds.length > 0 ? expansionIds : undefined,
-    });
+    void ask(
+      {
+        gameId,
+        question: questionText,
+        mode: 'arbitrate',
+        expansionIds: expansionIds.length > 0 ? expansionIds : undefined,
+        speak: readAloudRef.current,
+        locale,
+      },
+      { onAudio: enqueueIfReadAloud },
+    );
+  };
+
+  const submitVoice = (wav: Blob): void => {
+    if (!canVoiceAsk || gameId === null) {
+      return;
+    }
+    stopAudio();
+    voicePendingRef.current = true;
+    setVoiceFailure(null);
+    void ask(
+      {
+        gameId,
+        question: '.',
+        mode: 'arbitrate',
+        expansionIds: expansionIds.length > 0 ? expansionIds : undefined,
+        speak: readAloudRef.current,
+        locale,
+      },
+      {
+        audio: wav,
+        onAudio: enqueueIfReadAloud,
+      },
+    );
+  };
+
+  const holdToTalk = useHoldToTalk({
+    disabled: !canVoiceAsk,
+    onHoldStart: () => {
+      stopAudio();
+      cancel();
+      voicePendingRef.current = false;
+      setVoiceFailure(null);
+      if (activeExchangeId !== null) {
+        dropExchange(activeExchangeId);
+        setActiveExchangeId(null);
+      }
+    },
+    onRecordingComplete: submitVoice,
+  });
+
+  const onMicPointerDown = (event: PointerEvent<HTMLButtonElement>): void => {
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    holdToTalk.onPressStart();
+  };
+
+  const onMicPointerUp = (event: PointerEvent<HTMLButtonElement>): void => {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    holdToTalk.onPressEnd();
   };
 
   const onSubmit = (event: SubmitEvent<HTMLFormElement>): void => {
@@ -202,17 +325,19 @@ export const RulesChat: FC = () => {
     }
   };
 
-  const handleModeChange = (value: string): void => {
-    if (isAnswerMode(value)) {
-      setMode(value);
-    }
-  };
-
   const handleQuestionChange = (event: ChangeEvent<HTMLTextAreaElement>): void => {
     setQuestion(event.currentTarget.value);
   };
 
   const statusKey = streamingStatusKey(state);
+  let micHint: string | null = null;
+  if (!holdToTalk.isSupported) {
+    micHint = t('rulesChat.voice.unsupported');
+  } else if (holdToTalk.errorCode === 'mic_denied') {
+    micHint = t('rulesChat.voice.micDenied');
+  } else if (holdToTalk.errorCode === 'mic_unavailable') {
+    micHint = t('rulesChat.voice.micUnavailable');
+  }
 
   return (
     <form onSubmit={onSubmit} aria-label={t('rulesChat.formLabel')}>
@@ -258,17 +383,11 @@ export const RulesChat: FC = () => {
           </Fieldset>
         )}
 
-        <Fieldset legend={t('rulesChat.mode.legend')} variant="filled">
-          <SegmentedControl
-            value={mode}
-            onChange={handleModeChange}
-            data={MODES.map((value) => ({ value, label: t(`rulesChat.mode.${value}`) }))}
-            fullWidth
-            disabled={picksLocked}
-          />
-        </Fieldset>
-
         <ConversationLog exchanges={screenExchanges} />
+
+        {voiceFailure !== null && !state.isStreaming && activeExchangeId === null && (
+          <AnswerPanel state={voiceFailure} />
+        )}
 
         <Textarea
           label={t('rulesChat.question.label')}
@@ -280,9 +399,27 @@ export const RulesChat: FC = () => {
           minRows={2}
         />
 
+        <Switch
+          label={t('rulesChat.voice.readAloud')}
+          checked={readAloud}
+          onChange={(event) => {
+            handleReadAloudChange(event.currentTarget.checked);
+          }}
+        />
+
         <Group>
-          <Button type="submit" disabled={!canAsk} loading={state.isStreaming}>
+          <Button type="submit" disabled={!canTextAsk} loading={state.isStreaming}>
             {t('rulesChat.submit')}
+          </Button>
+          <Button
+            type="button"
+            variant={holdToTalk.isHolding ? 'filled' : 'light'}
+            disabled={!canVoiceAsk || !holdToTalk.isSupported}
+            onPointerDown={onMicPointerDown}
+            onPointerUp={onMicPointerUp}
+            onPointerCancel={onMicPointerUp}
+          >
+            {holdToTalk.isHolding ? t('rulesChat.voice.holding') : t('rulesChat.voice.holdToTalk')}
           </Button>
           {state.isStreaming && (
             <Button type="button" variant="subtle" color="gray" onClick={handleCancel}>
@@ -293,6 +430,12 @@ export const RulesChat: FC = () => {
             {statusKey !== null ? t(statusKey) : ''}
           </Text>
         </Group>
+
+        {micHint !== null && (
+          <Text size="sm" c="dimmed" role="status">
+            {micHint}
+          </Text>
+        )}
 
         {!lastSaveSucceeded && (
           <Text size="sm" c="dimmed" role="status">

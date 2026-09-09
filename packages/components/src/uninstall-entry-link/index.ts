@@ -1,0 +1,1 @@
+export { UninstallEntryLink } from './UninstallEntryLink';

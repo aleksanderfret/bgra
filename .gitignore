@@ -8,6 +8,7 @@ dist/
 coverage/
 apps/desktop/release/
 apps/desktop/packaging/bin/
+apps/desktop/packaging/BGA Uninstall.app/
 *.tsbuildinfo
 next-env.d.ts
 .turbo/

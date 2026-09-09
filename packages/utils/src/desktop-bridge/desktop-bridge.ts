@@ -37,6 +37,29 @@ export interface OkResult {
   ok: true;
 }
 
+export interface UninstallSelectionPayload {
+  removeData: boolean;
+  removeApplication: boolean;
+  removeLlmModels: boolean;
+  removeOllama: boolean;
+}
+
+export interface UninstallStepPayload {
+  id: string;
+  ok: boolean;
+  code?: string;
+}
+
+export interface UninstallReportPayload {
+  steps: UninstallStepPayload[];
+  allSelectedOk: boolean;
+}
+
+export interface UninstallPreviewPayload {
+  platform: 'darwin' | 'win32' | 'linux';
+  defaults: UninstallSelectionPayload;
+}
+
 export interface DesktopSetupState {
   machine: DesktopMachineSnapshot | null;
   recommendation: DesktopProfileRecommendation | null;
@@ -61,6 +84,8 @@ export interface BgaDesktopApi {
   onRuntimeProgress: (handler: (event: RuntimeProgress) => void) => () => void;
   openExternalHttps: (url: string) => Promise<void>;
   pullModels: () => Promise<OkResult>;
+  getUninstallPreview: () => Promise<UninstallPreviewPayload>;
+  runUninstall: (selection: UninstallSelectionPayload) => Promise<UninstallReportPayload>;
 }
 
 declare global {

@@ -380,40 +380,45 @@ half-ready UI; Mac and Windows present the same steps.
 
 ---
 
-## Stage 3H — Uninstall and remove what the app downloaded
+## Stage 3H — Uninstall and remove what the app downloaded ✅ **complete**
 
 **Goal:** a player can remove BGA **and** (if they choose) the things first-run
 put on the computer — without a terminal, and without assuming that dragging the
 app to Trash cleans anything else.
 
-Do this **after Stage 3B**. First-run is what creates Ollama, models, and app
-data; uninstall is the mirror. Dragging `BGA.app` to Trash on macOS only deletes
-the app bundle — it never runs our code — so Mac needs an **in-app** path.
-Windows can hook the normal uninstaller.
+Done after Stage 3B. First-run is what creates Ollama, models, and app data;
+uninstall is the mirror. Dragging `BGA.app` to Trash on macOS only deletes the
+app bundle — it never runs our code — so Mac needs an **in-app** path. Windows
+hooks Apps & features → Uninstall.
 
-- **Windows:** the NSIS (or equivalent) uninstall removes BGA and, with clear
-  prompts, the optional extras below — same choices as on Mac, not a silent wipe
-  of everything on the machine.
-- **Mac:** in the packaged app, a screen with a primary action like “Remove BGA
-  and downloaded files…” lists checkboxes the player understands:
-  - **BGA’s own data** (setup flag, library storage, local Python env) — default
-    on when uninstalling.
-  - **Downloaded models** (Ollama weights on disk) — off by default or behind an
-    explicit confirm; large and shared.
-  - **Ollama itself** — off by default with a plain warning that other apps may
-    use it; never remove it silently.
-- Copy stays in `en`/`pl`. No “open Terminal”, no “run this command”, no asking
-  the player to find folders by hand.
-- After confirm, quit related processes safely, delete only what was selected,
-  then quit. If Ollama or models were left on purpose, say so in one short line.
-- Do **not** treat Trash-drag as an uninstall hook on Mac — that path cannot run
-  our cleanup. The in-app (or DMG-bundled) remover is the supported way.
+Plan: `docs/archive/stage-3h-uninstall.md`.
 
-**Acceptance:** on Windows, Apps & features → Uninstall walks through the same
-choices and leaves the machine as selected; on Mac, the in-app remover can wipe
-BGA data alone, or data + models, or data + models + Ollama, each with a clear
-confirm; a player who only deletes `BGA.app` is not promised cleanup (document
-that the in-app remover is required for a full wipe); `pnpm verify` passes.
+- **Always:** remove the BGA program (Windows install dir after the UI exits;
+  Mac `BGA.app` + Uninstall helper via deferred delete after quit).
+- **Four checkboxes, all default off** (same UI on Mac and Windows):
+  - **Game data** — library (`storage`), reserved `player/` settings, chat history.
+  - **App runtime** — Python env, logs, setup flag, downloads, helpers, `hf-cache`
+    (and scoped legacy Hugging Face hub dirs for BGA-owned repos). Does **not**
+    wipe Chromium chat storage unless Game data is also selected.
+  - **Assistant language models** — only Ollama tags from BGA profiles (allowlist
+    parity with `settings.py`), never a wipe of all `~/.ollama`.
+  - **Ollama** — remove the Ollama app with a plain warning; never silent.
+- **Windows:** NSIS launches the same Electron uninstall UI (`--bga-uninstall`);
+  cancel aborts so Program Files is not deleted; NSIS removes the install dir
+  only after a successful UI exit.
+- **Mac:** in-app “Remove BGA…” (Home and Setup) **and** `BGA Uninstall.app`
+  (best-effort copy to Applications on first launch; also on the DMG). Trash-drag
+  is not a cleanup hook.
+- **Linux:** same types/IPC/UI skeleton; no packaged acceptance in this stage.
+- Copy stays in `en`/`pl`. No “open Terminal”, no folder treasure hunts.
+- After confirm: stop processes, apply selections, show what was left on purpose,
+  quit, then deferred program removal.
+
+**Acceptance:** on Windows, Apps & features → Uninstall shows the same choices and
+leaves the machine as selected (cancel leaves the install); on Mac, in-app or
+BGA Uninstall can remove program-only or any combination of data / runtime /
+models / Ollama, each with a clear confirm; a player who only deletes `BGA.app`
+is not promised cleanup; `pnpm verify` passes; Mac + Windows smoke before release.
 
 ---
 
@@ -550,63 +555,87 @@ Phase 2 ships; `pnpm verify` passes.
 
 ---
 
-## Stage 4 — Teaching mode
+## Stage 4 — Teaching mode ✅ **complete**
 
-**Goal:** the assistant teaches rather than merely answering. The lesson uses the
-**same visible thread** as Stage 3D — modules appear as turns you can scroll back to,
-not a panel that wipes the last one.
+**Goal:** the assistant teaches a game **like a human teacher**, on a dedicated
+**Learn** page — not by reading the rulebook aloud, and not inside the Questions
+thread (Stage 3D).
 
-- Separate prompts for `teach` and `arbitrate`
-- Teaching style drawn from tutorial transcripts, supplied as an example in the system
-  prompt, **marked as not being a source of rules**
-- Session state keyed by `sessionId`, **issued by the server and given a TTL** (D13). A
-  client-chosen identifier would be someone else's lesson for the price of a guess — the
-  cost of getting this right is nil today and considerable once anyone else can connect.
-  That id tracks *where the lesson is*, not the written history (the thread is per game
-  and durable; this id is short-lived).
-- Lesson structure: goal → theme → mechanics → turn → sample move, with a comprehension
-  check after each module
+Done after Stage 3D. Plan: `docs/superpowers/plans/stage-4-teaching.md` (archive
+after ship).
 
-**Acceptance:** a "teach me this game" conversation walks through the modules without
-dumping everything at once, earlier modules stay visible in the thread, and switching
-to `arbitrate` mid-session produces a short answer with a citation.
+- Three nav pages: **Learn** (`/teach`) | **Questions** (`/`) | **Rulebooks**
+- Server-issued `sessionId` with **72 h TTL** (D13); one active session per game
+- **Syllabus-first:** build a lesson plan from the section catalogue / TOC, soft
+  spine hints (goal → theme → mechanics → turn → sample move), reorder only with
+  real section refs — never invent topics
+- One grounded generation per teaching unit (or plan step); Continue / Repeat /
+  digression on Learn only; ~8 s auto-Continue
+- Digression = short cited ruling; `unitIndex` unchanged; Questions stays
+  `arbitrate` for mid-game fights
+- Local lesson archive under `storage/player/lessons/` feeds **style** only, never
+  the rules index
+
+**Acceptance:** Learn walks units without dumping the whole book; Continuie
+restores syllabus + turns after restart within TTL; digressions stay on Learn;
+thin retrieval yields an honest notice + Repeat; Questions never shows lesson
+chrome; `pnpm verify` passes.
 
 ---
 
-## Stage 5 — Voice
+## Stage 5 — Voice (local)
 
-**Goal:** a conversation without a keyboard. Speech is an extra pair of ears and a
-mouth on the **same written thread** from Stage 3D — never a voice-only mode.
+**Goal:** a conversation without a keyboard on this computer. Speech is an extra pair
+of ears and a mouth on the **same written thread** from Stage 3D — never a voice-only
+mode. This slice is **localhost / Electron only** (`127.0.0.1`). Tablet, LAN bind,
+mkcert HTTPS, and enforcing CSP are **Stage 5B**.
 
-- `uv sync --extra speech`
+- `uv sync --extra speech` (desktop product sync includes this extra automatically)
 - Speech-to-text behind one interface (`rag_engine.speech.SpeechToText`):
   **`mlx-whisper` on macOS (Apple Silicon)** and **`faster-whisper` on Windows/Linux**.
   The desktop decision O1 requires voice on both platforms; do not call mlx directly
   from routers.
-- Push-to-talk in the browser / Electron window (`MediaRecorder`); the `transcript`
-  frame shows what it heard before it answers, and that text lands in the thread as
-  the player's turn
-- The spoken answer is the assistant turn already on screen, read aloud. If the
-  player cannot listen, they still have the written message to scroll back to
-- Piper with a Polish voice, audio streamed **sentence by sentence** — not after the
-  whole answer is generated
-- **A local HTTPS setup is required** (`mkcert`) for a tablet on the home network —
-  `getUserMedia` does not work over HTTP outside `localhost` (decision Z4). Inside
-  Electron on `http://127.0.0.1` the mic works without mkcert, but still needs the
-  Electron permission handler and `NSMicrophoneUsageDescription`.
+- Hold-to-talk in the browser / Electron window (16 kHz mono WAV from the page; Space
+  works except while focus is in a text field). The `transcript` frame shows what it
+  heard before it answers, and that text lands in the thread as the player's turn
+- Optional “Read aloud” (default **off**). When on, Piper speaks completed sentences
+  **while tokens still stream** (`audio` SSE frames). New hold or new typed send stops
+  playback immediately
+- Piper voices: Polish `pl_PL-bass-high`, English `en_US-lessac-medium`. OS/UI locale
+  picks the first voice; switching language downloads the other in-app
+  (`POST /speech/ensure-voice`)
+- Learn mode uses the same speak/locale path; the 8s auto-advance waits until the
+  stream is done **and** the audio queue is idle
+- Recorded audio goes through the same proxy as everything else; `Permissions-Policy`
+  already limits the microphone to this origin. Electron still needs the permission
+  handler and `NSMicrophoneUsageDescription`.
+
+> **Footnote:** if interrupting mid-answer proves unreliable over SSE, a later
+> WebSocket audio channel may replace the `audio` frames — not required for Stage 5
+> acceptance.
+
+**Acceptance:** a spoken question produces a spoken answer on **both macOS and
+Windows**; the first sound arrives before the model finishes generating; the same
+words stay in the thread so they can be read later; read-aloud off stays silent;
+switching language prepares the matching Piper voice in the app.
+
+---
+
+## Stage 5B — Voice on the home network (tablet)
+
+**Goal:** the same voice UX on a tablet at the table, with a locked door on the LAN.
+
+- A local HTTPS setup (`mkcert`) — `getUserMedia` does not work over HTTP outside
+  `localhost` (decision Z4)
 - Opening the LAN interface is **one change with the access check**, not a step before
   it: Next.js stops binding `127.0.0.1` (D9) only in the same commit that fills in
-  `assertMayReachEngine` (D10). The Python engine stays on `127.0.0.1` either way.
+  `assertMayReachEngine` (D10). The Python engine stays on `127.0.0.1` either way
 - With HTTPS in place, the report-only CSP becomes enforcing, and `Strict-Transport-
   Security` is added. Mantine's inline styles and `ColorSchemeScript` need nonces first,
-  which is why the policy is only recording today.
-- Recorded audio goes through the same proxy as everything else; `Permissions-Policy`
-  already limits the microphone to this origin
+  which is why the policy is only recording today
 
-**Acceptance:** a spoken question produces a spoken answer on **both macOS and Windows**;
-the first sound arrives before the model finishes generating; the same words stay in the
-thread so they can be read later; **the microphone works on the tablet**, not only on
-the Mac; and a request from the tablet without credentials is refused by the proxy.
+**Acceptance:** the microphone works on the tablet, not only on the Mac; a request
+from the tablet without credentials is refused by the proxy.
 
 ---
 
@@ -789,14 +818,14 @@ re-read once with a layout-aware importer; the banner says so while that runs.
 **at the table** — you can look back, and sound is optional. Stage 0A–0C (hardening, desktop
 window, release) are already done; they sit under the numbered product stages.
 Stage 3B is what makes that arbiter usable from the packaged app (Ollama + models
-behind a one-click gate). Stage 3H is the mirror: remove the app and, when the
+behind a one-click gate). **Stage 3H is done:** remove the app and, when the
 player chooses, what first-run downloaded (Windows uninstall; Mac in-app remover
-with checkboxes — Trash alone cannot run cleanup). Stage 6 is worth doing right after 3 — before you start
-tuning prompts, because otherwise you are tuning by feel. Stage 6A (page layout)
-comes **after that measurement**: first learn how often columns and sidenotes cost
-us an answer, then decide whether a heavier import is worth it. Voice (5) and
-images (7) polish the experience; they are not a condition of usefulness. Online
-lookup (8) comes last because the app should be fully useful offline first —
-internet is a convenience, not a requirement. Stage 9 (context window) and 9A
-(when models sit in RAM) wait until that product exists; growing the window or
-rewriting load/unload earlier is guessing.
+with checkboxes — Trash alone cannot run cleanup). Stage 6 is worth doing right
+after 3 — before you start tuning prompts, because otherwise you are tuning by
+feel. Stage 6A (page layout) comes **after that measurement**: first learn how
+often columns and sidenotes cost us an answer, then decide whether a heavier
+import is worth it. Voice (5) and images (7) polish the experience; they are not
+a condition of usefulness. Online lookup (8) comes last because the app should be
+fully useful offline first — internet is a convenience, not a requirement.
+Stage 9 (context window) and 9A (when models sit in RAM) wait until that product
+exists; growing the window or rewriting load/unload earlier is guessing.

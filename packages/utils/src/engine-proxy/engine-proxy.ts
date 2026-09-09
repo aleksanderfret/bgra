@@ -26,10 +26,16 @@ export const routeKind = (segments: string[]): EngineRouteKind => {
   switch (segments[0]) {
     case 'ask':
       return 'stream';
+    case 'lesson':
+      // GET active is short JSON; POST start/continue/repeat/ask stream tokens.
+      return segments[1] === 'active' ? 'api' : 'stream';
     case 'static':
       return 'asset';
     case 'ingest':
       return segments[1] === 'pdf' ? 'stream' : 'long';
+    case 'speech':
+      // Piper download can take minutes on first language switch.
+      return 'long';
     default:
       return 'api';
   }

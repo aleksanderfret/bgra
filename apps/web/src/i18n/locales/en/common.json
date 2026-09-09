@@ -7,13 +7,88 @@
     "title": "Board game rules assistant",
     "subtitle": "Answers come only from the rulebooks, FAQs and errata indexed on this computer."
   },
+  "uninstall": {
+    "title": "Remove BGA",
+    "subtitle": "BGA will be removed from this computer. Choose what else to delete.",
+    "open": "Remove BGA…",
+    "intro": "The BGA program is always removed. Everything below is optional and off by default.",
+    "continue": "Continue",
+    "desktopOnly": {
+      "title": "Desktop app only",
+      "body": "Removing BGA and its downloads is available in the desktop app, not in the browser.",
+      "back": "Back to the assistant"
+    },
+    "macTrash": {
+      "title": "Dragging to Trash is not enough",
+      "body": "Putting BGA in the Trash only removes the app icon. Use this screen (or BGA Uninstall) to clear downloads and data you choose."
+    },
+    "option": {
+      "data": "Game data",
+      "dataHelp": "Rulebooks, parsed pages, chat history, and future player settings.",
+      "application": "App runtime files",
+      "applicationHelp": "Python environment, logs, setup flags, downloads, and search helpers — not your game library.",
+      "models": "Assistant language models",
+      "modelsHelp": "Only the models BGA downloaded for answering rules questions — not every model on this computer.",
+      "ollama": "Ollama",
+      "ollamaHelp": "The Ollama app itself. Other programs may use it."
+    },
+    "ollama": {
+      "warningTitle": "Other apps may need Ollama",
+      "warning": "Removing Ollama can break other tools that use it on this computer. Leave it installed unless you are sure."
+    },
+    "confirm": {
+      "title": "Confirm removal",
+      "programAlways": "BGA itself will be removed.",
+      "alsoSelected": "You also asked to remove:",
+      "back": "Back",
+      "run": "Remove now"
+    },
+    "done": {
+      "title": "Removal finished",
+      "body": "BGA is closing. These stay on this computer because you left them unchecked:"
+    },
+    "left": {
+      "data": "Game data",
+      "application": "App runtime files",
+      "models": "Assistant language models",
+      "ollama": "Ollama"
+    },
+    "error": {
+      "title": "Something did not finish",
+      "failed": "Removal could not start. Close other BGA windows and try again.",
+      "partial": "Some selected items could not be removed. Check the list of what was left on purpose."
+    }
+  },
   "rulebooks": {
     "title": "Rulebooks",
     "subtitle": "Load your own publisher PDFs on this computer. Nothing from someone else’s library is bundled."
   },
+  "teach": {
+    "title": "Learn this game",
+    "subtitle": "A step-by-step lesson from your rulebooks on this computer — not the same as asking a mid-game question.",
+    "formLabel": "Lesson",
+    "start": "Start lesson",
+    "continueLesson": "Continue lesson",
+    "continue": "Continue",
+    "repeat": "Repeat",
+    "askQuestion": "I have a question",
+    "askSubmit": "Ask",
+    "digressionPlaceholder": "Ask about this part of the rules…",
+    "autoAdvanceHint": "Continuing in a few seconds…",
+    "progress": "{{current}} of {{total}}",
+    "noGames": "Import a rulebook first, then come back to start a lesson.",
+    "cancel": "Cancel",
+    "logLabel": "Lesson steps",
+    "turn": {
+      "plan": "Lesson plan",
+      "unit": "Lesson step",
+      "digression": "Your question"
+    }
+  },
   "appNav": {
     "label": "Main views",
-    "assistant": "Assistant",
+    "teach": "Learn",
+    "questions": "Questions",
     "rulebooks": "Rulebooks"
   },
   "engineReadiness": {
@@ -33,6 +108,10 @@
     "offline": {
       "title": "The assistant did not start",
       "body": "Close the app and open it again."
+    },
+    "speechMissing": {
+      "title": "Spoken answers are not ready yet",
+      "body": "The microphone and spoken voice need one more download on this computer. Open Setup and finish installing, then try hold-to-talk again."
     }
   },
   "startup": {
@@ -66,7 +145,8 @@
   "language": {
     "label": "Interface language",
     "pl": "Polski",
-    "en": "English"
+    "en": "English",
+    "ensuringVoice": "Preparing the spoken voice for this language…"
   },
   "colorScheme": {
     "label": "Color scheme",
@@ -91,12 +171,6 @@
       "description": "Optional. Leave unticked for base rules only.",
       "cleared": "Expansion selection cleared for the new game."
     },
-    "mode": {
-      "legend": "Answer mode",
-      "label": "Answer mode",
-      "teach": "Teach me the game",
-      "arbitrate": "Settle a rule"
-    },
     "question": {
       "label": "Question",
       "placeholder": "Can I play an action card if I have no tiles left?"
@@ -108,9 +182,18 @@
       "regionLabel": "Conversation about this game",
       "playerLabel": "Your question",
       "saveFailed": "Couldn’t save this conversation on this computer. The latest answers may disappear if you close the app."
+    },
+    "voice": {
+      "readAloud": "Read aloud",
+      "holdToTalk": "Hold to talk",
+      "holding": "Listening…",
+      "micDenied": "Microphone access was denied. Allow it in system settings, then try again.",
+      "micUnavailable": "Couldn’t reach the microphone. Check that it is connected and try again.",
+      "unsupported": "This browser can’t use the microphone here."
     }
   },
   "stage": {
+    "planning": "Preparing your lesson…",
     "transcribing": "Transcribing the question…",
     "retrieving": "Searching the documents…",
     "reranking": "Ranking the passages…",
@@ -142,7 +225,9 @@
       "malformed_frame": "The engine sent a frame that is not valid JSON.",
       "unknown_event": "The engine sent a frame that does not match the event contract.",
       "generation_timeout": "The model stopped producing words. Ask again, or check that Ollama is still running.",
-      "model_missing": "A required local model is not installed. Download the models for this profile, then ask again."
+      "model_missing": "A required local model is not installed. Download the models for this profile, then ask again.",
+      "speech_unavailable": "Speech tools are not installed on this computer yet. Finish setup, then try the microphone again.",
+      "speech_failed": "I couldn’t understand that recording. Hold the mic and try once more."
     }
   },
   "documentKind": {
@@ -159,7 +244,14 @@
     "retrieval_not_ready": "The assistant cannot look through your rulebooks yet. Close the app and open it again, then ask once more.",
     "retrieval_loading": "Search is still starting on this computer. Wait a moment, then ask again.",
     "checking_sources_carefully": "Checking these pages carefully before answering…",
-    "preparing_assistant": "Getting ready to write the answer…"
+    "preparing_assistant": "Getting ready to write the answer…",
+    "lesson_plan_failed": "I could not build a lesson from these rulebooks yet. Import a clearer rulebook, or open Questions to ask about a specific rule.",
+    "lesson_expired": "This lesson has ended or timed out. Start a new one when you are ready.",
+    "lesson_game_mismatch": "This lesson belongs to a different game. Start a new lesson for the game you selected.",
+    "lesson_busy": "I am still finishing the previous step. Wait a moment, then continue.",
+    "lesson_complete": "That was the last part of this lesson. You can start again anytime, or ask a question.",
+    "speech_empty": "I didn’t catch any words. Hold the mic and ask again a little louder.",
+    "speech_invalid_audio": "That recording couldn’t be used. Hold the mic and try again."
   },
   "setup": {
     "title": "First-run setup",

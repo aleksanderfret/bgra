@@ -7,13 +7,88 @@
     "title": "Asystent zasad gier planszowych",
     "subtitle": "Odpowiedzi pochodzą wyłącznie z instrukcji, FAQ i errat wczytanych na tym komputerze."
   },
+  "uninstall": {
+    "title": "Usuń BGA",
+    "subtitle": "BGA zniknie z tego komputera. Wybierz, co jeszcze skasować.",
+    "open": "Usuń BGA…",
+    "intro": "Program BGA jest zawsze usuwany. Poniższe opcje są dobrowolne i domyślnie wyłączone.",
+    "continue": "Dalej",
+    "desktopOnly": {
+      "title": "Tylko aplikacja na komputerze",
+      "body": "Usuwanie BGA i pobranych plików jest dostępne w aplikacji na komputerze, nie w przeglądarce.",
+      "back": "Wróć do asystenta"
+    },
+    "macTrash": {
+      "title": "Przeciągnięcie do Kosza nie wystarczy",
+      "body": "Kosz usuwa tylko ikonę aplikacji. Użyj tego ekranu (albo BGA Uninstall), żeby wyczyścić pobrane rzeczy według Twojego wyboru."
+    },
+    "option": {
+      "data": "Dane gier",
+      "dataHelp": "Instrukcje, przetworzone strony, historia rozmów i przyszłe ustawienia gracza.",
+      "application": "Pliki środowiska aplikacji",
+      "applicationHelp": "Środowisko Pythona, logi, flagi instalacji, pobrane instalatory i pomocnicze pliki wyszukiwania — bez biblioteki gier.",
+      "models": "Modele językowe asystenta",
+      "modelsHelp": "Tylko modele pobrane przez BGA do odpowiadania na pytania o zasady — nie wszystkie modele na komputerze.",
+      "ollama": "Ollama",
+      "ollamaHelp": "Sama aplikacja Ollama. Inne programy mogą jej używać."
+    },
+    "ollama": {
+      "warningTitle": "Inne aplikacje mogą potrzebować Ollamy",
+      "warning": "Usunięcie Ollamy może zepsuć inne narzędzia na tym komputerze. Zostaw ją, jeśli nie jesteś pewien."
+    },
+    "confirm": {
+      "title": "Potwierdź usunięcie",
+      "programAlways": "Samo BGA zostanie usunięte.",
+      "alsoSelected": "Dodatkowo wybrałeś:",
+      "back": "Wstecz",
+      "run": "Usuń teraz"
+    },
+    "done": {
+      "title": "Usuwanie zakończone",
+      "body": "BGA się zamyka. To zostaje na komputerze, bo nie było zaznaczone:"
+    },
+    "left": {
+      "data": "Dane gier",
+      "application": "Pliki środowiska aplikacji",
+      "models": "Modele językowe asystenta",
+      "ollama": "Ollama"
+    },
+    "error": {
+      "title": "Coś się nie dokończyło",
+      "failed": "Nie udało się rozpocząć usuwania. Zamknij inne okna BGA i spróbuj ponownie.",
+      "partial": "Części wybranych rzeczy nie udało się usunąć. Sprawdź listę tego, co zostawiono celowo."
+    }
+  },
   "rulebooks": {
     "title": "Instrukcje",
     "subtitle": "Wczytujesz własne PDF-y wydawcy na tym komputerze. Nic z cudzej biblioteki nie jest dołączone."
   },
+  "teach": {
+    "title": "Naucz się tej gry",
+    "subtitle": "Lekcja krok po kroku z Twoich instrukcji na tym komputerze — to nie to samo, co pytanie w trakcie gry.",
+    "formLabel": "Lekcja",
+    "start": "Zacznij lekcję",
+    "continueLesson": "Kontynuuj lekcję",
+    "continue": "Dalej",
+    "repeat": "Powtórz",
+    "askQuestion": "Mam pytanie",
+    "askSubmit": "Zapytaj",
+    "digressionPlaceholder": "Zapytaj o tę część zasad…",
+    "autoAdvanceHint": "Za chwilę przejdziemy dalej…",
+    "progress": "{{current}} z {{total}}",
+    "noGames": "Najpierw wczytaj instrukcję, potem wróć, żeby zacząć lekcję.",
+    "cancel": "Anuluj",
+    "logLabel": "Kroki lekcji",
+    "turn": {
+      "plan": "Plan lekcji",
+      "unit": "Krok lekcji",
+      "digression": "Twoje pytanie"
+    }
+  },
   "appNav": {
     "label": "Główne widoki",
-    "assistant": "Asystent",
+    "teach": "Nauka",
+    "questions": "Pytania",
     "rulebooks": "Instrukcje"
   },
   "engineReadiness": {
@@ -33,6 +108,10 @@
     "offline": {
       "title": "Asystent się nie uruchomił",
       "body": "Zamknij aplikację i otwórz ją ponownie."
+    },
+    "speechMissing": {
+      "title": "Odpowiedzi na głos nie są jeszcze gotowe",
+      "body": "Mikrofon i głos mówiony wymagają jeszcze jednego pobrania na tym komputerze. Otwórz Instalację i dokończ ją, a potem spróbuj przytrzymać mikrofon ponownie."
     }
   },
   "startup": {
@@ -66,7 +145,8 @@
   "language": {
     "label": "Język interfejsu",
     "pl": "Polski",
-    "en": "English"
+    "en": "English",
+    "ensuringVoice": "Przygotowuję głos mówiony dla tego języka…"
   },
   "colorScheme": {
     "label": "Motyw",
@@ -91,12 +171,6 @@
       "description": "Opcjonalne. Bez zaznaczenia — tylko zasady podstawowe.",
       "cleared": "Wyczyszczono wybór rozszerzeń dla nowej gry."
     },
-    "mode": {
-      "legend": "Tryb odpowiedzi",
-      "label": "Tryb odpowiedzi",
-      "teach": "Naucz mnie gry",
-      "arbitrate": "Rozstrzygnij zasadę"
-    },
     "question": {
       "label": "Pytanie",
       "placeholder": "Czy mogę zagrać kartę akcji, jeśli nie mam już kafelków?"
@@ -108,9 +182,18 @@
       "regionLabel": "Rozmowa o tej grze",
       "playerLabel": "Twoje pytanie",
       "saveFailed": "Nie udało się zapisać tej rozmowy na tym komputerze. Ostatnie odpowiedzi mogą zniknąć, jeśli zamkniesz aplikację."
+    },
+    "voice": {
+      "readAloud": "Czytaj na głos",
+      "holdToTalk": "Przytrzymaj, aby mówić",
+      "holding": "Słucham…",
+      "micDenied": "Odmówiono dostępu do mikrofonu. Włącz go w ustawieniach systemu i spróbuj ponownie.",
+      "micUnavailable": "Nie udało się użyć mikrofonu. Sprawdź, czy jest podłączony, i spróbuj ponownie.",
+      "unsupported": "Ta przeglądarka nie obsługuje mikrofonu w tym miejscu."
     }
   },
   "stage": {
+    "planning": "Przygotowuję lekcję…",
     "transcribing": "Rozpoznaję pytanie…",
     "retrieving": "Przeszukuję dokumenty…",
     "reranking": "Porządkuję fragmenty…",
@@ -142,7 +225,9 @@
       "malformed_frame": "Silnik przysłał ramkę, która nie jest poprawnym JSON-em.",
       "unknown_event": "Silnik przysłał ramkę niezgodną z kontraktem zdarzeń.",
       "generation_timeout": "Model przestał dopisywać słowa. Zadaj pytanie jeszcze raz albo sprawdź, czy Ollama nadal działa.",
-      "model_missing": "Brakuje wymaganego lokalnego modelu. Pobierz modele dla tego profilu i zapytaj ponownie."
+      "model_missing": "Brakuje wymaganego lokalnego modelu. Pobierz modele dla tego profilu i zapytaj ponownie.",
+      "speech_unavailable": "Narzędzia mowy nie są jeszcze zainstalowane na tym komputerze. Dokończ instalację i spróbuj mikrofonu ponownie.",
+      "speech_failed": "Nie udało się rozpoznać nagrania. Przytrzymaj mikrofon i spróbuj jeszcze raz."
     }
   },
   "documentKind": {
@@ -159,7 +244,14 @@
     "retrieval_not_ready": "Asystent nie może jeszcze przeszukać twoich instrukcji. Zamknij aplikację i otwórz ją ponownie, a potem zapytaj jeszcze raz.",
     "retrieval_loading": "Wyszukiwanie nadal się uruchamia na tym komputerze. Poczekaj chwilę i zapytaj ponownie.",
     "checking_sources_carefully": "Sprawdzam dokładnie te strony, zanim odpowiem…",
-    "preparing_assistant": "Przygotowuję się do napisania odpowiedzi…"
+    "preparing_assistant": "Przygotowuję się do napisania odpowiedzi…",
+    "lesson_plan_failed": "Nie udało się ułożyć lekcji z tych instrukcji. Wczytaj jaśniejszą instrukcję albo otwórz Pytania i zapytaj o konkretną zasadę.",
+    "lesson_expired": "Ta lekcja się skończyła albo wygasła. Zacznij nową, kiedy będziesz gotowy.",
+    "lesson_game_mismatch": "Ta lekcja dotyczy innej gry. Zacznij nową lekcję dla wybranej gry.",
+    "lesson_busy": "Nadal kończę poprzedni krok. Poczekaj chwilę i kontynuuj.",
+    "lesson_complete": "To była ostatnia część tej lekcji. Możesz zacząć od nowa w każdej chwili albo zadać pytanie.",
+    "speech_empty": "Nie usłyszałem żadnych słów. Przytrzymaj mikrofon i zapytaj jeszcze raz, trochę głośniej.",
+    "speech_invalid_audio": "Tego nagrania nie dało się użyć. Przytrzymaj mikrofon i spróbuj ponownie."
   },
   "setup": {
     "title": "Pierwsze uruchomienie",

@@ -1,5 +1,5 @@
 import en from '@bga-web-i18n/locales/en/common.json';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, userEvent } from '../test-utils';
 import { LanguageSwitcher } from './LanguageSwitcher';
 
@@ -11,6 +11,18 @@ vi.mock('next/navigation', () => ({
 }));
 
 describe('LanguageSwitcher', () => {
+  beforeEach(() => {
+    replace.mockClear();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(JSON.stringify({ ready: true }), { status: 200 })),
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it('names the radiogroup with the visible translated label', () => {
     render(<LanguageSwitcher />, 'en');
 
@@ -31,6 +43,7 @@ describe('LanguageSwitcher', () => {
 
     // The URL is the only place the locale lives, so switching language has to
     // be a navigation; mutating i18next would leave the address bar lying.
+    // Voice download runs in the background after navigation.
     expect(replace).toHaveBeenCalledWith('/pl/games/azul');
   });
 

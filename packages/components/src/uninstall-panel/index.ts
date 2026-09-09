@@ -1,0 +1,1 @@
+export { UninstallPanel } from './UninstallPanel';

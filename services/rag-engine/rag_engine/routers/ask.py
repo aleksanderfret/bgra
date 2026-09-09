@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from collections.abc import AsyncIterator
 from contextlib import suppress
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse, StreamingResponse
+from pydantic import ValidationError
 
 from rag_engine.contract import (
     AskRequest,
@@ -20,9 +22,10 @@ from rag_engine.contract import (
     NoticeEvent,
     SourcesEvent,
     StatusEvent,
-    TokenEvent,
+    TranscriptEvent,
 )
 from rag_engine.engines.embed import OllamaEmbedder
+from rag_engine.engines.generation_lock import generation_semaphore
 from rag_engine.engines.llm import (
     GenerationTimeoutError,
     ModelNotInstalledError,
@@ -39,13 +42,18 @@ from rag_engine.retrieval.service import RetrievalStack
 from rag_engine.retrieval.sources import to_retrieved_source
 from rag_engine.retrieval.think import should_think
 from rag_engine.settings import Settings, get_settings
+from rag_engine.speech import (
+    SpeechExtraMissingError,
+    WavValidationError,
+    parse_app_locale,
+    transcribe_wav_bytes,
+)
+from rag_engine.speech.stream_speak import speak_alongside_tokens
 from rag_engine.sse import SSE_HEADERS, SSE_MEDIA_TYPE, encode_comment, encode_event
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["assistant"])
-
-_generation_semaphore = asyncio.Semaphore(1)
 
 
 def _stack_from(http_request: Request) -> RetrievalStack | None:
@@ -56,11 +64,66 @@ def _retrieval_loading(http_request: Request) -> bool:
     return bool(getattr(http_request.app.state, "retrieval_loading", False))
 
 
+def _parse_bool(value: str | None, default: bool = False) -> bool:
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 async def _stream_answer(
     payload: AskRequest,
     settings: Settings,
     http_request: Request,
+    *,
+    audio_wav: bytes | None = None,
 ) -> AsyncIterator[str]:
+    locale = parse_app_locale(payload.locale)
+    question = payload.question
+
+    if audio_wav is not None:
+        yield encode_event(StatusEvent(stage="transcribing"))
+        try:
+            question = await asyncio.to_thread(
+                transcribe_wav_bytes,
+                audio_wav,
+                profile_stt=settings.profile.stt,
+            )
+        except WavValidationError:
+            yield encode_event(NoticeEvent(code="speech_invalid_audio", params={}))
+            yield encode_event(SourcesEvent(sources=[]))
+            yield encode_event(
+                DoneEvent(answer_id=uuid4().hex, groundedness="insufficient_evidence")
+            )
+            return
+        except SpeechExtraMissingError:
+            yield encode_event(
+                ErrorEvent(code="speech_unavailable", message="Speech extra is not installed.")
+            )
+            yield encode_event(SourcesEvent(sources=[]))
+            yield encode_event(
+                DoneEvent(answer_id=uuid4().hex, groundedness="insufficient_evidence")
+            )
+            return
+        except Exception:
+            logger.exception("STT failed")
+            yield encode_event(
+                ErrorEvent(code="speech_failed", message="Speech recognition failed.")
+            )
+            yield encode_event(SourcesEvent(sources=[]))
+            yield encode_event(
+                DoneEvent(answer_id=uuid4().hex, groundedness="insufficient_evidence")
+            )
+            return
+
+        yield encode_event(TranscriptEvent(text=question))
+        if not question.strip():
+            yield encode_event(NoticeEvent(code="speech_empty", params={}))
+            yield encode_event(SourcesEvent(sources=[]))
+            yield encode_event(
+                DoneEvent(answer_id=uuid4().hex, groundedness="insufficient_evidence")
+            )
+            return
+
     yield encode_event(StatusEvent(stage="retrieving"))
 
     stack = _stack_from(http_request)
@@ -109,17 +172,14 @@ async def _stream_answer(
         return
 
     generation_failed = False
-    await _generation_semaphore.acquire()
+    await generation_semaphore.acquire()
     warm_task: asyncio.Task[None] | None = None
     try:
         if await http_request.is_disconnected():
             return
         yield encode_event(StatusEvent(stage="reranking"))
-        # Do not load the chat model in parallel with retrieve. Ollama runs one
-        # GPU job at a time, so a cold chat load would block embedding and delay
-        # sources by the full wake-up — and can make the *next* question slow too.
         hits = await retrieve(
-            question=payload.question,
+            question=question,
             game_ids=game_ids,
             embedder=OllamaEmbedder(settings.ollama_url, settings.profile.embedding),
             index=index,
@@ -152,8 +212,6 @@ async def _stream_answer(
                 context_tokens=settings.profile.context_tokens,
             )
         )
-        # When the chat model is already resident, load_model returns almost
-        # immediately. Only tell the player we are preparing if it takes a beat.
         try:
             await asyncio.wait_for(asyncio.shield(warm_task), timeout=0.2)
         except TimeoutError:
@@ -164,17 +222,26 @@ async def _stream_answer(
             yield encode_event(NoticeEvent(code="checking_sources_carefully", params={}))
         yield encode_event(StatusEvent(stage="generating"))
         yield encode_comment("generating")
-        messages = build_messages(payload.question, hits)
-        async for text in generate_stream(
-            settings.ollama_url,
-            settings.profile.llm,
-            messages,
-            context_tokens=settings.profile.context_tokens,
-            think=think,
+        messages = build_messages(question, hits)
+
+        async def token_stream() -> AsyncIterator[str]:
+            async for text in generate_stream(
+                settings.ollama_url,
+                settings.profile.llm,
+                messages,
+                context_tokens=settings.profile.context_tokens,
+                think=think,
+            ):
+                yield text
+
+        async for frame in speak_alongside_tokens(
+            token_stream(),
+            speak=payload.speak,
+            storage_dir=settings.storage_dir,
+            locale=locale,
+            is_disconnected=http_request.is_disconnected,
         ):
-            if await http_request.is_disconnected():
-                return
-            yield encode_event(TokenEvent(text=text))
+            yield frame
     except GenerationTimeoutError:
         generation_failed = True
         logger.warning("Generation timed out for model %s", settings.profile.llm)
@@ -202,7 +269,7 @@ async def _stream_answer(
             warm_task.cancel()
             with suppress(asyncio.CancelledError):
                 await warm_task
-        _generation_semaphore.release()
+        generation_semaphore.release()
 
     groundedness: Groundedness = "insufficient_evidence" if generation_failed else "grounded"
     yield encode_event(DoneEvent(answer_id=uuid4().hex, groundedness=groundedness))
@@ -210,10 +277,96 @@ async def _stream_answer(
 
 @router.post("/ask", response_model=None)
 async def ask(
-    payload: AskRequest,
     http_request: Request,
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> StreamingResponse | JSONResponse:
+    content_type = (http_request.headers.get("content-type") or "").lower()
+    audio_wav: bytes | None = None
+
+    if "multipart/form-data" in content_type:
+        from rag_engine.speech.wav import MAX_WAV_BYTES
+
+        try:
+            form = await http_request.form(max_part_size=MAX_WAV_BYTES)
+        except Exception:
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "type": "error",
+                    "code": "speech_invalid_audio",
+                    "message": "Audio upload exceeds the allowed size.",
+                },
+            )
+        game_id = str(form.get("gameId") or "")
+        mode_raw = str(form.get("mode") or "arbitrate")
+        speak = _parse_bool(str(form.get("speak")) if form.get("speak") is not None else None)
+        locale = str(form.get("locale") or "en")
+        expansion_raw = form.get("expansionIds")
+        expansion_ids: list[str] = []
+        if isinstance(expansion_raw, str) and expansion_raw.strip():
+            try:
+                parsed = json.loads(expansion_raw)
+            except json.JSONDecodeError:
+                return JSONResponse(
+                    status_code=400,
+                    content={
+                        "type": "error",
+                        "code": "invalid_expansion_ids",
+                        "message": "expansionIds must be a JSON array string.",
+                    },
+                )
+            if not isinstance(parsed, list) or not all(isinstance(item, str) for item in parsed):
+                return JSONResponse(
+                    status_code=400,
+                    content={
+                        "type": "error",
+                        "code": "invalid_expansion_ids",
+                        "message": "expansionIds must be a JSON array of strings.",
+                    },
+                )
+            expansion_ids = parsed
+
+        upload = form.get("audio")
+        question_field = form.get("question")
+        question = str(question_field) if isinstance(question_field, str) else ""
+
+        if hasattr(upload, "read"):
+            audio_wav = await upload.read()  # type: ignore[union-attr]
+            if not audio_wav:
+                audio_wav = None
+
+        if audio_wav is None and not question.strip():
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "type": "error",
+                    "code": "missing_question",
+                    "message": "Provide question text or an audio WAV upload.",
+                },
+            )
+
+        mode: Literal["teach", "arbitrate"] = "arbitrate"
+        if mode_raw == "teach":
+            mode = "teach"
+
+        try:
+            payload = AskRequest(
+                game_id=game_id,
+                question=question.strip() or ".",
+                mode=mode,
+                expansion_ids=expansion_ids,
+                speak=speak,
+                locale=locale,
+            )
+        except ValidationError as error:
+            return JSONResponse(status_code=422, content={"detail": error.errors()})
+    else:
+        body = await http_request.json()
+        try:
+            payload = AskRequest.model_validate(body)
+        except ValidationError as error:
+            return JSONResponse(status_code=422, content={"detail": error.errors()})
+
     try:
         validate_expansion_ids(settings.storage_dir, payload.game_id, payload.expansion_ids)
     except ValueError as error:
@@ -226,7 +379,7 @@ async def ask(
             },
         )
     return StreamingResponse(
-        _stream_answer(payload, settings, http_request),
+        _stream_answer(payload, settings, http_request, audio_wav=audio_wav),
         media_type=SSE_MEDIA_TYPE,
         headers=SSE_HEADERS,
     )
