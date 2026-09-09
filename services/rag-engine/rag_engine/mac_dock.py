@@ -11,6 +11,11 @@ logger = logging.getLogger(__name__)
 _BACKGROUND = 2
 
 
+def _running_on_macos() -> bool:
+    # Function boundary so mypy on Linux does not mark the darwin body unreachable.
+    return sys.platform == "darwin"
+
+
 def hide_cli_from_macos_dock() -> None:
     """Turn this process into a background app so macOS does not show a black 'exec' Dock icon.
 
@@ -19,7 +24,7 @@ def hide_cli_from_macos_dock() -> None:
     for the whole session. TransformProcessType alone is not enough: a process
     that never finishes launching stays `!signalled` and the Dock keeps bouncing.
     """
-    if sys.platform != "darwin":
+    if not _running_on_macos():
         return
     try:
         import ctypes

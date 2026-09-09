@@ -12,7 +12,6 @@ def test_hide_cli_from_macos_dock_is_noop_off_darwin(monkeypatch: pytest.MonkeyP
     hide_cli_from_macos_dock()
 
 
+@pytest.mark.skipif(sys.platform != "darwin", reason="macOS Dock transform only")
 def test_hide_cli_from_macos_dock_does_not_raise_on_darwin() -> None:
-    if sys.platform != "darwin":
-        return
     hide_cli_from_macos_dock()
