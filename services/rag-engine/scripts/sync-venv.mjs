@@ -2,16 +2,16 @@
 /**
  * Materialise the engine venv for this machine.
  *
- * Locally we always install ingest + retrieval so `pnpm verify` cannot strip
- * LanceDB / the reranker and leave Ask saying search never started.
- * CI stays on ingest only — retrieval pulls native ML wheels the contract and
- * API tests do not need (see .github/workflows/ci.yml).
+ * Locally we install ingest + retrieval + speech so the desktop product path
+ * and `pnpm dev` match (Ask, Learn, mic, Piper). CI stays on ingest only —
+ * retrieval/speech pull native ML wheels the contract and API tests do not need
+ * (see .github/workflows/ci.yml).
  */
 import { spawnSync } from 'node:child_process';
 
 const extras = ['--extra', 'ingest'];
 if (process.env.CI !== 'true') {
-  extras.push('--extra', 'retrieval');
+  extras.push('--extra', 'retrieval', '--extra', 'speech');
 }
 
 const result = spawnSync('uv', ['sync', ...extras], {

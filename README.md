@@ -192,6 +192,17 @@ pnpm --filter desktop build      # Compiles desktop shell
 pnpm --filter desktop dev        # Launches the app window
 ```
 
+The packaged desktop engine installs **ingest + retrieval + speech** into its
+own Python environment (microphone and spoken answers included). First launch
+sync can take longer because of those tools.
+
+To attach Electron to a running `pnpm dev` stack instead:
+
+```bash
+pnpm --filter desktop build
+pnpm --filter desktop dev:attach
+```
+
 To build an unsigned `.dmg` / `.zip` on your machine:
 
 ```bash

@@ -590,7 +590,7 @@ of ears and a mouth on the **same written thread** from Stage 3D — never a voi
 mode. This slice is **localhost / Electron only** (`127.0.0.1`). Tablet, LAN bind,
 mkcert HTTPS, and enforcing CSP are **Stage 5B**.
 
-- `uv sync --extra speech`
+- `uv sync --extra speech` (desktop product sync includes this extra automatically)
 - Speech-to-text behind one interface (`rag_engine.speech.SpeechToText`):
   **`mlx-whisper` on macOS (Apple Silicon)** and **`faster-whisper` on Windows/Linux**.
   The desktop decision O1 requires voice on both platforms; do not call mlx directly

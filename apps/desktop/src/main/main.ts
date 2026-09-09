@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, session, shell } from 'electron';
 import type { DesktopSetupState, RuntimeProgress } from '../ipc/desktop-api';
 import { BinaryNotFoundError, resolveBinary } from '../runtime/binaries';
+import { engineUvSyncArgs } from '../runtime/engine-uv-extras';
 import {
   downloadAllowlistedFile,
   installerDestination,
@@ -232,7 +233,7 @@ async function syncPythonEnvironment(engineDir: string): Promise<void> {
   const child = spawnLogged({
     label: 'uv-sync',
     command: uvPath,
-    args: ['sync', '--frozen', '--extra', 'retrieval', '--extra', 'ingest'],
+    args: engineUvSyncArgs(),
     cwd: engineDir,
     env: uvEnv(),
     logPath: join(app.getPath('userData'), 'logs', 'uv-sync.log'),
