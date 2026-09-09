@@ -63,9 +63,32 @@
     "title": "Rulebooks",
     "subtitle": "Load your own publisher PDFs on this computer. Nothing from someone else’s library is bundled."
   },
+  "teach": {
+    "title": "Learn this game",
+    "subtitle": "A step-by-step lesson from your rulebooks on this computer — not the same as asking a mid-game question.",
+    "formLabel": "Lesson",
+    "start": "Start lesson",
+    "continueLesson": "Continue lesson",
+    "continue": "Continue",
+    "repeat": "Repeat",
+    "askQuestion": "I have a question",
+    "askSubmit": "Ask",
+    "digressionPlaceholder": "Ask about this part of the rules…",
+    "autoAdvanceHint": "Continuing in a few seconds…",
+    "progress": "{{current}} of {{total}}",
+    "noGames": "Import a rulebook first, then come back to start a lesson.",
+    "cancel": "Cancel",
+    "logLabel": "Lesson steps",
+    "turn": {
+      "plan": "Lesson plan",
+      "unit": "Lesson step",
+      "digression": "Your question"
+    }
+  },
   "appNav": {
     "label": "Main views",
-    "assistant": "Assistant",
+    "teach": "Learn",
+    "questions": "Questions",
     "rulebooks": "Rulebooks"
   },
   "engineReadiness": {
@@ -143,12 +166,6 @@
       "description": "Optional. Leave unticked for base rules only.",
       "cleared": "Expansion selection cleared for the new game."
     },
-    "mode": {
-      "legend": "Answer mode",
-      "label": "Answer mode",
-      "teach": "Teach me the game",
-      "arbitrate": "Settle a rule"
-    },
     "question": {
       "label": "Question",
       "placeholder": "Can I play an action card if I have no tiles left?"
@@ -163,6 +180,7 @@
     }
   },
   "stage": {
+    "planning": "Preparing your lesson…",
     "transcribing": "Transcribing the question…",
     "retrieving": "Searching the documents…",
     "reranking": "Ranking the passages…",
@@ -211,7 +229,12 @@
     "retrieval_not_ready": "The assistant cannot look through your rulebooks yet. Close the app and open it again, then ask once more.",
     "retrieval_loading": "Search is still starting on this computer. Wait a moment, then ask again.",
     "checking_sources_carefully": "Checking these pages carefully before answering…",
-    "preparing_assistant": "Getting ready to write the answer…"
+    "preparing_assistant": "Getting ready to write the answer…",
+    "lesson_plan_failed": "I could not build a lesson from these rulebooks yet. Import a clearer rulebook, or open Questions to ask about a specific rule.",
+    "lesson_expired": "This lesson has ended or timed out. Start a new one when you are ready.",
+    "lesson_game_mismatch": "This lesson belongs to a different game. Start a new lesson for the game you selected.",
+    "lesson_busy": "I am still finishing the previous step. Wait a moment, then continue.",
+    "lesson_complete": "That was the last part of this lesson. You can start again anytime, or ask a question."
   },
   "setup": {
     "title": "First-run setup",

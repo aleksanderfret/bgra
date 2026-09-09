@@ -12,6 +12,9 @@ const ENGINE = 'http://127.0.0.1:8000';
 describe('routeKind', () => {
   it('separates the answer stream from plain API calls and assets', () => {
     expect(routeKind(['ask'])).toBe('stream');
+    expect(routeKind(['lesson', 'start'])).toBe('stream');
+    expect(routeKind(['lesson', 'continue'])).toBe('stream');
+    expect(routeKind(['lesson', 'active'])).toBe('api');
     expect(routeKind(['static', 'assets', 'azul', 'p04.png'])).toBe('asset');
     expect(routeKind(['games'])).toBe('api');
     expect(routeKind(['ingest', 'pdf'])).toBe('stream');

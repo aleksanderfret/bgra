@@ -7,15 +7,32 @@ import { usePathname, useRouter } from 'next/navigation';
 import { type FC, useId } from 'react';
 import { useTranslation } from 'react-i18next';
 
-export type AppView = 'assistant' | 'rulebooks';
+export type AppView = 'teach' | 'questions' | 'rulebooks';
+
+const APP_VIEWS: readonly AppView[] = ['teach', 'questions', 'rulebooks'];
+
+const isAppView = (value: string): value is AppView => APP_VIEWS.some((view) => view === value);
 
 const viewFromPathname = (pathname: string): AppView => {
   const segments = pathname.split('/').filter(Boolean);
-  return segments[1] === 'rulebooks' ? 'rulebooks' : 'assistant';
+  const section = segments[1];
+  if (section === 'teach') {
+    return 'teach';
+  }
+  if (section === 'rulebooks') {
+    return 'rulebooks';
+  }
+  return 'questions';
 };
 
 const pathForView = (locale: string, view: AppView): string => {
-  return view === 'rulebooks' ? `/${locale}/rulebooks` : `/${locale}`;
+  if (view === 'teach') {
+    return `/${locale}/teach`;
+  }
+  if (view === 'rulebooks') {
+    return `/${locale}/rulebooks`;
+  }
+  return `/${locale}`;
 };
 
 export const AppNav: FC = () => {
@@ -27,11 +44,12 @@ export const AppNav: FC = () => {
   const active = viewFromPathname(pathname);
 
   const handleViewChange = (value: string): void => {
-    if (value === 'assistant' || value === 'rulebooks') {
-      const next = pathForView(locale, value);
-      if (next !== pathname) {
-        router.push(next);
-      }
+    if (!isAppView(value)) {
+      return;
+    }
+    const next = pathForView(locale, value);
+    if (next !== pathname) {
+      router.push(next);
     }
   };
 
@@ -46,7 +64,8 @@ export const AppNav: FC = () => {
         value={active}
         onChange={handleViewChange}
         data={[
-          { value: 'assistant', label: t('appNav.assistant') },
+          { value: 'teach', label: t('appNav.teach') },
+          { value: 'questions', label: t('appNav.questions') },
           { value: 'rulebooks', label: t('appNav.rulebooks') },
         ]}
       />

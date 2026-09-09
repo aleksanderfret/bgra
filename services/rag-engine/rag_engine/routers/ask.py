@@ -23,6 +23,7 @@ from rag_engine.contract import (
     TokenEvent,
 )
 from rag_engine.engines.embed import OllamaEmbedder
+from rag_engine.engines.generation_lock import generation_semaphore
 from rag_engine.engines.llm import (
     GenerationTimeoutError,
     ModelNotInstalledError,
@@ -44,8 +45,6 @@ from rag_engine.sse import SSE_HEADERS, SSE_MEDIA_TYPE, encode_comment, encode_e
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["assistant"])
-
-_generation_semaphore = asyncio.Semaphore(1)
 
 
 def _stack_from(http_request: Request) -> RetrievalStack | None:
@@ -109,7 +108,7 @@ async def _stream_answer(
         return
 
     generation_failed = False
-    await _generation_semaphore.acquire()
+    await generation_semaphore.acquire()
     warm_task: asyncio.Task[None] | None = None
     try:
         if await http_request.is_disconnected():
@@ -202,7 +201,7 @@ async def _stream_answer(
             warm_task.cancel()
             with suppress(asyncio.CancelledError):
                 await warm_task
-        _generation_semaphore.release()
+        generation_semaphore.release()
 
     groundedness: Groundedness = "insufficient_evidence" if generation_failed else "grounded"
     yield encode_event(DoneEvent(answer_id=uuid4().hex, groundedness=groundedness))

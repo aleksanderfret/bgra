@@ -13,6 +13,8 @@ from rag_engine.contract import DOC_KEY_PATTERN, GAME_ID_PATTERN, DocumentKind
 
 _GAME_ID_RE = re.compile(GAME_ID_PATTERN)
 _DOC_KEY_RE = re.compile(DOC_KEY_PATTERN)
+# uuid4().hex — rejects empty, path separators, and `..`.
+_SESSION_ID_RE = re.compile(r"^[0-9a-f]{32}$")
 
 # Fixed names — never take a filename from the user's PDF.
 SOURCE_PDF_NAME = "source.pdf"
@@ -25,6 +27,10 @@ class InvalidGameIdError(ValueError):
 
 
 class InvalidDocKeyError(ValueError):
+    pass
+
+
+class InvalidSessionIdError(ValueError):
     pass
 
 
@@ -47,6 +53,14 @@ def assert_doc_key(doc_key: str) -> str:
             "Use a lowercase slug: letters, digits and hyphens only."
         )
     return doc_key
+
+
+def assert_session_id(session_id: str) -> str:
+    if not _SESSION_ID_RE.fullmatch(session_id):
+        raise InvalidSessionIdError(
+            f"Invalid session id {session_id!r}. Expected a 32-character hex id."
+        )
+    return session_id
 
 
 def assert_under_storage(path: Path, storage_dir: Path) -> Path:
@@ -147,6 +161,38 @@ def games_registry_path(storage_dir: Path) -> Path:
 
 def index_dir(storage_dir: Path) -> Path:
     return assert_under_storage(storage_dir / "index", storage_dir)
+
+
+def player_dir(storage_dir: Path) -> Path:
+    return assert_under_storage(storage_dir / "player", storage_dir)
+
+
+def lesson_sessions_dir(storage_dir: Path) -> Path:
+    return assert_under_storage(player_dir(storage_dir) / "lessons" / "sessions", storage_dir)
+
+
+def lesson_session_path(storage_dir: Path, session_id: str) -> Path:
+    assert_session_id(session_id)
+    return assert_under_storage(
+        lesson_sessions_dir(storage_dir) / f"{session_id}.json",
+        storage_dir,
+    )
+
+
+def lesson_active_pointer_path(storage_dir: Path, game_id: str) -> Path:
+    assert_game_id(game_id)
+    return assert_under_storage(
+        player_dir(storage_dir) / "lessons" / "active" / f"{game_id}.json",
+        storage_dir,
+    )
+
+
+def lesson_archive_dir(storage_dir: Path, game_id: str) -> Path:
+    assert_game_id(game_id)
+    return assert_under_storage(
+        player_dir(storage_dir) / "lessons" / "archive" / game_id,
+        storage_dir,
+    )
 
 
 def slugify_doc_key(title: str, *, fallback: str = "main") -> str:

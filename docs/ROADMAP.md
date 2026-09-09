@@ -555,26 +555,31 @@ Phase 2 ships; `pnpm verify` passes.
 
 ---
 
-## Stage 4 — Teaching mode
+## Stage 4 — Teaching mode ✅ **complete**
 
-**Goal:** the assistant teaches rather than merely answering. The lesson uses the
-**same visible thread** as Stage 3D — modules appear as turns you can scroll back to,
-not a panel that wipes the last one.
+**Goal:** the assistant teaches a game **like a human teacher**, on a dedicated
+**Learn** page — not by reading the rulebook aloud, and not inside the Questions
+thread (Stage 3D).
 
-- Separate prompts for `teach` and `arbitrate`
-- Teaching style drawn from tutorial transcripts, supplied as an example in the system
-  prompt, **marked as not being a source of rules**
-- Session state keyed by `sessionId`, **issued by the server and given a TTL** (D13). A
-  client-chosen identifier would be someone else's lesson for the price of a guess — the
-  cost of getting this right is nil today and considerable once anyone else can connect.
-  That id tracks *where the lesson is*, not the written history (the thread is per game
-  and durable; this id is short-lived).
-- Lesson structure: goal → theme → mechanics → turn → sample move, with a comprehension
-  check after each module
+Done after Stage 3D. Plan: `docs/superpowers/plans/stage-4-teaching.md` (archive
+after ship).
 
-**Acceptance:** a "teach me this game" conversation walks through the modules without
-dumping everything at once, earlier modules stay visible in the thread, and switching
-to `arbitrate` mid-session produces a short answer with a citation.
+- Three nav pages: **Learn** (`/teach`) | **Questions** (`/`) | **Rulebooks**
+- Server-issued `sessionId` with **72 h TTL** (D13); one active session per game
+- **Syllabus-first:** build a lesson plan from the section catalogue / TOC, soft
+  spine hints (goal → theme → mechanics → turn → sample move), reorder only with
+  real section refs — never invent topics
+- One grounded generation per teaching unit (or plan step); Continue / Repeat /
+  digression on Learn only; ~8 s auto-Continue
+- Digression = short cited ruling; `unitIndex` unchanged; Questions stays
+  `arbitrate` for mid-game fights
+- Local lesson archive under `storage/player/lessons/` feeds **style** only, never
+  the rules index
+
+**Acceptance:** Learn walks units without dumping the whole book; Continuie
+restores syllabus + turns after restart within TTL; digressions stay on Learn;
+thin retrieval yields an honest notice + Repeat; Questions never shows lesson
+chrome; `pnpm verify` passes.
 
 ---
 

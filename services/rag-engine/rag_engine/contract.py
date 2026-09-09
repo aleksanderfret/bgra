@@ -29,8 +29,20 @@ DOCUMENT_AUTHORITY: tuple[DocumentKind, ...] = (
 )
 
 AnswerMode = Literal["teach", "arbitrate"]
-PipelineStage = Literal["transcribing", "retrieving", "reranking", "generating", "speaking"]
+PipelineStage = Literal[
+    "planning",
+    "transcribing",
+    "retrieving",
+    "reranking",
+    "generating",
+    "speaking",
+]
 Groundedness = Literal["grounded", "partial", "insufficient_evidence"]
+
+#: Soft pedagogical spine — guidance for planning, not a fixed five-slot lesson.
+LessonSpineHint = Literal["goal", "theme", "mechanics", "turn", "sample_move"]
+LessonSessionStatus = Literal["planning", "active", "paused", "completed", "expired"]
+LessonTurnKind = Literal["plan", "unit", "digression"]
 
 
 class WireModel(BaseModel):
@@ -54,9 +66,58 @@ class RetrievedSource(WireModel):
 class AskRequest(WireModel):
     game_id: str = Field(pattern=GAME_ID_PATTERN)
     question: str = Field(min_length=1, max_length=2000)
-    mode: AnswerMode = "teach"
+    mode: AnswerMode = "arbitrate"
     session_id: str | None = None
     expansion_ids: list[str] = Field(default_factory=list)
+
+
+class LessonSyllabusUnit(WireModel):
+    unit_id: str
+    title: str
+    section_refs: list[str] = Field(default_factory=list)
+    spine_hint: LessonSpineHint | None = None
+
+
+class LessonTurn(WireModel):
+    id: str
+    kind: LessonTurnKind
+    unit_id: str | None = None
+    question: str | None = None
+    text: str
+    sources: list[RetrievedSource] = Field(default_factory=list)
+    groundedness: Groundedness
+
+
+class LessonSession(WireModel):
+    """Server-owned teaching session. `session_id` is issued by the engine (D13)."""
+
+    session_id: str
+    game_id: str = Field(pattern=GAME_ID_PATTERN)
+    expansion_ids: list[str] = Field(default_factory=list)
+    syllabus: list[LessonSyllabusUnit] = Field(default_factory=list)
+    unit_index: int = 0
+    status: LessonSessionStatus
+    updated_at: str
+    expires_at: str
+    turns: list[LessonTurn] = Field(default_factory=list)
+
+
+class LessonStartRequest(WireModel):
+    game_id: str = Field(pattern=GAME_ID_PATTERN)
+    expansion_ids: list[str] = Field(default_factory=list)
+
+
+class LessonSessionRequest(WireModel):
+    session_id: str
+
+
+class LessonAskRequest(WireModel):
+    session_id: str
+    question: str = Field(min_length=1, max_length=2000)
+
+
+class LessonActiveResponse(WireModel):
+    session: LessonSession | None = None
 
 
 class StatusEvent(WireModel):

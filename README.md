@@ -337,10 +337,10 @@ What you can already do, and what is still on the way. The numbered engineering 
 - [x] Watch a real progress bar while a rulebook is being added.
 - [x] Scroll back through earlier questions for that game.
 - [x] Remove the app and, if you choose, the downloads it left behind — without a terminal.
+- [x] Learn a new game step by step on its own Learn screen — not mixed into mid-game questions.
 
 **Next at the table**
 
-- [ ] Learn a new game step by step, not only settle a fight mid-session.
 - [ ] Ask out loud and hear the answer; the text stays on screen either way.
 
 **Later**

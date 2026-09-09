@@ -26,6 +26,9 @@ export const routeKind = (segments: string[]): EngineRouteKind => {
   switch (segments[0]) {
     case 'ask':
       return 'stream';
+    case 'lesson':
+      // GET active is short JSON; POST start/continue/repeat/ask stream tokens.
+      return segments[1] === 'active' ? 'api' : 'stream';
     case 'static':
       return 'asset';
     case 'ingest':

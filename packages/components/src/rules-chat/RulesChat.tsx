@@ -1,6 +1,6 @@
 'use client';
 
-import type { AnswerMode, GameSummary } from '@bga/api-contract';
+import type { GameSummary } from '@bga/api-contract';
 import { ConversationLog } from '@bga/components/conversation-log';
 import { useAskStream } from '@bga/hooks/use-ask-stream';
 import { useConversationThread } from '@bga/hooks/use-conversation-thread';
@@ -9,17 +9,7 @@ import { streamingStatusKey } from '@bga/utils/answer-state';
 import { selectExchanges } from '@bga/utils/conversation-thread';
 import { GAMES_CHANGED_EVENT } from '@bga/utils/desktop-bridge';
 import { isGameSummaryList } from '@bga/utils/game-summary';
-import {
-  Button,
-  Checkbox,
-  Fieldset,
-  Group,
-  SegmentedControl,
-  Select,
-  Stack,
-  Text,
-  Textarea,
-} from '@mantine/core';
+import { Button, Checkbox, Fieldset, Group, Select, Stack, Text, Textarea } from '@mantine/core';
 import {
   type ChangeEvent,
   type FC,
@@ -31,10 +21,6 @@ import {
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-
-const MODES: readonly AnswerMode[] = ['teach', 'arbitrate'];
-
-const isAnswerMode = (value: string): value is AnswerMode => MODES.some((mode) => mode === value);
 
 interface ExpansionCheckboxProps {
   expansionId: string;
@@ -65,7 +51,6 @@ export const RulesChat: FC = () => {
   const enginePhase = useEngineReadiness();
   const [expansionIds, setExpansionIds] = useState<string[]>([]);
   const [expansionsCleared, setExpansionsCleared] = useState(false);
-  const [mode, setMode] = useState<AnswerMode>('teach');
   const [question, setQuestion] = useState('');
   const [activeExchangeId, setActiveExchangeId] = useState<string | null>(null);
   const expansionsStatusId = useId();
@@ -177,7 +162,7 @@ export const RulesChat: FC = () => {
     const questionText = question.trim();
     const id = beginExchange({
       question: questionText,
-      mode,
+      mode: 'arbitrate',
       expansionIds: [...expansionIds],
     });
     setActiveExchangeId(id);
@@ -185,7 +170,7 @@ export const RulesChat: FC = () => {
     void ask({
       gameId,
       question: questionText,
-      mode,
+      mode: 'arbitrate',
       expansionIds: expansionIds.length > 0 ? expansionIds : undefined,
     });
   };
@@ -199,12 +184,6 @@ export const RulesChat: FC = () => {
     if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
       event.preventDefault();
       submitQuestion();
-    }
-  };
-
-  const handleModeChange = (value: string): void => {
-    if (isAnswerMode(value)) {
-      setMode(value);
     }
   };
 
@@ -257,16 +236,6 @@ export const RulesChat: FC = () => {
             </Stack>
           </Fieldset>
         )}
-
-        <Fieldset legend={t('rulesChat.mode.legend')} variant="filled">
-          <SegmentedControl
-            value={mode}
-            onChange={handleModeChange}
-            data={MODES.map((value) => ({ value, label: t(`rulesChat.mode.${value}`) }))}
-            fullWidth
-            disabled={picksLocked}
-          />
-        </Fieldset>
 
         <ConversationLog exchanges={screenExchanges} />
 
