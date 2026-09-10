@@ -5,10 +5,12 @@ import { useAudioQueue } from './useAudioQueue';
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 describe('useAudioQueue', () => {
-  it('plays frames in sequence order and stops clearing the queue', () => {
+  it('plays frames in sequence order with a gap, and stops clearing the queue', () => {
+    vi.useFakeTimers();
     const play = vi.fn().mockResolvedValue(undefined);
     const pause = vi.fn();
     const load = vi.fn();
@@ -55,6 +57,11 @@ describe('useAudioQueue', () => {
 
     act(() => {
       endedHandler?.();
+    });
+    expect(play).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      vi.advanceTimersByTime(320);
     });
     expect(play).toHaveBeenCalledTimes(2);
 

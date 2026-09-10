@@ -7,7 +7,8 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const stubAudioContext = (): void => {
+const stubAudioContext = (options?: { startSuspended?: boolean }): void => {
+  const startSuspended = options?.startSuspended === true;
   vi.stubGlobal(
     'AudioContext',
     function MockAudioContext(this: {
@@ -21,10 +22,11 @@ const stubAudioContext = (): void => {
       };
       createGain: () => { gain: { value: number }; connect: () => void };
       destination: object;
+      resume: () => Promise<void>;
       close: () => Promise<void>;
     }) {
       this.sampleRate = 16_000;
-      this.state = 'running';
+      this.state = startSuspended ? 'suspended' : 'running';
       this.createMediaStreamSource = () => ({ connect: vi.fn() });
       this.createScriptProcessor = () => ({
         connect: vi.fn(),
@@ -33,6 +35,9 @@ const stubAudioContext = (): void => {
       });
       this.createGain = () => ({ gain: { value: 1 }, connect: vi.fn() });
       this.destination = {};
+      this.resume = vi.fn().mockImplementation(async () => {
+        this.state = 'running';
+      });
       this.close = vi.fn().mockResolvedValue(undefined);
     },
   );
@@ -109,5 +114,94 @@ describe('useHoldToTalk', () => {
 
     expect(result.current.isHolding).toBe(false);
     document.body.removeChild(input);
+  });
+
+  it('keeps Listening until release when onRecordingComplete identity changes mid-hold', async () => {
+    const stop = vi.fn();
+    const stream = {
+      getTracks: () => [{ stop }],
+    } as unknown as MediaStream;
+
+    vi.stubGlobal('navigator', {
+      mediaDevices: {
+        getUserMedia: vi.fn().mockResolvedValue(stream),
+      },
+    });
+    stubAudioContext();
+
+    const { result, rerender } = renderHook(
+      ({ onRecordingComplete }: { onRecordingComplete: (wav: Blob) => void }) =>
+        useHoldToTalk({ onRecordingComplete }),
+      { initialProps: { onRecordingComplete: vi.fn() } },
+    );
+
+    act(() => {
+      result.current.onPressStart();
+    });
+    await waitFor(() => {
+      expect(result.current.isHolding).toBe(true);
+    });
+
+    rerender({ onRecordingComplete: vi.fn() });
+    expect(result.current.isHolding).toBe(true);
+
+    act(() => {
+      result.current.onPressEnd();
+    });
+    expect(result.current.isHolding).toBe(false);
+  });
+
+  it('reports recording_empty when a completed hold captured no audio', async () => {
+    const stream = {
+      getTracks: () => [{ stop: vi.fn() }],
+    } as unknown as MediaStream;
+
+    vi.stubGlobal('navigator', {
+      mediaDevices: {
+        getUserMedia: vi.fn().mockResolvedValue(stream),
+      },
+    });
+    stubAudioContext();
+
+    const onRecordingComplete = vi.fn();
+    const { result } = renderHook(() => useHoldToTalk({ onRecordingComplete }));
+
+    act(() => {
+      result.current.onPressStart();
+    });
+    await waitFor(() => {
+      expect(result.current.isHolding).toBe(true);
+    });
+
+    act(() => {
+      result.current.onPressEnd();
+    });
+
+    expect(result.current.isHolding).toBe(false);
+    expect(result.current.errorCode).toBe('recording_empty');
+    expect(onRecordingComplete).not.toHaveBeenCalled();
+  });
+
+  it('resumes a suspended AudioContext before capturing', async () => {
+    const stream = {
+      getTracks: () => [{ stop: vi.fn() }],
+    } as unknown as MediaStream;
+
+    vi.stubGlobal('navigator', {
+      mediaDevices: {
+        getUserMedia: vi.fn().mockResolvedValue(stream),
+      },
+    });
+    stubAudioContext({ startSuspended: true });
+
+    const onRecordingComplete = vi.fn();
+    const { result } = renderHook(() => useHoldToTalk({ onRecordingComplete }));
+
+    act(() => {
+      result.current.onPressStart();
+    });
+    await waitFor(() => {
+      expect(result.current.isHolding).toBe(true);
+    });
   });
 });

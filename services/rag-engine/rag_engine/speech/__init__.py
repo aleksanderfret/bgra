@@ -29,6 +29,7 @@ from rag_engine.speech.wav import (
     MAX_WAV_BYTES,
     WavValidationError,
     assert_transcribable_wav,
+    load_pcm16_mono_float32,
     pcm16_mono_wav_bytes,
     write_wav_temp,
 )
@@ -50,6 +51,7 @@ __all__ = [
     "ensure_piper_voice",
     "flush_completed_sentences",
     "force_flush_remainder",
+    "load_pcm16_mono_float32",
     "parse_app_locale",
     "pcm16_mono_wav_bytes",
     "speech_backend_name",

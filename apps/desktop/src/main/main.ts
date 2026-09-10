@@ -127,7 +127,7 @@ function ensureMacUninstallHelperInstalled(): void {
     });
     copyMacUninstallHelperToApplications({ sourceApp: source });
   } catch {
-    // Best-effort — in-app remover and DMG copy remain available.
+    // Best-effort — in-app remover remains available if copy fails.
   }
 }
 
@@ -978,9 +978,6 @@ if (!gotLock) {
               await startBackend({ skipRetrievalWarm: action.skipRetrievalWarm });
               break;
             case 'loadAppPage':
-              if (returningPlayer) {
-                ensureRuntimeBusy = true;
-              }
               await splashShown;
               await loadAppPage();
               break;

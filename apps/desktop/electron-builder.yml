@@ -71,19 +71,17 @@ mac:
   extendInfo:
     NSMicrophoneUsageDescription: BGA needs the microphone for push-to-talk questions about board game rules.
 dmg:
+  # Classic drag-to-Applications layout (app left, Applications link right).
+  window:
+    width: 540
+    height: 380
   contents:
     - x: 130
-      y: 220
+      y: 160
     - x: 410
-      y: 220
+      y: 160
       type: link
       path: /Applications
-    - x: 130
-      y: 400
-      type: file
-      # Relative to apps/desktop (electron-builder cwd). dmgbuild does not
-      # resolve bare names via buildResources the way older appdmg did.
-      path: packaging/BGA Uninstall.app
 win:
   target:
     - nsis

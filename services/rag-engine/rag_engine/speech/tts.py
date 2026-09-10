@@ -92,10 +92,12 @@ def _iter_pcm(voice_model: object, text: str) -> Iterator[bytes]:
 
 
 def _pcm16_to_wav(pcm: bytes, *, sample_rate: int) -> bytes:
+    # ~280 ms of silence so sentence endings are not clipped by the next clip.
+    trailing_silence = b"\x00\x00" * max(1, int(sample_rate * 0.28))
     buffer = io.BytesIO()
     with wave.open(buffer, "wb") as handle:
         handle.setnchannels(1)
         handle.setsampwidth(2)
         handle.setframerate(sample_rate)
-        handle.writeframes(pcm)
+        handle.writeframes(pcm + trailing_silence)
     return buffer.getvalue()

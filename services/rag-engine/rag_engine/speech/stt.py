@@ -7,13 +7,13 @@ from pathlib import Path
 from typing import Protocol
 
 from rag_engine.speech.backend import SpeechExtraMissingError, speech_backend_name, stt_model_id
-from rag_engine.speech.wav import WavValidationError, write_wav_temp
+from rag_engine.speech.wav import WavValidationError, load_pcm16_mono_float32, write_wav_temp
 
 logger = logging.getLogger(__name__)
 
 
 class SpeechToText(Protocol):
-    def transcribe(self, audio_path: Path) -> str:
+    def transcribe(self, audio_path: Path, *, language: str | None = None) -> str:
         """Return the recognised text for a recorded utterance."""
 
 
@@ -21,14 +21,20 @@ class _MlxWhisperStt:
     def __init__(self, model_id: str) -> None:
         self._model_id = model_id
 
-    def transcribe(self, audio_path: Path) -> str:
+    def transcribe(self, audio_path: Path, *, language: str | None = None) -> str:
         try:
             import mlx_whisper
+            import numpy as np
         except ImportError as error:
             raise SpeechExtraMissingError(
                 "mlx-whisper is not installed. Sync the speech extra on macOS."
             ) from error
-        result = mlx_whisper.transcribe(str(audio_path), path_or_hf_repo=self._model_id)
+        # Pass float samples — path-based load_audio requires ffmpeg on PATH.
+        audio = np.asarray(load_pcm16_mono_float32(audio_path), dtype=np.float32)
+        options: dict[str, object] = {"path_or_hf_repo": self._model_id}
+        if language is not None and language.strip():
+            options["language"] = language.strip()
+        result = mlx_whisper.transcribe(audio, **options)
         text = result.get("text") if isinstance(result, dict) else None
         if not isinstance(text, str):
             return ""
@@ -52,9 +58,12 @@ class _FasterWhisperStt:
         self._model = WhisperModel(self._model_id, device="cpu", compute_type="int8")
         return self._model
 
-    def transcribe(self, audio_path: Path) -> str:
+    def transcribe(self, audio_path: Path, *, language: str | None = None) -> str:
         model = self._load()
-        segments, _info = model.transcribe(str(audio_path), beam_size=1)  # type: ignore[attr-defined]
+        kwargs: dict[str, object] = {"beam_size": 1}
+        if language is not None and language.strip():
+            kwargs["language"] = language.strip()
+        segments, _info = model.transcribe(str(audio_path), **kwargs)  # type: ignore[attr-defined]
         parts = [segment.text for segment in segments]
         return " ".join(part.strip() for part in parts if part.strip()).strip()
 
@@ -77,6 +86,7 @@ def transcribe_wav_bytes(
     stt: SpeechToText | None = None,
     platform: str | None = None,
     profile_stt: str | None = None,
+    language: str | None = None,
 ) -> str:
     """Validate WAV bytes, write a temp file, transcribe, then delete the temp file."""
     path = write_wav_temp(data)
@@ -89,7 +99,7 @@ def transcribe_wav_bytes(
         )
     )
     try:
-        return engine.transcribe(path).strip()
+        return engine.transcribe(path, language=language).strip()
     finally:
         try:
             path.unlink(missing_ok=True)

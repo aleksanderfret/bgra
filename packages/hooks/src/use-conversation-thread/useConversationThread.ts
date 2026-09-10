@@ -8,6 +8,7 @@ import {
   dropExchange as dropFromThread,
   emptyThread,
   loadThread,
+  replaceExchangeQuestion as renameInThread,
   replaceExchangeAnswer,
   saveThread,
 } from '@bga/utils/conversation-thread';
@@ -30,6 +31,7 @@ export interface UseConversationThread {
   lastSaveSucceeded: boolean;
   beginExchange: (input: BeginExchangeInput) => string;
   updateAnswer: (exchangeId: string, answer: AnswerState) => void;
+  renameExchangeQuestion: (exchangeId: string, question: string) => void;
   dropExchange: (exchangeId: string) => void;
 }
 
@@ -110,6 +112,16 @@ export const useConversationThread = (
     [apply],
   );
 
+  const renameExchangeQuestion = useCallback(
+    (exchangeId: string, question: string): void => {
+      if (!threadRef.current.exchanges.some((exchange) => exchange.id === exchangeId)) {
+        return;
+      }
+      apply(renameInThread(threadRef.current, exchangeId, question));
+    },
+    [apply],
+  );
+
   const dropExchange = useCallback(
     (exchangeId: string): void => {
       apply(dropFromThread(threadRef.current, exchangeId));
@@ -117,5 +129,12 @@ export const useConversationThread = (
     [apply],
   );
 
-  return { thread, lastSaveSucceeded, beginExchange, updateAnswer, dropExchange };
+  return {
+    thread,
+    lastSaveSucceeded,
+    beginExchange,
+    updateAnswer,
+    renameExchangeQuestion,
+    dropExchange,
+  };
 };

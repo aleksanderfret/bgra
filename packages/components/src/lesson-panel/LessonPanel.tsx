@@ -643,12 +643,35 @@ export const LessonPanel: FC = () => {
                 }
                 holdToTalk.onPressEnd();
               }}
+              onLostPointerCapture={() => {
+                holdToTalk.onPressEnd();
+              }}
             >
               {holdToTalk.isHolding
                 ? t('rulesChat.voice.holding')
                 : t('rulesChat.voice.holdToTalk')}
             </Button>
           </Group>
+          {holdToTalk.errorCode === 'mic_denied' && (
+            <Text size="sm" c="dimmed" role="status">
+              {t('rulesChat.voice.micDenied')}
+            </Text>
+          )}
+          {holdToTalk.errorCode === 'mic_unavailable' && (
+            <Text size="sm" c="dimmed" role="status">
+              {t('rulesChat.voice.micUnavailable')}
+            </Text>
+          )}
+          {holdToTalk.errorCode === 'recording_empty' && (
+            <Text size="sm" c="dimmed" role="status">
+              {t('rulesChat.voice.recordingEmpty')}
+            </Text>
+          )}
+          {!holdToTalk.isSupported && (
+            <Text size="sm" c="dimmed" role="status">
+              {t('rulesChat.voice.unsupported')}
+            </Text>
+          )}
           {!digressionOpen && (
             <Text size="sm" c="dimmed" role="status">
               {t('teach.autoAdvanceHint')}

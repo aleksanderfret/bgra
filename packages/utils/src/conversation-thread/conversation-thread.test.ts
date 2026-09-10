@@ -4,8 +4,10 @@ import {
   appendExchange,
   dropExchange,
   emptyThread,
+  findReusableExchange,
   parseThread,
   replaceExchangeAnswer,
+  replaceExchangeQuestion,
   selectExchanges,
   serializeThread,
   type ThreadExchange,
@@ -96,5 +98,23 @@ describe('conversation-thread', () => {
 
     expect(parsed.exchanges[0]?.answer.isStreaming).toBe(false);
     expect(parsed.exchanges[0]?.answer.stage).toBe('idle');
+  });
+
+  it('finds a finished answer for the same question and expansions', () => {
+    const first = appendExchange(emptyThread('azul'), exchange('a', 'How do I score?'));
+    const withAnswer = replaceExchangeAnswer(first, 'a', {
+      ...initialAnswerState,
+      text: 'Four tiles.',
+    });
+    expect(findReusableExchange(withAnswer, 'how do I score?', [])?.id).toBe('a');
+    expect(findReusableExchange(withAnswer, 'How do I score?', ['exp-1'])).toBeNull();
+    expect(findReusableExchange(withAnswer, 'Something else?', [])).toBeNull();
+  });
+
+  it('renames the question on an in-flight voice exchange', () => {
+    const thread = appendExchange(emptyThread('azul'), exchange('a', '…'));
+    expect(replaceExchangeQuestion(thread, 'a', 'How do I score?').exchanges[0]?.question).toBe(
+      'How do I score?',
+    );
   });
 });

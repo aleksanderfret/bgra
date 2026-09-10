@@ -188,8 +188,10 @@
       "readAloud": "Czytaj na głos",
       "holdToTalk": "Przytrzymaj, aby mówić",
       "holding": "Słucham…",
+      "pendingQuestion": "Pytanie z mikrofonu…",
       "micDenied": "Odmówiono dostępu do mikrofonu. Włącz go w ustawieniach systemu i spróbuj ponownie.",
       "micUnavailable": "Nie udało się użyć mikrofonu. Sprawdź, czy jest podłączony, i spróbuj ponownie.",
+      "recordingEmpty": "Nie usłyszałem żadnych słów. Trzymaj przycisk podczas mówienia, a potem puść.",
       "unsupported": "Ta przeglądarka nie obsługuje mikrofonu w tym miejscu."
     }
   },

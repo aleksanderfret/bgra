@@ -161,6 +161,61 @@ export const dropExchange = (
   exchanges: thread.exchanges.filter((exchange) => exchange.id !== exchangeId),
 });
 
+export const replaceExchangeQuestion = (
+  thread: ConversationThread,
+  exchangeId: string,
+  question: string,
+): ConversationThread => ({
+  ...thread,
+  exchanges: thread.exchanges.map((exchange) =>
+    exchange.id === exchangeId ? { ...exchange, question } : exchange,
+  ),
+});
+
+export const normalizeThreadQuestion = (question: string): string =>
+  question.trim().toLowerCase().replace(/\s+/g, ' ');
+
+const sameExpansionIds = (left: readonly string[], right: readonly string[]): boolean => {
+  if (left.length !== right.length) {
+    return false;
+  }
+  const sortedLeft = [...left].sort();
+  const sortedRight = [...right].sort();
+  return sortedLeft.every((id, index) => id === sortedRight[index]);
+};
+
+/** Last finished answer for the same question + expansions (no re-search). */
+export const findReusableExchange = (
+  thread: ConversationThread,
+  question: string,
+  expansionIds: readonly string[],
+): ThreadExchange | null => {
+  const normalized = normalizeThreadQuestion(question);
+  if (normalized.length === 0) {
+    return null;
+  }
+  for (let index = thread.exchanges.length - 1; index >= 0; index -= 1) {
+    const exchange = thread.exchanges[index];
+    if (exchange === undefined) {
+      continue;
+    }
+    if (normalizeThreadQuestion(exchange.question) !== normalized) {
+      continue;
+    }
+    if (!sameExpansionIds(exchange.expansionIds, expansionIds)) {
+      continue;
+    }
+    if (exchange.answer.isStreaming || exchange.answer.error !== null) {
+      continue;
+    }
+    if (exchange.answer.text.trim().length === 0) {
+      continue;
+    }
+    return exchange;
+  }
+  return null;
+};
+
 export const selectExchanges = (
   thread: ConversationThread,
   slice: ThreadSlice,

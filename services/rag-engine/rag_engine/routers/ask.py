@@ -87,6 +87,7 @@ async def _stream_answer(
                 transcribe_wav_bytes,
                 audio_wav,
                 profile_stt=settings.profile.stt,
+                language=locale,
             )
         except WavValidationError:
             yield encode_event(NoticeEvent(code="speech_invalid_audio", params={}))

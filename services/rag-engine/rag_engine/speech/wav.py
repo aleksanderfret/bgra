@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import array
 import io
 import struct
 import tempfile
@@ -51,6 +52,32 @@ def write_wav_temp(data: bytes) -> Path:
         tmp.write(data)
         tmp.flush()
         return Path(tmp.name)
+
+
+def load_pcm16_mono_float32(path: Path) -> list[float]:
+    """Read a validated 16 kHz mono PCM WAV into float32 samples in [-1, 1].
+
+    mlx-whisper's path loader shells out to ffmpeg; we never ship ffmpeg, so
+    hold-to-talk STT must feed samples instead of a file path.
+    """
+    with wave.open(str(path), "rb") as handle:
+        if handle.getnchannels() != _REQUIRED_CHANNELS:
+            raise WavValidationError(
+                f"expected {_REQUIRED_CHANNELS} channel(s), got {handle.getnchannels()}"
+            )
+        if handle.getsampwidth() != _REQUIRED_SAMPLE_WIDTH:
+            raise WavValidationError(f"expected {_REQUIRED_SAMPLE_WIDTH}-byte samples")
+        if handle.getframerate() != _REQUIRED_RATE:
+            raise WavValidationError(f"expected {_REQUIRED_RATE} Hz, got {handle.getframerate()}")
+        frames = handle.getnframes()
+        if frames <= 0:
+            raise WavValidationError("WAV has no frames")
+        raw = handle.readframes(frames)
+
+    samples = array.array("h")
+    samples.frombytes(raw)
+    scale = 32768.0
+    return [sample / scale for sample in samples]
 
 
 def pcm16_mono_wav_bytes(samples: bytes, *, sample_rate: int = _REQUIRED_RATE) -> bytes:

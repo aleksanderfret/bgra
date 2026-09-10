@@ -76,6 +76,8 @@ module = [
     "youtube_transcript_api.*",
     "yt_dlp",
     "yt_dlp.*",
+    "numpy",
+    "numpy.*",
     "mlx_whisper",
     "mlx_whisper.*",
     "faster_whisper",

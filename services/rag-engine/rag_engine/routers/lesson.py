@@ -825,10 +825,13 @@ async def _stream_ask(
     if audio_wav is not None:
         yield encode_event(StatusEvent(stage="transcribing"))
         try:
+            from rag_engine.speech import parse_app_locale
+
             question = await asyncio.to_thread(
                 transcribe_wav_bytes,
                 audio_wav,
                 profile_stt=settings.profile.stt,
+                language=parse_app_locale(payload.locale),
             )
         except WavValidationError:
             yield encode_event(NoticeEvent(code="speech_invalid_audio", params={}))

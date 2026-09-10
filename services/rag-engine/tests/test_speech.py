@@ -15,7 +15,9 @@ from rag_engine.speech.voices import parse_app_locale, voice_for_locale
 from rag_engine.speech.wav import (
     WavValidationError,
     assert_transcribable_wav,
+    load_pcm16_mono_float32,
     pcm16_mono_wav_bytes,
+    write_wav_temp,
 )
 
 
@@ -57,16 +59,29 @@ def test_wav_accepts_16k_mono_pcm() -> None:
     assert_transcribable_wav(data)
 
 
+def test_load_pcm16_mono_float32_scales_samples(tmp_path: Path) -> None:
+    # One full-scale sample (+32767) → ~1.0 float.
+    data = pcm16_mono_wav_bytes((32767).to_bytes(2, "little", signed=True))
+    path = write_wav_temp(data)
+    try:
+        samples = load_pcm16_mono_float32(path)
+    finally:
+        path.unlink(missing_ok=True)
+    assert len(samples) == 1
+    assert samples[0] == pytest.approx(32767 / 32768.0)
+
+
 def test_transcribe_wav_bytes_uses_stt_and_deletes_temp(tmp_path: Path) -> None:
     data = pcm16_mono_wav_bytes(b"\x00\x00" * 800)
     stt = MagicMock()
     stt.transcribe.return_value = "  hello rules  "
-    text = transcribe_wav_bytes(data, stt=stt)
+    text = transcribe_wav_bytes(data, stt=stt, language="pl")
     assert text == "hello rules"
     stt.transcribe.assert_called_once()
     path_arg: Path = stt.transcribe.call_args[0][0]
     assert path_arg.suffix == ".wav"
     assert not path_arg.exists()
+    assert stt.transcribe.call_args.kwargs.get("language") == "pl"
 
 
 def test_flush_completed_sentences_keeps_remainder() -> None:

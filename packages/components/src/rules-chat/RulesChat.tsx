@@ -9,7 +9,11 @@ import { useConversationThread } from '@bga/hooks/use-conversation-thread';
 import { useEngineReadiness } from '@bga/hooks/use-engine-readiness';
 import { useHoldToTalk } from '@bga/hooks/use-hold-to-talk';
 import { type AnswerState, isBlockingNotice, streamingStatusKey } from '@bga/utils/answer-state';
-import { selectExchanges } from '@bga/utils/conversation-thread';
+import {
+  findReusableExchange,
+  freezeAnswer,
+  selectExchanges,
+} from '@bga/utils/conversation-thread';
 import { GAMES_CHANGED_EVENT } from '@bga/utils/desktop-bridge';
 import { isGameSummaryList } from '@bga/utils/game-summary';
 import { loadReadAloudPreference, saveReadAloudPreference } from '@bga/utils/voice-prefs';
@@ -74,8 +78,14 @@ export const RulesChat: FC = () => {
   const expansionsStatusId = useId();
   const { state, ask, cancel } = useAskStream();
   const { enqueue, stop: stopAudio } = useAudioQueue();
-  const { thread, lastSaveSucceeded, beginExchange, updateAnswer, dropExchange } =
-    useConversationThread(gameId);
+  const {
+    thread,
+    lastSaveSucceeded,
+    beginExchange,
+    updateAnswer,
+    renameExchangeQuestion,
+    dropExchange,
+  } = useConversationThread(gameId);
   const wasStreamingRef = useRef(false);
   const voicePendingRef = useRef(false);
   const readAloudRef = useRef(readAloud);
@@ -136,19 +146,14 @@ export const RulesChat: FC = () => {
     if (
       voicePendingRef.current &&
       state.transcript !== null &&
-      activeExchangeId === null &&
+      activeExchangeId !== null &&
       state.transcript.trim().length > 0
     ) {
       voicePendingRef.current = false;
       setVoiceFailure(null);
-      const id = beginExchange({
-        question: state.transcript,
-        mode: 'arbitrate',
-        expansionIds: [...expansionIds],
-      });
-      setActiveExchangeId(id);
+      renameExchangeQuestion(activeExchangeId, state.transcript);
     }
-  }, [activeExchangeId, beginExchange, expansionIds, state.transcript]);
+  }, [activeExchangeId, renameExchangeQuestion, state.transcript]);
 
   useEffect(() => {
     if (voicePendingRef.current && state.isStreaming) {
@@ -163,11 +168,20 @@ export const RulesChat: FC = () => {
       const failed =
         state.error !== null || (state.notice !== null && isBlockingNotice(state.notice.code));
       setVoiceFailure(failed ? state : null);
+      if (activeExchangeId !== null && failed) {
+        dropExchange(activeExchangeId);
+        setActiveExchangeId(null);
+      }
     }
     if (activeExchangeId === null) {
       if (!voicePendingRef.current) {
         wasStreamingRef.current = false;
       }
+      return;
+    }
+    // Ignore leftover idle state from the previous turn so we do not wipe a
+    // freshly opened exchange before the new stream's startAnswer arrives.
+    if (!state.isStreaming && !wasStreamingRef.current) {
       return;
     }
     updateAnswer(activeExchangeId, state);
@@ -179,7 +193,7 @@ export const RulesChat: FC = () => {
       wasStreamingRef.current = false;
       setActiveExchangeId(null);
     }
-  }, [activeExchangeId, state, updateAnswer]);
+  }, [activeExchangeId, dropExchange, state, updateAnswer]);
 
   const baseGames = (games ?? []).filter((game) => game.baseGameId === null);
   const expansionsForBase =
@@ -242,19 +256,29 @@ export const RulesChat: FC = () => {
     voicePendingRef.current = false;
     setVoiceFailure(null);
     const questionText = question.trim();
+    const expansions = [...expansionIds];
+    // Reuse skips the engine — and therefore Piper — so only do it when
+    // the player is not asking for read-aloud on this turn.
+    const reused =
+      readAloudRef.current === true ? null : findReusableExchange(thread, questionText, expansions);
     const id = beginExchange({
       question: questionText,
       mode: 'arbitrate',
-      expansionIds: [...expansionIds],
+      expansionIds: expansions,
     });
     setActiveExchangeId(id);
     setQuestion('');
+    if (reused !== null) {
+      updateAnswer(id, freezeAnswer(reused.answer));
+      setActiveExchangeId(null);
+      return;
+    }
     void ask(
       {
         gameId,
         question: questionText,
         mode: 'arbitrate',
-        expansionIds: expansionIds.length > 0 ? expansionIds : undefined,
+        expansionIds: expansions.length > 0 ? expansions : undefined,
         speak: readAloudRef.current,
         locale,
       },
@@ -269,6 +293,12 @@ export const RulesChat: FC = () => {
     stopAudio();
     voicePendingRef.current = true;
     setVoiceFailure(null);
+    const id = beginExchange({
+      question: t('rulesChat.voice.pendingQuestion'),
+      mode: 'arbitrate',
+      expansionIds: [...expansionIds],
+    });
+    setActiveExchangeId(id);
     void ask(
       {
         gameId,
@@ -337,6 +367,8 @@ export const RulesChat: FC = () => {
     micHint = t('rulesChat.voice.micDenied');
   } else if (holdToTalk.errorCode === 'mic_unavailable') {
     micHint = t('rulesChat.voice.micUnavailable');
+  } else if (holdToTalk.errorCode === 'recording_empty') {
+    micHint = t('rulesChat.voice.recordingEmpty');
   }
 
   return (
@@ -418,6 +450,7 @@ export const RulesChat: FC = () => {
             onPointerDown={onMicPointerDown}
             onPointerUp={onMicPointerUp}
             onPointerCancel={onMicPointerUp}
+            onLostPointerCapture={onMicPointerUp}
           >
             {holdToTalk.isHolding ? t('rulesChat.voice.holding') : t('rulesChat.voice.holdToTalk')}
           </Button>

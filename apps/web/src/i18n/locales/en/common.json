@@ -188,8 +188,10 @@
       "readAloud": "Read aloud",
       "holdToTalk": "Hold to talk",
       "holding": "Listening…",
+      "pendingQuestion": "Spoken question…",
       "micDenied": "Microphone access was denied. Allow it in system settings, then try again.",
       "micUnavailable": "Couldn’t reach the microphone. Check that it is connected and try again.",
+      "recordingEmpty": "I didn’t catch any words. Keep holding the button while you speak, then let go.",
       "unsupported": "This browser can’t use the microphone here."
     }
   },

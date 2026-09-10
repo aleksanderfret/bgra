@@ -59,29 +59,32 @@ export const SetupPanel: FC = () => {
       setBrowserOnly(true);
       return;
     }
-    void api.getSetupState().then(setState);
-    return api.onRuntimeProgress((event) => {
+    let cancelled = false;
+    const refreshState = (): void => {
+      void api.getSetupState().then((next) => {
+        if (!cancelled) {
+          setState(next);
+        }
+      });
+    };
+    refreshState();
+    const poll = window.setInterval(refreshState, 1_000);
+    const stopProgress = api.onRuntimeProgress((event) => {
       setProgress(event);
       if (event.stage === 'error') {
         setErrorCode(event.code);
       }
       if (event.stage === 'ready') {
         setErrorCode(null);
-        void api
-          .getSetupState()
-          .then(async (next) => {
-            setState(next);
-            if (next.askReady) {
-              await api.markSetupComplete();
-              router.replace(`/${locale}`);
-            }
-          })
-          .catch(() => {
-            /* stay on setup; player can retry */
-          });
+        refreshState();
       }
     });
-  }, [locale, router]);
+    return () => {
+      cancelled = true;
+      window.clearInterval(poll);
+      stopProgress();
+    };
+  }, []);
 
   useEffect(() => {
     if (state === null || errorCode !== null) {

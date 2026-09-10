@@ -4,11 +4,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 const TARGET_RATE = 16_000;
 const MAX_SECONDS = 30;
+/** Below this after a real hold, treat as empty and tell the player. */
+const MIN_PCM_SAMPLES = TARGET_RATE * 0.15;
+
+export type HoldToTalkErrorCode = 'mic_denied' | 'mic_unavailable' | 'recording_empty';
 
 export interface UseHoldToTalk {
   isHolding: boolean;
   isSupported: boolean;
-  errorCode: 'mic_denied' | 'mic_unavailable' | null;
+  errorCode: HoldToTalkErrorCode | null;
   /** Pointer/mouse/touch: press and hold the mic control. */
   onPressStart: () => void;
   onPressEnd: () => void;
@@ -85,10 +89,22 @@ const encodeWav = (samples: Int16Array, sampleRate: number): Blob => {
   return new Blob([buffer], { type: 'audio/wav' });
 };
 
+const rmsLevel = (samples: Int16Array): number => {
+  if (samples.length === 0) {
+    return 0;
+  }
+  let sum = 0;
+  for (let index = 0; index < samples.length; index += 1) {
+    const sample = samples[index] ?? 0;
+    sum += sample * sample;
+  }
+  return Math.sqrt(sum / samples.length) / 0x8000;
+};
+
 export const useHoldToTalk = (options: UseHoldToTalkOptions): UseHoldToTalk => {
   const { onRecordingComplete, onHoldStart, disabled = false } = options;
   const [isHolding, setIsHolding] = useState(false);
-  const [errorCode, setErrorCode] = useState<'mic_denied' | 'mic_unavailable' | null>(null);
+  const [errorCode, setErrorCode] = useState<HoldToTalkErrorCode | null>(null);
   const isSupported =
     typeof navigator !== 'undefined' &&
     typeof navigator.mediaDevices?.getUserMedia === 'function' &&
@@ -103,6 +119,14 @@ export const useHoldToTalk = (options: UseHoldToTalkOptions): UseHoldToTalk => {
   const streamRef = useRef<MediaStream | null>(null);
   const sampleRateRef = useRef(TARGET_RATE);
   const startedAtRef = useRef(0);
+  const windowReleaseAttachedRef = useRef(false);
+  const disabledRef = useRef(disabled);
+  disabledRef.current = disabled;
+  const onRecordingCompleteRef = useRef(onRecordingComplete);
+  onRecordingCompleteRef.current = onRecordingComplete;
+  const onHoldStartRef = useRef(onHoldStart);
+  onHoldStartRef.current = onHoldStart;
+  const finishRecordingRef = useRef<() => void>(() => undefined);
 
   const teardown = useCallback((): void => {
     processorRef.current?.disconnect();
@@ -118,8 +142,38 @@ export const useHoldToTalk = (options: UseHoldToTalkOptions): UseHoldToTalk => {
     }
   }, []);
 
+  const onWindowReleaseRef = useRef((): void => {
+    if (!windowReleaseAttachedRef.current) {
+      return;
+    }
+    windowReleaseAttachedRef.current = false;
+    window.removeEventListener('pointerup', onWindowReleaseRef.current);
+    window.removeEventListener('pointercancel', onWindowReleaseRef.current);
+    finishRecordingRef.current();
+  });
+
+  const detachWindowRelease = useCallback((): void => {
+    if (!windowReleaseAttachedRef.current) {
+      return;
+    }
+    windowReleaseAttachedRef.current = false;
+    window.removeEventListener('pointerup', onWindowReleaseRef.current);
+    window.removeEventListener('pointercancel', onWindowReleaseRef.current);
+  }, []);
+
+  const attachWindowRelease = useCallback((): void => {
+    if (windowReleaseAttachedRef.current) {
+      return;
+    }
+    windowReleaseAttachedRef.current = true;
+    window.addEventListener('pointerup', onWindowReleaseRef.current);
+    window.addEventListener('pointercancel', onWindowReleaseRef.current);
+  }, []);
+
   const finishRecording = useCallback((): void => {
-    if (startingRef.current && !holdingRef.current) {
+    detachWindowRelease();
+    // Release while getUserMedia / graph setup is still in flight.
+    if (startingRef.current) {
       cancelledStartRef.current = true;
       return;
     }
@@ -135,6 +189,7 @@ export const useHoldToTalk = (options: UseHoldToTalkOptions): UseHoldToTalk => {
     teardown();
 
     if (chunks.length === 0) {
+      setErrorCode('recording_empty');
       return;
     }
     let total = 0;
@@ -149,32 +204,65 @@ export const useHoldToTalk = (options: UseHoldToTalkOptions): UseHoldToTalk => {
     }
     const downsampled = downsample(merged, inputRate, TARGET_RATE);
     const pcm = floatTo16BitPcm(downsampled);
-    if (pcm.length === 0) {
+    if (pcm.length < MIN_PCM_SAMPLES || rmsLevel(pcm) < 0.004) {
+      setErrorCode('recording_empty');
       return;
     }
-    onRecordingComplete(encodeWav(pcm, TARGET_RATE));
-  }, [onRecordingComplete, teardown]);
+    onRecordingCompleteRef.current(encodeWav(pcm, TARGET_RATE));
+  }, [detachWindowRelease, teardown]);
+
+  finishRecordingRef.current = finishRecording;
 
   const startRecording = useCallback(async (): Promise<void> => {
-    if (disabled || holdingRef.current || startingRef.current || !isSupported) {
+    if (disabledRef.current || holdingRef.current || startingRef.current || !isSupported) {
       return;
     }
     startingRef.current = true;
     cancelledStartRef.current = false;
-    onHoldStart?.();
+    onHoldStartRef.current?.();
     setErrorCode(null);
+    attachWindowRelease();
+
+    // Create (and resume) inside the press gesture, before any await, so the
+    // graph is allowed to run. Creating after getUserMedia often stays suspended.
+    const context = new AudioContext();
+    contextRef.current = context;
+    sampleRateRef.current = context.sampleRate;
     try {
+      if (context.state === 'suspended') {
+        await context.resume();
+      }
+      if (cancelledStartRef.current || disabledRef.current) {
+        startingRef.current = false;
+        cancelledStartRef.current = false;
+        detachWindowRelease();
+        teardown();
+        return;
+      }
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      if (cancelledStartRef.current || disabled) {
+      if (cancelledStartRef.current || disabledRef.current) {
         stream.getTracks().forEach((track) => {
           track.stop();
         });
         startingRef.current = false;
         cancelledStartRef.current = false;
+        detachWindowRelease();
+        teardown();
         return;
       }
-      const context = new AudioContext();
-      sampleRateRef.current = context.sampleRate;
+      if (context.state === 'suspended') {
+        await context.resume();
+      }
+      if (cancelledStartRef.current || disabledRef.current) {
+        stream.getTracks().forEach((track) => {
+          track.stop();
+        });
+        startingRef.current = false;
+        cancelledStartRef.current = false;
+        detachWindowRelease();
+        teardown();
+        return;
+      }
       const source = context.createMediaStreamSource(stream);
       // ScriptProcessor is deprecated but widely available without a worklet file.
       const processor = context.createScriptProcessor(4096, 1, 1);
@@ -185,7 +273,7 @@ export const useHoldToTalk = (options: UseHoldToTalkOptions): UseHoldToTalk => {
           return;
         }
         if (Date.now() - startedAtRef.current > MAX_SECONDS * 1000) {
-          finishRecording();
+          finishRecordingRef.current();
           return;
         }
         const input = event.inputBuffer.getChannelData(0);
@@ -198,24 +286,31 @@ export const useHoldToTalk = (options: UseHoldToTalkOptions): UseHoldToTalk => {
       processor.connect(silence);
       silence.connect(context.destination);
       streamRef.current = stream;
-      contextRef.current = context;
       processorRef.current = processor;
-      startingRef.current = false;
-      if (cancelledStartRef.current) {
+
+      if (cancelledStartRef.current || disabledRef.current) {
+        startingRef.current = false;
         cancelledStartRef.current = false;
+        detachWindowRelease();
         teardown();
         return;
       }
+      // Mark holding before clearing "starting" so a release never lands in a
+      // gap where both flags are false (that used to leave Listening stuck on).
       holdingRef.current = true;
+      startingRef.current = false;
       setIsHolding(true);
     } catch (error) {
       startingRef.current = false;
       cancelledStartRef.current = false;
+      holdingRef.current = false;
+      setIsHolding(false);
+      detachWindowRelease();
       teardown();
       const name = error instanceof DOMException ? error.name : '';
       setErrorCode(name === 'NotAllowedError' ? 'mic_denied' : 'mic_unavailable');
     }
-  }, [disabled, finishRecording, isSupported, onHoldStart, teardown]);
+  }, [attachWindowRelease, detachWindowRelease, isSupported, teardown]);
 
   const onPressStart = useCallback((): void => {
     void startRecording();
@@ -227,7 +322,7 @@ export const useHoldToTalk = (options: UseHoldToTalkOptions): UseHoldToTalk => {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.code !== 'Space' || event.repeat || disabled) {
+      if (event.code !== 'Space' || event.repeat || disabledRef.current) {
         return;
       }
       if (isTextEntryTarget(event.target)) {
@@ -240,29 +335,34 @@ export const useHoldToTalk = (options: UseHoldToTalkOptions): UseHoldToTalk => {
       if (event.code !== 'Space') {
         return;
       }
-      // Always end an in-flight hold even if focus moved into a text field.
       if (holdingRef.current || startingRef.current) {
         event.preventDefault();
-        finishRecording();
+        finishRecordingRef.current();
         return;
       }
       if (isTextEntryTarget(event.target)) {
         return;
       }
       event.preventDefault();
-      finishRecording();
+      finishRecordingRef.current();
     };
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
     return () => {
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
+    };
+  }, [startRecording]);
+
+  useEffect(() => {
+    return () => {
       cancelledStartRef.current = true;
       startingRef.current = false;
       holdingRef.current = false;
+      detachWindowRelease();
       teardown();
     };
-  }, [disabled, finishRecording, startRecording, teardown]);
+  }, [detachWindowRelease, teardown]);
 
   return {
     isHolding,
