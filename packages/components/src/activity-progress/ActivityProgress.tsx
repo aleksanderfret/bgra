@@ -21,10 +21,9 @@ export const ActivityProgress: FC<ActivityProgressProps> = ({ view, layout }) =>
     code === null
       ? t('activity.unknown')
       : t(`activity.${code}`, { defaultValue: t('activity.unknown') });
-  const hasCounts =
-    typeof view.current === 'number' && typeof view.total === 'number' && view.total > 0;
   const percent = view.percent;
   const determinate = percent !== null;
+  const displayPercent = percent === null ? null : Math.round(percent);
   const dashOffset =
     percent === null ? RING_CIRCUMFERENCE : RING_CIRCUMFERENCE * (1 - percent / 100);
   const shellClass = layout === 'page' ? classes.page : classes.inline;
@@ -56,22 +55,22 @@ export const ActivityProgress: FC<ActivityProgressProps> = ({ view, layout }) =>
   const copy = (
     <Stack gap={4} className={classes.label} key={code ?? 'unknown'}>
       <Text>{label}</Text>
-      {hasCounts ? (
+      {displayPercent !== null ? (
         <Text size="sm" c="dimmed">
-          {t('activity.detail', { current: view.current, total: view.total })}
+          {t('activity.detail', { percent: displayPercent })}
         </Text>
       ) : null}
     </Stack>
   );
 
-  if (determinate) {
+  if (percent !== null) {
     return (
       <div
         className={shellClass}
         role="progressbar"
         aria-valuemin={0}
         aria-valuemax={100}
-        aria-valuenow={percent}
+        aria-valuenow={Math.round(percent)}
         aria-label={label}
       >
         {mark}

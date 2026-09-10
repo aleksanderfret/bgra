@@ -15,6 +15,8 @@ export interface StartupCopy {
   body: string;
 }
 
+export type StartupCopyVariant = 'firstRun' | 'returning';
+
 export interface SplashHtmlOptions {
   copy: StartupCopy;
   dark: boolean;
@@ -25,7 +27,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object';
 }
 
-export function startupCopyFromCatalogue(catalogue: unknown): StartupCopy | null {
+export function startupCopyFromCatalogue(
+  catalogue: unknown,
+  variant: StartupCopyVariant,
+): StartupCopy | null {
   if (!isRecord(catalogue)) {
     return null;
   }
@@ -33,13 +38,16 @@ export function startupCopyFromCatalogue(catalogue: unknown): StartupCopy | null
   if (!isRecord(startup)) {
     return null;
   }
-  if (typeof startup.loadingTitle !== 'string' || typeof startup.loadingBody !== 'string') {
+  const bodyKey = variant === 'firstRun' ? 'loadingBodyFirstRun' : 'loadingBodyReturning';
+  const title = startup.loadingTitle;
+  const body = startup[bodyKey];
+  if (typeof title !== 'string' || typeof body !== 'string') {
     return null;
   }
-  if (startup.loadingTitle.length === 0 || startup.loadingBody.length === 0) {
+  if (title.length === 0 || body.length === 0) {
     return null;
   }
-  return { title: startup.loadingTitle, body: startup.loadingBody };
+  return { title, body };
 }
 
 export function activityLineFromCatalogue(catalogue: unknown, code: string): string | null {
@@ -57,11 +65,15 @@ export function activityLineFromCatalogue(catalogue: unknown, code: string): str
   return line;
 }
 
-export function readStartupCopy(localesDir: string, locale: 'en' | 'pl'): StartupCopy {
+export function readStartupCopy(
+  localesDir: string,
+  locale: 'en' | 'pl',
+  variant: StartupCopyVariant,
+): StartupCopy {
   const raw = readFileSync(join(localesDir, locale, 'common.json'), 'utf8');
-  const copy = startupCopyFromCatalogue(JSON.parse(raw) as unknown);
+  const copy = startupCopyFromCatalogue(JSON.parse(raw) as unknown, variant);
   if (copy === null) {
-    throw new Error(`Missing startup copy in ${locale} catalogue`);
+    throw new Error(`Missing startup copy (${variant}) in ${locale} catalogue`);
   }
   return copy;
 }
@@ -103,15 +115,16 @@ export interface ApplySplashActivityOptions {
   localesDir: string;
   locale: 'en' | 'pl';
   code: SplashActivityCode;
+  firstRun: boolean;
 }
 
 export function applySplashActivity(options: ApplySplashActivityOptions): void {
-  const { target, localesDir, locale, code } = options;
+  const { target, localesDir, locale, code, firstRun } = options;
   if (target === null || target.isDestroyed()) {
     return;
   }
   const title = readActivityLine(localesDir, locale, code);
-  const body = readStartupCopy(localesDir, locale).body;
+  const body = readStartupCopy(localesDir, locale, firstRun ? 'firstRun' : 'returning').body;
   void target.executeJavaScript(splashSetActivityScript(title, body)).catch(() => {
     /* splash may already have navigated away */
   });
@@ -143,11 +156,12 @@ export function buildSplashHtml(options: SplashHtmlOptions): string {
     h1 { font-size: 1.35rem; font-weight: 600; margin: 1rem 0 0.5rem; }
     p { margin: 0; line-height: 1.45; opacity: 0.82; }
     .mark { width: 5.5rem; height: 5.5rem; margin: 0 auto; }
-    .ring { fill: none; stroke-width: 3; stroke-linecap: round; }
+    .ring { fill: none; stroke-width: 5; stroke-linecap: round; }
     .track { stroke: currentColor; opacity: 0.18; }
     .inner {
       stroke: currentColor;
-      opacity: 0.28;
+      opacity: 0.45;
+      stroke-dasharray: 28 135;
       transform-origin: 44px 44px;
       animation: orbit 1.8s linear infinite;
     }

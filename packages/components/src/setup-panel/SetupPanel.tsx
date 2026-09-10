@@ -8,7 +8,7 @@ import {
   type RuntimeProgress,
 } from '@bga/utils/desktop-bridge';
 import { DEFAULT_LOCALE, isLocale } from '@bga/utils/locale';
-import { Alert, Button, Group, List, Stack, Text } from '@mantine/core';
+import { Alert, Button, Group, List, Stack, Text, Title } from '@mantine/core';
 import { useRouter } from 'next/navigation';
 import { type FC, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -16,11 +16,13 @@ import { useTranslation } from 'react-i18next';
 const CHECKING_VIEW = { activity: 'checking_computer' as const, percent: null };
 const PREPARING_VIEW = { activity: 'preparing_search' as const, percent: null };
 
-export const shouldAutoResumeSetup = (state: DesktopSetupState): boolean => {
-  if (state.askReady) {
-    return false;
-  }
+/** Already finished Install, or tools are present / boot is catching up. */
+export const isReturningSetupPlayer = (state: DesktopSetupState): boolean => {
   return state.runtimeBusy || state.setupComplete || state.ollamaPath !== null;
+};
+
+export const shouldAutoResumeSetup = (state: DesktopSetupState): boolean => {
+  return isReturningSetupPlayer(state);
 };
 
 type Translate = ReturnType<typeof useTranslation>['t'];
@@ -71,7 +73,7 @@ export const SetupPanel: FC = () => {
             setState(next);
             if (next.askReady) {
               await api.markSetupComplete();
-              router.push(`/${locale}`);
+              router.replace(`/${locale}`);
             }
           })
           .catch(() => {
@@ -80,6 +82,28 @@ export const SetupPanel: FC = () => {
       }
     });
   }, [locale, router]);
+
+  useEffect(() => {
+    if (state === null || errorCode !== null) {
+      return;
+    }
+    if (!isReturningSetupPlayer(state) || !state.askReady) {
+      return;
+    }
+    const api = getDesktopApi();
+    if (api === null) {
+      return;
+    }
+    let cancelled = false;
+    void api.markSetupComplete().then(() => {
+      if (!cancelled) {
+        router.replace(`/${locale}`);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [state, errorCode, locale, router]);
 
   if (browserOnly) {
     return (
@@ -101,7 +125,8 @@ export const SetupPanel: FC = () => {
   const missingValue = t('ui.missingValue');
   const waitView =
     progress === null ? PREPARING_VIEW : (runtimeProgressToActivity(progress) ?? PREPARING_VIEW);
-  const showWait = errorCode === null && !state.askReady && (busy || shouldAutoResumeSetup(state));
+  const returning = isReturningSetupPlayer(state);
+  const showWait = errorCode === null && (busy || returning);
 
   if (showWait) {
     return <ActivityProgress layout="page" view={waitView} />;
@@ -116,7 +141,7 @@ export const SetupPanel: FC = () => {
       return;
     }
     void api.markSetupComplete().then(() => {
-      router.push(`/${locale}`);
+      router.replace(`/${locale}`);
     });
   };
 
@@ -130,7 +155,7 @@ export const SetupPanel: FC = () => {
       .ensureRuntime()
       .then(() => api.markSetupComplete())
       .then(() => {
-        router.push(`/${locale}`);
+        router.replace(`/${locale}`);
       })
       .catch(() => {
         /* progress event carries the error code */
@@ -148,6 +173,11 @@ export const SetupPanel: FC = () => {
 
   return (
     <Stack gap="lg">
+      <Stack gap={4}>
+        <Title order={1}>{t('setup.title')}</Title>
+        <Text c="dimmed">{t('setup.subtitle')}</Text>
+      </Stack>
+
       <Alert color="gray" title={t('setup.hardware.title')}>
         <List spacing="xs" size="sm">
           <List.Item>

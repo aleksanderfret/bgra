@@ -2,7 +2,7 @@ import { ColorSchemeSwitcher } from '@bga/components/color-scheme-switcher';
 import { LanguageSwitcher } from '@bga/components/language-switcher';
 import { SetupPanel } from '@bga/components/setup-panel';
 import { UninstallEntryLink } from '@bga/components/uninstall-entry-link';
-import { Container, Group, Stack, Text, Title } from '@mantine/core';
+import { Container, Group, Stack } from '@mantine/core';
 import type { TFunction } from 'i18next';
 import type { FC } from 'react';
 
@@ -18,10 +18,6 @@ export const SetupPage: FC<SetupPageProps> = ({ t }) => (
         <LanguageSwitcher />
         <UninstallEntryLink />
       </Group>
-      <Stack gap={4}>
-        <Title order={1}>{t('setup.title')}</Title>
-        <Text c="dimmed">{t('setup.subtitle')}</Text>
-      </Stack>
       <SetupPanel />
     </Stack>
   </Container>

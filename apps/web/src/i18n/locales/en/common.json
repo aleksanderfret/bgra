@@ -94,7 +94,7 @@
   "engineReadiness": {
     "starting": {
       "title": "Preparing the assistant",
-      "body": "Loading search on this computer. The first time can take a few minutes. You can look around; questions about the rules will wait until this finishes."
+      "body": "Loading search on this computer. This can take a few minutes. You can look around; questions about the rules will wait until this finishes."
     },
     "readingLayout": {
       "title": "Reading your rulebooks again",
@@ -116,11 +116,12 @@
   },
   "startup": {
     "loadingTitle": "Getting ready…",
-    "loadingBody": "The assistant opens when this computer is ready. The first time can take a minute."
+    "loadingBodyFirstRun": "The assistant opens when this computer is ready. The first time can take a minute.",
+    "loadingBodyReturning": "Starting the app…"
   },
   "activity": {
     "unknown": "Still working…",
-    "detail": "{{current}} of {{total}}",
+    "detail": "{{percent}}%",
     "checking_computer": "Checking this computer…",
     "starting_assistant": "Starting the assistant…",
     "downloading_installer": "Downloading the Ollama installer…",

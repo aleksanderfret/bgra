@@ -36,7 +36,9 @@ export const DesktopGate: FC<DesktopGateProps> = ({ locale, children }) => {
         return;
       }
       const onSetup = pathname.includes('/setup');
-      if (!state.gatePassed && !onSetup) {
+      if (state.gatePassed && onSetup) {
+        router.replace(`/${locale}`);
+      } else if (!state.gatePassed && !onSetup) {
         router.replace(`/${locale}/setup`);
       }
       setReady(true);

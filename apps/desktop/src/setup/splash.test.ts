@@ -15,19 +15,36 @@ import {
 const localesDir = join(dirname(fileURLToPath(import.meta.url)), '../../../web/src/i18n/locales');
 
 describe('startupCopyFromCatalogue', () => {
-  it('reads title and body from the catalogue', () => {
-    expect(
-      startupCopyFromCatalogue({
-        startup: { loadingTitle: 'Getting ready…', loadingBody: 'Please wait.' },
-      }),
-    ).toEqual({ title: 'Getting ready…', body: 'Please wait.' });
+  it('reads first-run and returning bodies from the catalogue', () => {
+    const catalogue = {
+      startup: {
+        loadingTitle: 'Getting ready…',
+        loadingBodyFirstRun: 'First open.',
+        loadingBodyReturning: 'Starting the app…',
+      },
+    };
+    expect(startupCopyFromCatalogue(catalogue, 'firstRun')).toEqual({
+      title: 'Getting ready…',
+      body: 'First open.',
+    });
+    expect(startupCopyFromCatalogue(catalogue, 'returning')).toEqual({
+      title: 'Getting ready…',
+      body: 'Starting the app…',
+    });
   });
 
   it('rejects a blank title', () => {
     expect(
-      startupCopyFromCatalogue({
-        startup: { loadingTitle: '', loadingBody: 'Please wait.' },
-      }),
+      startupCopyFromCatalogue(
+        {
+          startup: {
+            loadingTitle: '',
+            loadingBodyFirstRun: 'Please wait.',
+            loadingBodyReturning: 'Starting…',
+          },
+        },
+        'firstRun',
+      ),
     ).toBeNull();
   });
 });
@@ -35,19 +52,32 @@ describe('startupCopyFromCatalogue', () => {
 describe('readStartupCopy', () => {
   it('matches the web English and Polish catalogues', () => {
     const enWeb = JSON.parse(readFileSync(join(localesDir, 'en', 'common.json'), 'utf8')) as {
-      startup: { loadingTitle: string; loadingBody: string };
+      startup: {
+        loadingTitle: string;
+        loadingBodyFirstRun: string;
+        loadingBodyReturning: string;
+      };
     };
     const plWeb = JSON.parse(readFileSync(join(localesDir, 'pl', 'common.json'), 'utf8')) as {
-      startup: { loadingTitle: string; loadingBody: string };
+      startup: {
+        loadingTitle: string;
+        loadingBodyFirstRun: string;
+        loadingBodyReturning: string;
+      };
     };
-    expect(readStartupCopy(localesDir, 'en')).toEqual({
+    expect(readStartupCopy(localesDir, 'en', 'firstRun')).toEqual({
       title: enWeb.startup.loadingTitle,
-      body: enWeb.startup.loadingBody,
+      body: enWeb.startup.loadingBodyFirstRun,
     });
-    expect(readStartupCopy(localesDir, 'pl')).toEqual({
-      title: plWeb.startup.loadingTitle,
-      body: plWeb.startup.loadingBody,
+    expect(readStartupCopy(localesDir, 'en', 'returning')).toEqual({
+      title: enWeb.startup.loadingTitle,
+      body: enWeb.startup.loadingBodyReturning,
     });
+    expect(readStartupCopy(localesDir, 'pl', 'returning').body).toBe(
+      plWeb.startup.loadingBodyReturning,
+    );
+    expect(enWeb.startup.loadingBodyReturning.toLowerCase()).not.toContain('first');
+    expect(plWeb.startup.loadingBodyReturning.toLowerCase()).not.toContain('pierwsz');
   });
 });
 
@@ -119,10 +149,13 @@ describe('applySplashActivity', () => {
       localesDir,
       locale: 'en',
       code: 'starting_assistant',
+      firstRun: false,
     });
     await Promise.resolve();
     const title = readActivityLine(localesDir, 'en', 'starting_assistant');
+    const body = readStartupCopy(localesDir, 'en', 'returning').body;
     expect(scripts[0]).toContain(JSON.stringify(title));
+    expect(scripts[0]).toContain(JSON.stringify(body));
   });
 
   it('does nothing when the page is gone', () => {
@@ -137,6 +170,7 @@ describe('applySplashActivity', () => {
       localesDir,
       locale: 'en',
       code: 'starting_assistant',
+      firstRun: true,
     });
     expect(called).toBe(false);
   });

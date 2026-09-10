@@ -1,1 +1,1 @@
-export { SetupPanel, shouldAutoResumeSetup } from './SetupPanel';
+export { isReturningSetupPlayer, SetupPanel, shouldAutoResumeSetup } from './SetupPanel';

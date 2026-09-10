@@ -94,7 +94,7 @@
   "engineReadiness": {
     "starting": {
       "title": "Przygotowuję asystenta",
-      "body": "Wczytuję wyszukiwanie na tym komputerze. Za pierwszym razem może to potrwać kilka minut. Możesz się rozglądać; pytania o zasady poczekają, aż to się skończy."
+      "body": "Wczytuję wyszukiwanie na tym komputerze. To może potrwać kilka minut. Możesz się rozglądać; pytania o zasady poczekają, aż to się skończy."
     },
     "readingLayout": {
       "title": "Ponownie czytam Twoje instrukcje",
@@ -116,11 +116,12 @@
   },
   "startup": {
     "loadingTitle": "Przygotowuję aplikację…",
-    "loadingBody": "Asystent otworzy się, gdy wszystko będzie gotowe. Za pierwszym razem może to chwilę potrwać."
+    "loadingBodyFirstRun": "Asystent otworzy się, gdy wszystko będzie gotowe. Za pierwszym razem może to chwilę potrwać.",
+    "loadingBodyReturning": "Trwa rozruch aplikacji…"
   },
   "activity": {
     "unknown": "Nadal pracuję…",
-    "detail": "{{current}} z {{total}}",
+    "detail": "{{percent}}%",
     "checking_computer": "Sprawdzam ten komputer…",
     "starting_assistant": "Uruchamiam asystenta…",
     "downloading_installer": "Pobieram instalator Ollamy…",

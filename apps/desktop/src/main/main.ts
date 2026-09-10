@@ -100,6 +100,7 @@ let lastProbe: HealthProbe | null = null;
 let ensureRuntimeBusy = false;
 let backendsReady = false;
 let pendingSplashActivity: SplashActivityCode = 'checking_computer';
+let splashFirstRun = true;
 const windowsWithNavigationLock = new WeakSet<BrowserWindow>();
 
 function packageRoot(): string {
@@ -188,6 +189,7 @@ function writeSplashActivity(code: SplashActivityCode): void {
     localesDir: i18nLocalesDir(),
     locale: uiLocale,
     code,
+    firstRun: splashFirstRun,
   });
 }
 
@@ -851,7 +853,11 @@ function createWindow(): Promise<void> {
     },
   });
 
-  const copy = readStartupCopy(i18nLocalesDir(), uiLocale);
+  const copy = readStartupCopy(
+    i18nLocalesDir(),
+    uiLocale,
+    splashFirstRun ? 'firstRun' : 'returning',
+  );
   const html = buildSplashHtml({
     copy,
     dark: nativeTheme.shouldUseDarkColors,
@@ -937,6 +943,7 @@ if (!gotLock) {
     registerIpc();
     installMicPermissionHandler();
     uiLocale = desktopLocale(app.getLocale());
+    splashFirstRun = !setupCompleteFlagExists();
     const splashShown = createWindow();
 
     try {
@@ -963,12 +970,17 @@ if (!gotLock) {
         // open the assistant — never make the player re-tap Install.
         await resolveTools();
         const returningPlayer = setupCompleteFlagExists() || ollamaPath !== null;
+        splashFirstRun = !returningPlayer;
+        writeSplashActivity(pendingSplashActivity);
         for (const action of desktopLaunchActions({ returningPlayer })) {
           switch (action.type) {
             case 'startBackend':
               await startBackend({ skipRetrievalWarm: action.skipRetrievalWarm });
               break;
             case 'loadAppPage':
+              if (returningPlayer) {
+                ensureRuntimeBusy = true;
+              }
               await splashShown;
               await loadAppPage();
               break;

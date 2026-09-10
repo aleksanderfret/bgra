@@ -31,9 +31,8 @@ describe('ActivityProgress', () => {
     expect(bar).toHaveAttribute('aria-valuemin', '0');
     expect(bar).toHaveAttribute('aria-valuemax', '100');
     expect(bar).toHaveTextContent(en.activity.drawing);
-    expect(bar).toHaveTextContent(
-      en.activity.detail.replace('{{current}}', '4').replace('{{total}}', '10'),
-    );
+    expect(bar).toHaveTextContent(en.activity.detail.replace('{{percent}}', '58'));
+    expect(bar).not.toHaveTextContent('4 of 10');
   });
 
   it('uses the unknown line when no activity code is set', () => {

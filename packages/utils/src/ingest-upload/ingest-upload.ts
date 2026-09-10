@@ -14,12 +14,43 @@ const errorEvent = (code: string, message: string): IngestEvent => {
   return { type: 'error', code, message };
 };
 
+const isEventStream = (xhr: XMLHttpRequest): boolean => {
+  const contentType = xhr.getResponseHeader('content-type') ?? '';
+  return contentType.includes('event-stream');
+};
+
 export const postIngestPdf = (
   form: FormData,
   handlers: IngestUploadHandlers,
 ): IngestUploadSession => {
   const xhr = new XMLHttpRequest();
   const decoder = createIngestEventDecoder();
+  let seenChars = 0;
+  let receivedEvents = 0;
+
+  const consumeStreamDelta = (): void => {
+    const text = xhr.responseText;
+    if (text.length <= seenChars) {
+      return;
+    }
+    const chunk = text.slice(seenChars);
+    seenChars = text.length;
+    for (const event of decoder.push(chunk)) {
+      receivedEvents += 1;
+      handlers.onEvent(event);
+    }
+  };
+
+  const flushStreamTail = (): void => {
+    consumeStreamDelta();
+    if (!decoder.hasPendingBytes()) {
+      return;
+    }
+    for (const event of decoder.push('\n\n')) {
+      receivedEvents += 1;
+      handlers.onEvent(event);
+    }
+  };
 
   xhr.open('POST', '/api/engine/ingest/pdf');
   xhr.upload.onprogress = (event: ProgressEvent<EventTarget>) => {
@@ -29,19 +60,19 @@ export const postIngestPdf = (
     }
     handlers.onUploadPercent(null);
   };
+  xhr.onprogress = () => {
+    if (xhr.readyState >= 2 && isEventStream(xhr)) {
+      consumeStreamDelta();
+    }
+  };
   xhr.onabort = () => {
     handlers.onAbort?.();
   };
   xhr.onload = () => {
-    const contentType = xhr.getResponseHeader('content-type') ?? '';
-    if (contentType.includes('event-stream')) {
-      const events = decoder.push(`${xhr.responseText}\n\n`);
-      if (events.length === 0) {
+    if (isEventStream(xhr)) {
+      flushStreamTail();
+      if (receivedEvents === 0) {
         handlers.onEvent(errorEvent('ingest_failed', 'Ingest did not return a usable response.'));
-        return;
-      }
-      for (const event of events) {
-        handlers.onEvent(event);
       }
       return;
     }

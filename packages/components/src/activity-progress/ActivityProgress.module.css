@@ -28,7 +28,7 @@
 
 .ring {
   fill: none;
-  stroke-width: 3;
+  stroke-width: 5;
   stroke-linecap: round;
 }
 
@@ -38,7 +38,8 @@
 
 .inner {
   stroke: var(--mantine-color-blue-filled);
-  opacity: 0.28;
+  opacity: 0.45;
+  stroke-dasharray: 28 135;
   transform-origin: 50% 50%;
   animation: orbit 1.8s linear infinite;
 }
