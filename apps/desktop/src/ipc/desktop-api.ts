@@ -53,6 +53,7 @@ export interface UninstallPreview {
 }
 
 export interface DesktopApi {
+  platform: 'darwin' | 'win32' | 'linux';
   getSetupState: () => Promise<DesktopSetupState>;
   saveDiagnostics: () => Promise<{ path: string }>;
   markSetupComplete: () => Promise<DesktopSetupState>;

@@ -48,6 +48,7 @@ describe('SetupPanel', () => {
 
   it('does not ask a returning player to tap Install again', async () => {
     window.bgaDesktop = {
+      platform: 'darwin',
       getSetupState: async () => ({ ...firstOpenState, setupComplete: true, runtimeBusy: true }),
       saveDiagnostics: async () => ({ path: '/tmp/d.json' }),
       markSetupComplete: async () => ({ ...firstOpenState, setupComplete: true, askReady: true }),
@@ -82,6 +83,7 @@ describe('SetupPanel', () => {
       gatePassed: true,
     }));
     window.bgaDesktop = {
+      platform: 'darwin',
       getSetupState: async () => ({
         ...firstOpenState,
         setupComplete: true,

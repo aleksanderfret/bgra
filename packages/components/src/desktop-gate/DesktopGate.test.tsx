@@ -11,6 +11,7 @@ vi.mock('next/navigation', () => ({
 describe('DesktopGate', () => {
   it('shows a wait state while the desktop probe is in flight', () => {
     window.bgaDesktop = {
+      platform: 'darwin',
       getSetupState: () => new Promise(() => undefined),
       saveDiagnostics: async () => ({ path: '/tmp/d.json' }),
       markSetupComplete: async () => {

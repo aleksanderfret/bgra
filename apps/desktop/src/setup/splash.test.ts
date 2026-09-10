@@ -126,6 +126,16 @@ describe('buildSplashHtml', () => {
     expect(html).toContain('lang="en"');
     expect(html).toContain('@keyframes orbit');
   });
+
+  it('adds top padding when the macOS title bar is inset', () => {
+    const html = buildSplashHtml({
+      copy: { title: 'Ready', body: 'Wait' },
+      dark: false,
+      locale: 'pl',
+      insetTitleBar: true,
+    });
+    expect(html).toContain('padding-top: 2.5rem');
+  });
 });
 
 describe('splashSetActivityScript', () => {

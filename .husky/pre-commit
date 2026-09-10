@@ -1,4 +1,14 @@
-# Lint and format only the files in this commit. Fixes are re-staged.
-# Types, tests and the production build run on pre-push (`pnpm verify`).
+# Format/lint staged files, then run the same fast suite as `pnpm preflight`
+# (lint + typecheck + tests). Production build stays on pre-push (`pnpm verify`).
 . "$(dirname "$0")/load-node.sh"
 corepack pnpm exec lint-staged
+
+# Turbo TUI enables terminal mouse tracking; stream UI matches CI.
+export TURBO_UI=stream
+
+restore_terminal() {
+  printf '\033[?1000l\033[?1002l\033[?1003l\033[?1006l' >/dev/tty 2>/dev/null || true
+}
+trap restore_terminal EXIT
+
+corepack pnpm preflight

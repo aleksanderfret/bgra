@@ -1,5 +1,6 @@
-# Same checks as CI, including a production build.
-# `pnpm verify` is lint + types + tests + build for every package.
+# Full CI gate including a production build (`pnpm verify`).
+# Lint/typecheck/tests already ran on pre-commit (`pnpm preflight`); verify
+# repeats them plus build so push matches CI even if someone skipped hooks.
 . "$(dirname "$0")/load-node.sh"
 
 # Turbo TUI enables terminal mouse tracking. After a hook that is not a

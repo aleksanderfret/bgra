@@ -77,6 +77,7 @@ export interface DesktopSetupState {
 }
 
 export interface BgaDesktopApi {
+  platform: 'darwin' | 'win32' | 'linux';
   getSetupState: () => Promise<DesktopSetupState>;
   saveDiagnostics: () => Promise<DiagnosticsSaveResult>;
   markSetupComplete: () => Promise<DesktopSetupState>;

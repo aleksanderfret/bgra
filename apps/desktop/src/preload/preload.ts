@@ -2,6 +2,8 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type { DesktopApi, DesktopSetupState, RuntimeProgress } from '../ipc/desktop-api';
 
 const api: DesktopApi = {
+  platform:
+    process.platform === 'win32' || process.platform === 'linux' ? process.platform : 'darwin',
   getSetupState: (): Promise<DesktopSetupState> => ipcRenderer.invoke('desktop:get-setup-state'),
   saveDiagnostics: (): Promise<{ path: string }> => ipcRenderer.invoke('desktop:save-diagnostics'),
   markSetupComplete: (): Promise<DesktopSetupState> =>

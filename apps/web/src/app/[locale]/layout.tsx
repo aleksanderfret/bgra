@@ -3,6 +3,7 @@ import '@mantine/notifications/styles.css';
 
 import { AssistantReadyGate } from '@bga/components/assistant-ready-gate';
 import { DesktopGate } from '@bga/components/desktop-gate';
+import { DesktopWindowInset } from '@bga/components/desktop-window-inset';
 import { ColorSchemeScript, MantineProvider, mantineHtmlProps } from '@mantine/core';
 import { Notifications } from '@mantine/notifications';
 import type { Metadata } from 'next';
@@ -53,7 +54,9 @@ export default async function RootLayout({ children, params }: LayoutProps<'/[lo
           <MantineProvider theme={theme} defaultColorScheme={DEFAULT_COLOR_SCHEME}>
             <Notifications />
             <DesktopGate locale={locale}>
-              <AssistantReadyGate>{children}</AssistantReadyGate>
+              <DesktopWindowInset>
+                <AssistantReadyGate>{children}</AssistantReadyGate>
+              </DesktopWindowInset>
             </DesktopGate>
           </MantineProvider>
         </I18nProvider>

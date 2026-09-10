@@ -1,11 +1,11 @@
 /**
- * Pre-commit only looks at what is about to be committed.
+ * Pre-commit formats/lints only what is about to be committed, then the
+ * husky hook runs `pnpm preflight` (full lint + typecheck + tests).
  *
- * TypeScript typecheck, tests, and the production build stay on pre-push
- * (`pnpm verify`): they need the whole graph.
- * Python mypy is cheap and is the check that kept failing only on push, so it
- * runs here whenever a `.py` file is staged. Filenames are not passed to mypy
- * — it must see the whole engine, not just the touched files. `--directory`
+ * The production build stays on pre-push (`pnpm verify`).
+ *
+ * Python mypy runs here whenever a `.py` file is staged (cheap, whole engine).
+ * Filenames are not passed to mypy — it must see the whole package. `--directory`
  * is required: lint-staged starts at the repo root, and without that mypy
  * never reads the engine `files =` list.
  */

@@ -846,6 +846,12 @@ function createWindow(): Promise<void> {
     width: 1100,
     height: 800,
     show: false,
+    ...(process.platform === 'darwin'
+      ? {
+          titleBarStyle: 'hiddenInset' as const,
+          trafficLightPosition: { x: 14, y: 14 },
+        }
+      : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/preload.js'),
       contextIsolation: true,
@@ -863,6 +869,7 @@ function createWindow(): Promise<void> {
     copy,
     dark: nativeTheme.shouldUseDarkColors,
     locale: uiLocale,
+    insetTitleBar: process.platform === 'darwin',
   });
   const shown = new Promise<void>((resolve) => {
     mainWindow?.once('ready-to-show', () => {

@@ -21,6 +21,8 @@ export interface SplashHtmlOptions {
   copy: StartupCopy;
   dark: boolean;
   locale: 'en' | 'pl';
+  /** macOS hiddenInset — leave room for traffic lights. */
+  insetTitleBar?: boolean;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -134,6 +136,7 @@ export function buildSplashHtml(options: SplashHtmlOptions): string {
   const title = escapeHtml(options.copy.title);
   const body = escapeHtml(options.copy.body);
   const darkClass = options.dark ? ' class="dark"' : '';
+  const insetPad = options.insetTitleBar === true ? ' padding-top: 2.5rem;' : '';
   return `<!DOCTYPE html>
 <html lang="${options.locale}">
 <head>
@@ -146,7 +149,7 @@ export function buildSplashHtml(options: SplashHtmlOptions): string {
     body {
       display: flex;
       align-items: center;
-      justify-content: center;
+      justify-content: center;${insetPad}
       font-family: system-ui, -apple-system, sans-serif;
       background: #f8f9fa;
       color: #1a1b1e;
