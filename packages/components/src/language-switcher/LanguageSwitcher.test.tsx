@@ -1,3 +1,4 @@
+import { LOCALE_STORAGE_KEY } from '@bga/utils/locale-prefs';
 import en from '@bga-web-i18n/locales/en/common.json';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, userEvent } from '../test-utils';
@@ -13,6 +14,7 @@ vi.mock('next/navigation', () => ({
 describe('LanguageSwitcher', () => {
   beforeEach(() => {
     replace.mockClear();
+    localStorage.clear();
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(new Response(JSON.stringify({ ready: true }), { status: 200 })),
@@ -36,15 +38,14 @@ describe('LanguageSwitcher', () => {
     expect(screen.getByText(en.language.en)).toHaveAttribute('lang', 'en');
   });
 
-  it('navigates to the same page under the other locale', async () => {
+  it('navigates to the same page under the other locale and remembers the choice', async () => {
     render(<LanguageSwitcher />, 'en');
 
     await userEvent.click(screen.getByRole('radio', { name: en.language.pl }));
 
-    // The URL is the only place the locale lives, so switching language has to
-    // be a navigation; mutating i18next would leave the address bar lying.
-    // Voice download runs in the background after navigation.
+    // URL is the live locale; preference restores it on the next visit / launch.
     expect(replace).toHaveBeenCalledWith('/pl/games/azul');
+    expect(localStorage.getItem(LOCALE_STORAGE_KEY)).toBe('pl');
   });
 
   it('marks the locale it was rendered with as the active one', () => {

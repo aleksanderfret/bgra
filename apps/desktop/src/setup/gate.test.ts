@@ -8,6 +8,7 @@ import {
   liveProbeOk,
   packagingUvRelativePath,
   parseHealthProbe,
+  resolveUiLocale,
   splashActivityFromProbe,
 } from './gate';
 
@@ -79,12 +80,19 @@ describe('splashActivityFromProbe', () => {
   });
 });
 
-describe('desktopLocale / initialAppPath', () => {
+describe('desktopLocale / resolveUiLocale / initialAppPath', () => {
   it('maps Polish locales and defaults to English', () => {
     expect(desktopLocale('pl')).toBe('pl');
     expect(desktopLocale('pl-PL')).toBe('pl');
     expect(desktopLocale('en-US')).toBe('en');
     expect(desktopLocale('de')).toBe('en');
+  });
+
+  it('prefers a saved UI locale over the OS language', () => {
+    expect(resolveUiLocale({ appLocale: 'pl-PL', savedLocale: 'en' })).toBe('en');
+    expect(resolveUiLocale({ appLocale: 'en-US', savedLocale: 'pl' })).toBe('pl');
+    expect(resolveUiLocale({ appLocale: 'pl-PL', savedLocale: null })).toBe('pl');
+    expect(resolveUiLocale({ appLocale: 'de', savedLocale: 'de' })).toBe('en');
   });
 
   it('sends gated launches to setup', () => {

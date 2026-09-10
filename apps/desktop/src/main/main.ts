@@ -31,14 +31,15 @@ import {
 import { writeDiagnosticsFile } from '../setup/diagnostics';
 import {
   argvHasUninstallFlag,
-  desktopLocale,
   gatePassed,
   type HealthProbe,
   initialAppPath,
   isAllowedWhenGated,
   liveProbeOk,
   parseHealthProbe,
+  resolveUiLocale,
   splashActivityFromProbe,
+  UI_LOCALE_COOKIE_NAME,
 } from '../setup/gate';
 import { desktopLaunchActions } from '../setup/launch-order';
 import {
@@ -473,7 +474,7 @@ async function startBackend(options: { skipRetrievalWarm: boolean }): Promise<vo
 
   machine = await readMachineSnapshot(dataDir);
   recommendation = recommendProfile(machine);
-  uiLocale = desktopLocale(app.getLocale());
+  await refreshUiLocale();
 
   await resolveTools();
 
@@ -620,7 +621,7 @@ async function startBackend(options: { skipRetrievalWarm: boolean }): Promise<vo
 async function startUninstallUi(): Promise<void> {
   pushSplashActivity('checking_computer');
   mkdirSync(join(app.getPath('userData'), 'logs'), { recursive: true });
-  uiLocale = desktopLocale(app.getLocale());
+  await refreshUiLocale();
   await resolveTools();
   webPort = await findFreePort(3000);
   const root = repoRoot();
@@ -879,6 +880,23 @@ function createWindow(): Promise<void> {
   return shown;
 }
 
+async function readSavedUiLocale(): Promise<string | null> {
+  try {
+    const cookies = await session.defaultSession.cookies.get({ name: UI_LOCALE_COOKIE_NAME });
+    const hit = cookies.find((cookie) => cookie.value === 'en' || cookie.value === 'pl');
+    return hit?.value ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function refreshUiLocale(): Promise<void> {
+  uiLocale = resolveUiLocale({
+    appLocale: app.getLocale(),
+    savedLocale: await readSavedUiLocale(),
+  });
+}
+
 async function loadAppPage(): Promise<void> {
   if (mainWindow === null) {
     await createWindow();
@@ -887,6 +905,7 @@ async function loadAppPage(): Promise<void> {
   if (window === null) {
     throw new Error('Main window failed to open');
   }
+  await refreshUiLocale();
   const path = initialAppPath({
     locale: uiLocale,
     gatePassed: currentGatePassed(),
@@ -942,7 +961,7 @@ if (!gotLock) {
   app.whenReady().then(async () => {
     registerIpc();
     installMicPermissionHandler();
-    uiLocale = desktopLocale(app.getLocale());
+    await refreshUiLocale();
     splashFirstRun = !setupCompleteFlagExists();
     const splashShown = createWindow();
 

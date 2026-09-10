@@ -1,6 +1,7 @@
 'use client';
 
 import { DEFAULT_LOCALE, isLocale, LOCALES, type Locale } from '@bga/utils/locale';
+import { saveLocalePreference } from '@bga/utils/locale-prefs';
 import { withLocale } from '@bga/utils/locale-routing';
 import { Group, Loader, SegmentedControl, Stack, Text } from '@mantine/core';
 import { usePathname, useRouter } from 'next/navigation';
@@ -21,7 +22,8 @@ export const LanguageSwitcher: FC = () => {
       return;
     }
     const next: Locale = value;
-    // Switch the UI immediately; prepare the spoken voice in the background.
+    saveLocalePreference(next);
+    // URL is the live locale; preference restores it on the next visit / launch.
     router.replace(withLocale(pathname, next));
     setEnsuring(true);
     void (async () => {

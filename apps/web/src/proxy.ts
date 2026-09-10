@@ -1,11 +1,12 @@
+import { LOCALE_COOKIE_NAME, parseLocalePreference } from '@bga/utils/locale-prefs';
 import { type NextRequest, NextResponse } from 'next/server';
 import { localeFromPathname, prefixLocale } from './i18n/routing';
 import { DEFAULT_LOCALE } from './i18n/settings';
 
 /**
- * Locale lives in the path, not a cookie: `<html lang>` and metadata are
- * produced before any client code runs. Bare paths always open Polish (Z1);
- * English is opt-in via `/en` or the language switcher.
+ * Active locale lives in the path (`<html lang>` / metadata before client JS).
+ * Bare paths restore the last choice from the language-switcher cookie, else
+ * Polish (Z1).
  */
 
 export const config = {
@@ -20,8 +21,11 @@ export const proxy = (request: NextRequest): NextResponse => {
     return NextResponse.next();
   }
 
+  const preferred =
+    parseLocalePreference(request.cookies.get(LOCALE_COOKIE_NAME)?.value) ?? DEFAULT_LOCALE;
+
   const target = request.nextUrl.clone();
-  target.pathname = prefixLocale(pathname, DEFAULT_LOCALE);
+  target.pathname = prefixLocale(pathname, preferred);
 
   return NextResponse.redirect(target);
 };

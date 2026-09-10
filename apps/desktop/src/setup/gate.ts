@@ -75,12 +75,26 @@ export function gatePassed(options: { setupCompleteFlag: boolean; probe: HealthP
   return options.setupCompleteFlag && liveProbeOk(options.probe);
 }
 
+/** Same name as `@bga/utils/locale-prefs` — desktop cannot import that package. */
+export const UI_LOCALE_COOKIE_NAME = 'bga.locale';
+
 export function desktopLocale(appLocale: string): 'en' | 'pl' {
   const lower = appLocale.toLowerCase();
   if (lower === 'pl' || lower.startsWith('pl-') || lower.startsWith('pl_')) {
     return 'pl';
   }
   return 'en';
+}
+
+/** Prefer the player's last UI choice; fall back to the OS language. */
+export function resolveUiLocale(options: {
+  appLocale: string;
+  savedLocale: string | null | undefined;
+}): 'en' | 'pl' {
+  if (options.savedLocale === 'en' || options.savedLocale === 'pl') {
+    return options.savedLocale;
+  }
+  return desktopLocale(options.appLocale);
 }
 
 export function argvHasUninstallFlag(argv: readonly string[]): boolean {
