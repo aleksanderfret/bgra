@@ -100,7 +100,7 @@ export const SetupPanel: FC = () => {
     let cancelled = false;
     void api.markSetupComplete().then(() => {
       if (!cancelled) {
-        router.replace(`/${locale}`);
+        router.replace(`/${locale}/add-game`);
       }
     });
     return () => {
@@ -144,7 +144,7 @@ export const SetupPanel: FC = () => {
       return;
     }
     void api.markSetupComplete().then(() => {
-      router.replace(`/${locale}`);
+      router.replace(`/${locale}/add-game`);
     });
   };
 
@@ -158,7 +158,7 @@ export const SetupPanel: FC = () => {
       .ensureRuntime()
       .then(() => api.markSetupComplete())
       .then(() => {
-        router.replace(`/${locale}`);
+        router.replace(`/${locale}/add-game`);
       })
       .catch(() => {
         /* progress event carries the error code */

@@ -87,9 +87,18 @@
   },
   "appNav": {
     "label": "Main views",
-    "teach": "Learn",
-    "questions": "Questions",
-    "rulebooks": "Rulebooks"
+    "learn": "Learn",
+    "checkRule": "Check rule",
+    "addGame": "Add game",
+    "settings": "Settings"
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Choose the language and look of the app.",
+    "open": "Settings"
+  },
+  "appChrome": {
+    "tools": "Tools"
   },
   "engineReadiness": {
     "starting": {
@@ -111,7 +120,7 @@
     },
     "speechMissing": {
       "title": "Spoken answers are not ready yet",
-      "body": "The microphone and spoken voice need one more download on this computer. Open Setup and finish installing, then try hold-to-talk again."
+      "body": "The microphone and spoken voice need one more download on this computer. Finish installing on the first-run screen, then try hold-to-talk again."
     }
   },
   "startup": {
@@ -136,9 +145,6 @@
     "filing": "Filing in the library…",
     "community": "Fetching community notes…",
     "indexing": "Making these pages searchable…"
-  },
-  "preferences": {
-    "label": "Display preferences"
   },
   "ui": {
     "missingValue": "—"
@@ -248,6 +254,7 @@
     "retrieval_loading": "Search is still starting on this computer. Wait a moment, then ask again.",
     "checking_sources_carefully": "Checking these pages carefully before answering…",
     "preparing_assistant": "Getting ready to write the answer…",
+    "sources_disagree": "These documents do not fully agree. I am following the stronger source (errata and FAQ beat the rulebook).",
     "lesson_plan_failed": "I could not build a lesson from these rulebooks yet. Import a clearer rulebook, or open Questions to ask about a specific rule.",
     "lesson_expired": "This lesson has ended or timed out. Start a new one when you are ready.",
     "lesson_game_mismatch": "This lesson belongs to a different game. Start a new lesson for the game you selected.",

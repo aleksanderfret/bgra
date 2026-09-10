@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import ValidationError
 
+from rag_engine.authority import has_rule_bearing_hit, sources_disagree
 from rag_engine.contract import (
     AskRequest,
     DoneEvent,
@@ -197,12 +198,21 @@ async def _stream_answer(
             )
             return
 
+        if not has_rule_bearing_hit(hits):
+            yield encode_event(SourcesEvent(sources=[]))
+            yield encode_event(
+                DoneEvent(answer_id=uuid4().hex, groundedness="insufficient_evidence")
+            )
+            return
+
         yield encode_event(
             SourcesEvent(sources=[to_retrieved_source(hit) for hit in player_facing_hits(hits)])
         )
         yield encode_comment("sources")
         if await http_request.is_disconnected():
             return
+        if sources_disagree(hits):
+            yield encode_event(NoticeEvent(code="sources_disagree", params={}))
         think = settings.profile.llm_thinks and should_think(
             hits, settings.min_relevance_score, settings.profile.context_tokens
         )

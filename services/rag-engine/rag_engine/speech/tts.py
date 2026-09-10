@@ -15,6 +15,9 @@ from rag_engine.speech.voices import voice_config_path, voice_onnx_path
 logger = logging.getLogger(__name__)
 
 AUDIO_MIME_WAV = "audio/wav"
+#: Slightly slower speech so Piper finishes the last phonemes cleanly.
+_LENGTH_SCALE = 1.1
+_SENTENCE_ENDINGS = frozenset(".!?\u2026")
 
 _voice_lock = threading.Lock()
 _voice_cache: dict[str, object] = {}
@@ -24,6 +27,15 @@ def clear_piper_voice_cache() -> None:
     """Drop cached Piper models (tests)."""
     with _voice_lock:
         _voice_cache.clear()
+
+
+def _ensure_sentence_ending(text: str) -> str:
+    stripped = text.rstrip()
+    if not stripped:
+        return stripped
+    if stripped[-1] in _SENTENCE_ENDINGS:
+        return stripped
+    return f"{stripped}."
 
 
 def _load_piper_voice(onnx: Path, config: Path) -> object:
@@ -50,7 +62,7 @@ def synthesize_sentence_wav(
     voice: str,
 ) -> bytes:
     """Synthesize one sentence to PCM WAV bytes. Raises if Piper or voice missing."""
-    cleaned = text.strip()
+    cleaned = _ensure_sentence_ending(text.strip())
     if not cleaned:
         return b""
 
@@ -73,7 +85,12 @@ def _iter_pcm(voice_model: object, text: str) -> Iterator[bytes]:
     synthesize = getattr(voice_model, "synthesize", None)
     if synthesize is None:
         raise SpeechExtraMissingError("PiperVoice.synthesize is unavailable")
-    result = synthesize(text)
+    try:
+        from piper.config import SynthesisConfig
+    except ImportError:
+        result = synthesize(text)
+    else:
+        result = synthesize(text, syn_config=SynthesisConfig(length_scale=_LENGTH_SCALE))
     # Newer piper returns AudioChunk iterators; older may return raw bytes.
     if isinstance(result, (bytes, bytearray)):
         yield bytes(result)

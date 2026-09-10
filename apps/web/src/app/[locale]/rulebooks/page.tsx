@@ -1,17 +1,15 @@
-import { RulebooksPage } from '@bga/pages/rulebooks';
-import { notFound } from 'next/navigation';
-import { getTranslation } from '@/i18n/server';
+import { notFound, redirect } from 'next/navigation';
 import { isLocale } from '@/i18n/settings';
 
-const RulebooksRoute = async ({ params }: PageProps<'/[locale]/rulebooks'>) => {
+/** Legacy path — prefer `/add-game`. */
+const RulebooksRedirect = async ({ params }: PageProps<'/[locale]/rulebooks'>) => {
   const { locale } = await params;
 
   if (!isLocale(locale)) {
     notFound();
   }
 
-  const t = getTranslation(locale);
-  return <RulebooksPage t={t} />;
+  redirect(`/${locale}/add-game`);
 };
 
-export default RulebooksRoute;
+export default RulebooksRedirect;

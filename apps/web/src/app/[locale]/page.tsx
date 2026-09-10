@@ -1,17 +1,15 @@
-import { HomePage } from '@bga/pages/home';
-import { notFound } from 'next/navigation';
-import { getTranslation } from '@/i18n/server';
+import { notFound, redirect } from 'next/navigation';
 import { isLocale } from '@/i18n/settings';
 
-const HomeRoute = async ({ params }: PageProps<'/[locale]'>) => {
+/** Old questions home — prefer `/check-rule`. */
+const LocaleRootRedirect = async ({ params }: PageProps<'/[locale]'>) => {
   const { locale } = await params;
 
   if (!isLocale(locale)) {
     notFound();
   }
 
-  const t = getTranslation(locale);
-  return <HomePage t={t} />;
+  redirect(`/${locale}/check-rule`);
 };
 
-export default HomeRoute;
+export default LocaleRootRedirect;

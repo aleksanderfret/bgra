@@ -7,7 +7,7 @@ const replace = vi.fn();
 const push = vi.fn();
 
 vi.mock('next/navigation', () => ({
-  usePathname: () => '/en',
+  usePathname: () => '/en/check-rule',
   useRouter: () => ({ replace, push }),
 }));
 
@@ -17,28 +17,37 @@ describe('AppNav', () => {
     replace.mockClear();
   });
 
-  it('names the main views control and highlights questions on home', () => {
+  it('names the main views control and highlights check-rule on that page', () => {
     render(<AppNav />, 'en');
 
     expect(screen.getByRole('navigation', { name: en.appNav.label })).toBeInTheDocument();
-    expect(screen.getByRole('radio', { name: en.appNav.questions })).toBeChecked();
-    expect(screen.getByRole('radio', { name: en.appNav.teach })).not.toBeChecked();
-    expect(screen.getByRole('radio', { name: en.appNav.rulebooks })).not.toBeChecked();
+    expect(screen.getByRole('radio', { name: en.appNav.checkRule })).toBeChecked();
+    expect(screen.getByRole('radio', { name: en.appNav.learn })).not.toBeChecked();
+    expect(screen.getByRole('radio', { name: en.appNav.addGame })).not.toBeChecked();
+    expect(screen.getByRole('radio', { name: en.appNav.settings })).not.toBeChecked();
   });
 
   it('opens the learn view when the user picks it', async () => {
     render(<AppNav />, 'en');
 
-    await userEvent.click(screen.getByRole('radio', { name: en.appNav.teach }));
+    await userEvent.click(screen.getByRole('radio', { name: en.appNav.learn }));
 
-    expect(push).toHaveBeenCalledWith('/en/teach');
+    expect(push).toHaveBeenCalledWith('/en/learn');
   });
 
-  it('opens the rulebooks view when the user picks it', async () => {
+  it('opens the add-game view when the user picks it', async () => {
     render(<AppNav />, 'en');
 
-    await userEvent.click(screen.getByRole('radio', { name: en.appNav.rulebooks }));
+    await userEvent.click(screen.getByRole('radio', { name: en.appNav.addGame }));
 
-    expect(push).toHaveBeenCalledWith('/en/rulebooks');
+    expect(push).toHaveBeenCalledWith('/en/add-game');
+  });
+
+  it('opens settings when the user picks it', async () => {
+    render(<AppNav />, 'en');
+
+    await userEvent.click(screen.getByRole('radio', { name: en.appNav.settings }));
+
+    expect(push).toHaveBeenCalledWith('/en/settings');
   });
 });

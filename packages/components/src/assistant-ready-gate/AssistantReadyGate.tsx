@@ -16,7 +16,7 @@ export const AssistantReadyGate: FC<AssistantReadyGateProps> = ({ children }) =>
   const pathname = usePathname();
   const phase = useEngineReadiness();
   const [seenReady, setSeenReady] = useState(false);
-  const onSetup = pathname.includes('/setup');
+  const onInit = pathname.includes('/init');
 
   useEffect(() => {
     if (phase === 'ready') {
@@ -24,7 +24,7 @@ export const AssistantReadyGate: FC<AssistantReadyGateProps> = ({ children }) =>
     }
   }, [phase]);
 
-  if (onSetup) {
+  if (onInit) {
     return children;
   }
 

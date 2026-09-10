@@ -15,6 +15,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import ValidationError
 
+from rag_engine.authority import has_rule_bearing_hit, sources_disagree
 from rag_engine.contract import (
     DoneEvent,
     ErrorEvent,
@@ -592,6 +593,28 @@ async def _stream_digression(
             _save(storage_dir, session.model_copy(update={"status": "active"}))
             outcome = "handled"
             return
+
+        if not has_rule_bearing_hit(hits):
+            yield encode_event(SourcesEvent(sources=[]))
+            yield encode_event(
+                DoneEvent(answer_id=uuid4().hex, groundedness="insufficient_evidence")
+            )
+            session = _append_turn(
+                storage_dir,
+                session,
+                kind="digression",
+                unit_id=unit.unit_id if unit else None,
+                question=question,
+                text="",
+                sources=[],
+                groundedness="insufficient_evidence",
+            )
+            _save(storage_dir, session.model_copy(update={"status": "active"}))
+            outcome = "handled"
+            return
+
+        if sources_disagree(hits):
+            yield encode_event(NoticeEvent(code="sources_disagree", params={}))
 
         messages = build_digression_messages(question, hits)
         got_done = False

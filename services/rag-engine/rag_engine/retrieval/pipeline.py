@@ -2,6 +2,7 @@ import asyncio
 import re
 from typing import Protocol
 
+from rag_engine.authority import order_relevant_hits
 from rag_engine.contract import DocumentKind
 from rag_engine.ingest.chunking import clean_heading
 from rag_engine.ingest.models import BLOCK_KIND_CATALOGUE, BLOCK_KIND_RULE
@@ -210,7 +211,7 @@ async def retrieve(
         floor=min_relevance_score,
         share_of_best=relevance_share_of_best,
     )
-    relevant.sort(key=lambda chunk: chunk.score, reverse=True)
     if not relevant:
         return []
-    return expand_siblings(relevant, index=index, game_ids=game_ids, top_k=top_k)
+    ordered_relevant = order_relevant_hits(relevant)
+    return expand_siblings(ordered_relevant, index=index, game_ids=game_ids, top_k=top_k)

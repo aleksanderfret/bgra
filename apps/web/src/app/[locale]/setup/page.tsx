@@ -1,17 +1,15 @@
-import { SetupPage } from '@bga/pages/setup';
-import { notFound } from 'next/navigation';
-import { getTranslation } from '@/i18n/server';
+import { notFound, redirect } from 'next/navigation';
 import { isLocale } from '@/i18n/settings';
 
-const SetupRoute = async ({ params }: PageProps<'/[locale]/setup'>) => {
+/** Legacy path — prefer `/init`. */
+const SetupRedirect = async ({ params }: PageProps<'/[locale]/setup'>) => {
   const { locale } = await params;
 
   if (!isLocale(locale)) {
     notFound();
   }
 
-  const t = getTranslation(locale);
-  return <SetupPage t={t} />;
+  redirect(`/${locale}/init`);
 };
 
-export default SetupRoute;
+export default SetupRedirect;

@@ -23,6 +23,7 @@ export const NOTICE_CODES = [
   'retrieval_loading',
   'checking_sources_carefully',
   'preparing_assistant',
+  'sources_disagree',
   'speech_empty',
   'speech_invalid_audio',
 ] as const;

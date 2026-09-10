@@ -87,9 +87,18 @@
   },
   "appNav": {
     "label": "Główne widoki",
-    "teach": "Nauka",
-    "questions": "Pytania",
-    "rulebooks": "Instrukcje"
+    "learn": "Nauka",
+    "checkRule": "Sprawdź zasadę",
+    "addGame": "Dodaj grę",
+    "settings": "Ustawienia"
+  },
+  "settings": {
+    "title": "Ustawienia",
+    "subtitle": "Wybierz język i wygląd aplikacji.",
+    "open": "Ustawienia"
+  },
+  "appChrome": {
+    "tools": "Narzędzia"
   },
   "engineReadiness": {
     "starting": {
@@ -111,7 +120,7 @@
     },
     "speechMissing": {
       "title": "Odpowiedzi na głos nie są jeszcze gotowe",
-      "body": "Mikrofon i głos mówiony wymagają jeszcze jednego pobrania na tym komputerze. Otwórz Instalację i dokończ ją, a potem spróbuj przytrzymać mikrofon ponownie."
+      "body": "Mikrofon i głos mówiony wymagają jeszcze jednego pobrania na tym komputerze. Dokończ instalację na ekranie pierwszego uruchomienia, a potem spróbuj przytrzymać mikrofon ponownie."
     }
   },
   "startup": {
@@ -136,9 +145,6 @@
     "filing": "Odkładam do biblioteki…",
     "community": "Pobieram notatki społeczności…",
     "indexing": "Przygotowuję te strony do wyszukiwania…"
-  },
-  "preferences": {
-    "label": "Ustawienia wyświetlania"
   },
   "ui": {
     "missingValue": "—"
@@ -248,6 +254,7 @@
     "retrieval_loading": "Wyszukiwanie nadal się uruchamia na tym komputerze. Poczekaj chwilę i zapytaj ponownie.",
     "checking_sources_carefully": "Sprawdzam dokładnie te strony, zanim odpowiem…",
     "preparing_assistant": "Przygotowuję się do napisania odpowiedzi…",
+    "sources_disagree": "Te dokumenty nie są w pełni zgodne. Opieram się na mocniejszym źródle (errata i FAQ mają pierwszeństwo przed instrukcją).",
     "lesson_plan_failed": "Nie udało się ułożyć lekcji z tych instrukcji. Wczytaj jaśniejszą instrukcję albo otwórz Pytania i zapytaj o konkretną zasadę.",
     "lesson_expired": "Ta lekcja się skończyła albo wygasła. Zacznij nową, kiedy będziesz gotowy.",
     "lesson_game_mismatch": "Ta lekcja dotyczy innej gry. Zacznij nową lekcję dla wybranej gry.",

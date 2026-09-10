@@ -109,7 +109,7 @@ export function initialAppPath(options: {
   if (options.uninstallMode) {
     return `/${options.locale}/uninstall`;
   }
-  return options.gatePassed ? `/${options.locale}` : `/${options.locale}/setup`;
+  return options.gatePassed ? `/${options.locale}/add-game` : `/${options.locale}/init`;
 }
 
 /** Paths the gated window may open before Ask is ready. */
@@ -123,11 +123,14 @@ export function isAllowedWhenGated(url: string, locale: 'en' | 'pl'): boolean {
 }
 
 export function isGatedAllowedPath(path: string, locale: 'en' | 'pl'): boolean {
-  const setup = `/${locale}/setup`;
+  const init = `/${locale}/init`;
+  const settings = `/${locale}/settings`;
   const uninstall = `/${locale}/uninstall`;
   return (
-    path === setup ||
-    path.startsWith(`${setup}/`) ||
+    path === init ||
+    path.startsWith(`${init}/`) ||
+    path === settings ||
+    path.startsWith(`${settings}/`) ||
     path === uninstall ||
     path.startsWith(`${uninstall}/`)
   );

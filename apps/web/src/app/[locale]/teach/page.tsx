@@ -1,17 +1,15 @@
-import { TeachPage } from '@bga/pages/teach';
-import { notFound } from 'next/navigation';
-import { getTranslation } from '@/i18n/server';
+import { notFound, redirect } from 'next/navigation';
 import { isLocale } from '@/i18n/settings';
 
-const TeachRoute = async ({ params }: PageProps<'/[locale]/teach'>) => {
+/** Legacy path — prefer `/learn`. */
+const TeachRedirect = async ({ params }: PageProps<'/[locale]/teach'>) => {
   const { locale } = await params;
 
   if (!isLocale(locale)) {
     notFound();
   }
 
-  const t = getTranslation(locale);
-  return <TeachPage t={t} />;
+  redirect(`/${locale}/learn`);
 };
 
-export default TeachRoute;
+export default TeachRedirect;

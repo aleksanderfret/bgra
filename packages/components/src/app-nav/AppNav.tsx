@@ -7,33 +7,28 @@ import { usePathname, useRouter } from 'next/navigation';
 import { type FC, useId } from 'react';
 import { useTranslation } from 'react-i18next';
 
-export type AppView = 'teach' | 'questions' | 'rulebooks';
+export type AppView = 'learn' | 'check-rule' | 'add-game' | 'settings';
 
-const APP_VIEWS: readonly AppView[] = ['teach', 'questions', 'rulebooks'];
+const APP_VIEWS: readonly AppView[] = ['learn', 'check-rule', 'add-game', 'settings'];
 
 const isAppView = (value: string): value is AppView => APP_VIEWS.some((view) => view === value);
 
 const viewFromPathname = (pathname: string): AppView => {
   const segments = pathname.split('/').filter(Boolean);
   const section = segments[1];
-  if (section === 'teach') {
-    return 'teach';
+  if (section === 'learn') {
+    return 'learn';
   }
-  if (section === 'rulebooks') {
-    return 'rulebooks';
+  if (section === 'add-game') {
+    return 'add-game';
   }
-  return 'questions';
+  if (section === 'settings') {
+    return 'settings';
+  }
+  return 'check-rule';
 };
 
-const pathForView = (locale: string, view: AppView): string => {
-  if (view === 'teach') {
-    return `/${locale}/teach`;
-  }
-  if (view === 'rulebooks') {
-    return `/${locale}/rulebooks`;
-  }
-  return `/${locale}`;
-};
+const pathForView = (locale: string, view: AppView): string => `/${locale}/${view}`;
 
 export const AppNav: FC = () => {
   const { t } = useTranslation();
@@ -64,9 +59,10 @@ export const AppNav: FC = () => {
         value={active}
         onChange={handleViewChange}
         data={[
-          { value: 'teach', label: t('appNav.teach') },
-          { value: 'questions', label: t('appNav.questions') },
-          { value: 'rulebooks', label: t('appNav.rulebooks') },
+          { value: 'learn', label: t('appNav.learn') },
+          { value: 'check-rule', label: t('appNav.checkRule') },
+          { value: 'add-game', label: t('appNav.addGame') },
+          { value: 'settings', label: t('appNav.settings') },
         ]}
       />
     </Stack>

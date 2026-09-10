@@ -1,1 +1,0 @@
-export { DiagnosticsButton } from './DiagnosticsButton';

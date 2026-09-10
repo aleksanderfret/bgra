@@ -533,7 +533,7 @@ async function startBackend(options: { skipRetrievalWarm: boolean }): Promise<vo
   if (isDev && process.env.BGA_WEB_URL) {
     const url = new URL(process.env.BGA_WEB_URL);
     webPort = Number(url.port || 3000);
-    await waitForHttp(`http://127.0.0.1:${webPort}/${uiLocale}`, { timeoutMs: 5_000 });
+    await waitForHttp(`http://127.0.0.1:${webPort}/${uiLocale}/check-rule`, { timeoutMs: 5_000 });
     await waitForHttp(`http://127.0.0.1:${enginePort}/health`, { timeoutMs: 60_000 });
     await refreshProbe();
     return;
@@ -610,7 +610,7 @@ async function startBackend(options: { skipRetrievalWarm: boolean }): Promise<vo
   if (nextProcess === null) {
     throw new Error('Next.js process failed to start');
   }
-  await waitForHttpWhileAlive(`http://127.0.0.1:${webPort}/${uiLocale}`, nextProcess, {
+  await waitForHttpWhileAlive(`http://127.0.0.1:${webPort}/${uiLocale}/check-rule`, nextProcess, {
     timeoutMs: 60_000,
   });
   await refreshProbe();
@@ -631,7 +631,7 @@ async function startUninstallUi(): Promise<void> {
   if (isDev && process.env.BGA_WEB_URL) {
     const url = new URL(process.env.BGA_WEB_URL);
     webPort = Number(url.port || 3000);
-    await waitForHttp(`http://127.0.0.1:${webPort}/${uiLocale}`, { timeoutMs: 5_000 });
+    await waitForHttp(`http://127.0.0.1:${webPort}/${uiLocale}/check-rule`, { timeoutMs: 5_000 });
     backendsReady = true;
     return;
   }
@@ -698,7 +698,7 @@ async function startUninstallUi(): Promise<void> {
   if (nextProcess === null) {
     throw new Error('Next.js process failed to start');
   }
-  await waitForHttpWhileAlive(`http://127.0.0.1:${webPort}/${uiLocale}`, nextProcess, {
+  await waitForHttpWhileAlive(`http://127.0.0.1:${webPort}/${uiLocale}/check-rule`, nextProcess, {
     timeoutMs: 60_000,
   });
   backendsReady = true;
@@ -823,7 +823,7 @@ function installNavigationLock(window: BrowserWindow): void {
     }
     if (!isAllowedWhenGated(url, uiLocale)) {
       event.preventDefault();
-      void window.loadURL(`http://127.0.0.1:${webPort}/${uiLocale}/setup`);
+      void window.loadURL(`http://127.0.0.1:${webPort}/${uiLocale}/init`);
     }
   });
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));

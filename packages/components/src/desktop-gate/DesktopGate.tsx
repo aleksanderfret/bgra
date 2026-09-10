@@ -12,12 +12,18 @@ export interface DesktopGateProps {
   children: ReactNode;
 }
 
+const isAllowedWhileGated = (pathname: string, locale: string): boolean => {
+  const pathOnly = pathname.split('?')[0] ?? pathname;
+  const allowed = [`/${locale}/init`, `/${locale}/settings`, `/${locale}/uninstall`];
+  return allowed.some((base) => pathOnly === base || pathOnly.startsWith(`${base}/`));
+};
+
 /**
- * Keeps packaged desktop on /setup until the gate passes.
+ * Keeps packaged desktop on /init until the gate passes.
  *
  * Initial `ready` must be false on both server and client. Starting true when
  * `window.bgaDesktop` is absent (SSR) and false in Electron caused a hydration
- * mismatch that left the setup page mounted twice.
+ * mismatch that left the init page mounted twice.
  */
 export const DesktopGate: FC<DesktopGateProps> = ({ locale, children }) => {
   const router = useRouter();
@@ -35,11 +41,12 @@ export const DesktopGate: FC<DesktopGateProps> = ({ locale, children }) => {
       if (cancelled) {
         return;
       }
-      const onSetup = pathname.includes('/setup');
-      if (state.gatePassed && onSetup) {
-        router.replace(`/${locale}`);
-      } else if (!state.gatePassed && !onSetup) {
-        router.replace(`/${locale}/setup`);
+      const pathOnly = pathname.split('?')[0] ?? pathname;
+      const onInit = pathOnly === `/${locale}/init` || pathOnly.startsWith(`/${locale}/init/`);
+      if (state.gatePassed && onInit) {
+        router.replace(`/${locale}/add-game`);
+      } else if (!state.gatePassed && !isAllowedWhileGated(pathname, locale)) {
+        router.replace(`/${locale}/init`);
       }
       setReady(true);
     });

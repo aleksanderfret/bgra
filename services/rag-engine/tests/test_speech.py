@@ -96,6 +96,24 @@ def test_flush_completed_sentences_handles_closers() -> None:
     assert rest == "Then"
 
 
+def test_flush_does_not_complete_on_terminator_at_buffer_end() -> None:
+    done, rest = flush_completed_sentences("Hello world.")
+    assert done == []
+    assert rest == "Hello world."
+
+
+def test_flush_skips_abbreviations_and_list_markers() -> None:
+    done, rest = flush_completed_sentences("See e.g. the rule. Next")
+    assert done == ["See e.g. the rule."]
+    assert rest == "Next"
+    done_np, rest_np = flush_completed_sentences("Np. handel. Dalej")
+    assert done_np == ["Np. handel."]
+    assert rest_np == "Dalej"
+    done_list, rest_list = flush_completed_sentences("1. Draw a tile. Next")
+    assert done_list == ["1. Draw a tile."]
+    assert rest_list == "Next"
+
+
 def test_force_flush_remainder() -> None:
     assert force_flush_remainder("  trailing  ") == ["trailing"]
     assert force_flush_remainder("   ") == []

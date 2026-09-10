@@ -1,0 +1,1 @@
+export { SettingsEntryLink } from './SettingsEntryLink';

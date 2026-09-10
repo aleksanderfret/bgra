@@ -95,9 +95,9 @@ describe('desktopLocale / resolveUiLocale / initialAppPath', () => {
     expect(resolveUiLocale({ appLocale: 'de', savedLocale: 'de' })).toBe('en');
   });
 
-  it('sends gated launches to setup', () => {
-    expect(initialAppPath({ locale: 'en', gatePassed: false })).toBe('/en/setup');
-    expect(initialAppPath({ locale: 'pl', gatePassed: true })).toBe('/pl');
+  it('sends gated launches to init or add-game', () => {
+    expect(initialAppPath({ locale: 'en', gatePassed: false })).toBe('/en/init');
+    expect(initialAppPath({ locale: 'pl', gatePassed: true })).toBe('/pl/add-game');
   });
 
   it('sends uninstall mode to the uninstall route even when gated', () => {
@@ -113,14 +113,15 @@ describe('argvHasUninstallFlag / isAllowedWhenGated', () => {
     expect(argvHasUninstallFlag(['electron', '.', '--bga-uninstall'])).toBe(true);
   });
 
-  it('allows setup and uninstall under the gate with path boundaries', () => {
-    expect(isAllowedWhenGated('http://127.0.0.1:3000/en/setup', 'en')).toBe(true);
+  it('allows init, settings, and uninstall under the gate with path boundaries', () => {
+    expect(isAllowedWhenGated('http://127.0.0.1:3000/en/init', 'en')).toBe(true);
+    expect(isAllowedWhenGated('http://127.0.0.1:3000/en/settings', 'en')).toBe(true);
     expect(isAllowedWhenGated('http://127.0.0.1:3000/en/uninstall', 'en')).toBe(true);
     expect(isAllowedWhenGated('http://127.0.0.1:3000/en/uninstall?x=1', 'en')).toBe(true);
     expect(isAllowedWhenGated('http://127.0.0.1:3000/en', 'en')).toBe(false);
     expect(isAllowedWhenGated('http://127.0.0.1:3000/pl/uninstall', 'en')).toBe(false);
     expect(isAllowedWhenGated('http://127.0.0.1:3000/en/uninstall-evil', 'en')).toBe(false);
-    expect(isAllowedWhenGated('http://127.0.0.1:3000/en/setup-extra', 'en')).toBe(false);
+    expect(isAllowedWhenGated('http://127.0.0.1:3000/en/init-extra', 'en')).toBe(false);
   });
 });
 
