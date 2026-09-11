@@ -6,15 +6,19 @@ import type { FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import classes from './ActivityProgress.module.css';
 
+export type ActivityMessagePlacement = 'beside' | 'below';
+
 export interface ActivityProgressProps {
   view: ActivityView;
   layout: 'page' | 'inline';
+  /** Where the label sits relative to the ring. Defaults: page → below, inline → beside. */
+  messagePlacement?: ActivityMessagePlacement;
 }
 
 const RING_RADIUS = 36;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 
-export const ActivityProgress: FC<ActivityProgressProps> = ({ view, layout }) => {
+export const ActivityProgress: FC<ActivityProgressProps> = ({ view, layout, messagePlacement }) => {
   const { t } = useTranslation();
   const code = view.activity;
   const label =
@@ -26,7 +30,11 @@ export const ActivityProgress: FC<ActivityProgressProps> = ({ view, layout }) =>
   const displayPercent = percent === null ? null : Math.round(percent);
   const dashOffset =
     percent === null ? RING_CIRCUMFERENCE : RING_CIRCUMFERENCE * (1 - percent / 100);
-  const shellClass = layout === 'page' ? classes.page : classes.inline;
+  const placement = messagePlacement ?? (layout === 'page' ? 'below' : 'beside');
+  const shellClass = [
+    layout === 'page' ? classes.page : classes.inline,
+    placement === 'below' ? classes.below : classes.beside,
+  ].join(' ');
 
   const mark = (
     <svg className={classes.mark} viewBox="0 0 88 88" aria-hidden="true">
@@ -72,6 +80,7 @@ export const ActivityProgress: FC<ActivityProgressProps> = ({ view, layout }) =>
         aria-valuemax={100}
         aria-valuenow={Math.round(percent)}
         aria-label={label}
+        data-message-placement={placement}
       >
         {mark}
         {copy}
@@ -80,7 +89,13 @@ export const ActivityProgress: FC<ActivityProgressProps> = ({ view, layout }) =>
   }
 
   return (
-    <div className={shellClass} role="status" aria-busy="true" aria-live="polite">
+    <div
+      className={shellClass}
+      role="status"
+      aria-busy="true"
+      aria-live="polite"
+      data-message-placement={placement}
+    >
       {mark}
       {copy}
     </div>

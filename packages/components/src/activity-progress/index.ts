@@ -1,2 +1,2 @@
-export type { ActivityProgressProps } from './ActivityProgress';
+export type { ActivityMessagePlacement, ActivityProgressProps } from './ActivityProgress';
 export { ActivityProgress } from './ActivityProgress';

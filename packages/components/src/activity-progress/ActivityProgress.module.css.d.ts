@@ -1,6 +1,8 @@
 declare const classes: {
   readonly page: string;
   readonly inline: string;
+  readonly below: string;
+  readonly beside: string;
   readonly mark: string;
   readonly ring: string;
   readonly track: string;

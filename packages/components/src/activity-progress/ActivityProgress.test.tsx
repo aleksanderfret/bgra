@@ -40,4 +40,32 @@ describe('ActivityProgress', () => {
 
     expect(screen.getByRole('status')).toHaveTextContent(pl.activity.unknown);
   });
+
+  it('puts page copy below the ring by default', () => {
+    render(
+      <ActivityProgress layout="page" view={{ activity: 'checking_computer', percent: null }} />,
+      'en',
+    );
+
+    expect(screen.getByRole('status')).toHaveAttribute('data-message-placement', 'below');
+  });
+
+  it('puts inline copy beside the ring by default', () => {
+    render(<ActivityProgress layout="inline" view={{ activity: 'drawing', percent: 10 }} />, 'en');
+
+    expect(screen.getByRole('progressbar')).toHaveAttribute('data-message-placement', 'beside');
+  });
+
+  it('honours an explicit messagePlacement override', () => {
+    render(
+      <ActivityProgress
+        layout="page"
+        messagePlacement="beside"
+        view={{ activity: 'checking_computer', percent: null }}
+      />,
+      'en',
+    );
+
+    expect(screen.getByRole('status')).toHaveAttribute('data-message-placement', 'beside');
+  });
 });

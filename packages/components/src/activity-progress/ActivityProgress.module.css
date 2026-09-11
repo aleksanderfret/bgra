@@ -1,10 +1,17 @@
 .page {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
   box-sizing: border-box;
-  min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 2rem;
+  /* Top padding clears macOS traffic lights; keep the rest tight so the
+     viewport never scrolls. */
+  padding: 1rem;
+  padding-top: 2.5rem;
+  overflow: hidden;
+  background: var(--mantine-color-body);
   text-align: center;
 }
 
@@ -12,6 +19,20 @@
   display: flex;
   align-items: center;
   gap: 0.85rem;
+  text-align: start;
+}
+
+.below {
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.beside {
+  flex-direction: row;
+  gap: 0.85rem;
+}
+
+.page.beside {
   text-align: start;
 }
 
@@ -60,6 +81,7 @@
 
 .label {
   animation: fade-in 220ms ease;
+  max-width: 22rem;
 }
 
 @keyframes orbit {
