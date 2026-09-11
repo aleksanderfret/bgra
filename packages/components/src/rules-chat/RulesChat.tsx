@@ -1,12 +1,13 @@
 'use client';
 
-import type { GameSummary } from '@bga/api-contract';
 import { AnswerPanel } from '@bga/components/answer-panel';
 import { ConversationLog } from '@bga/components/conversation-log';
+import { GamePicker } from '@bga/components/game-picker';
 import { useAskStream } from '@bga/hooks/use-ask-stream';
 import { useAudioQueue } from '@bga/hooks/use-audio-queue';
 import { useConversationThread } from '@bga/hooks/use-conversation-thread';
 import { useEngineReadiness } from '@bga/hooks/use-engine-readiness';
+import { useGameCatalogue } from '@bga/hooks/use-game-catalogue';
 import { useHoldToTalk } from '@bga/hooks/use-hold-to-talk';
 import { type AnswerState, isBlockingNotice, streamingStatusKey } from '@bga/utils/answer-state';
 import {
@@ -14,20 +15,8 @@ import {
   freezeAnswer,
   selectExchanges,
 } from '@bga/utils/conversation-thread';
-import { GAMES_CHANGED_EVENT } from '@bga/utils/desktop-bridge';
-import { isGameSummaryList } from '@bga/utils/game-summary';
 import { loadReadAloudPreference, saveReadAloudPreference } from '@bga/utils/voice-prefs';
-import {
-  Button,
-  Checkbox,
-  Fieldset,
-  Group,
-  Select,
-  Stack,
-  Switch,
-  Text,
-  Textarea,
-} from '@mantine/core';
+import { Button, Checkbox, Fieldset, Group, Stack, Switch, Text, Textarea } from '@mantine/core';
 import {
   type ChangeEvent,
   type FC,
@@ -66,9 +55,9 @@ const ExpansionCheckbox: FC<ExpansionCheckboxProps> = ({
 export const RulesChat: FC = () => {
   const { t, i18n } = useTranslation();
   const locale = i18n.language === 'pl' ? 'pl' : 'en';
-  const [games, setGames] = useState<GameSummary[] | null>(null);
+  const { games } = useGameCatalogue();
   const [gameId, setGameId] = useState<string | null>(null);
-  const enginePhase = useEngineReadiness();
+  const { phase: enginePhase } = useEngineReadiness();
   const [expansionIds, setExpansionIds] = useState<string[]>([]);
   const [expansionsCleared, setExpansionsCleared] = useState(false);
   const [question, setQuestion] = useState('');
@@ -101,47 +90,6 @@ export const RulesChat: FC = () => {
       enqueue(frame);
     }
   };
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadGames = async (): Promise<void> => {
-      try {
-        const response = await fetch('/api/engine/games');
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-        const payload: unknown = await response.json();
-        if (!cancelled && isGameSummaryList(payload)) {
-          setGames(payload);
-        }
-      } catch {
-        if (!cancelled && enginePhase === 'offline') {
-          setGames([]);
-        }
-      }
-    };
-
-    void loadGames();
-    const onGamesChanged = (): void => {
-      void loadGames();
-    };
-    window.addEventListener(GAMES_CHANGED_EVENT, onGamesChanged);
-    const retry =
-      enginePhase === 'ready'
-        ? null
-        : window.setInterval(() => {
-            void loadGames();
-          }, 1_000);
-    return () => {
-      cancelled = true;
-      window.removeEventListener(GAMES_CHANGED_EVENT, onGamesChanged);
-      if (retry !== null) {
-        window.clearInterval(retry);
-      }
-    };
-  }, [enginePhase]);
-
   useEffect(() => {
     if (
       voicePendingRef.current &&
@@ -375,18 +323,16 @@ export const RulesChat: FC = () => {
     <form onSubmit={onSubmit} aria-label={t('rulesChat.formLabel')}>
       <Stack gap="lg">
         <Fieldset legend={t('rulesChat.game.label')} variant="filled">
-          <Select
+          <GamePicker
             description={t('rulesChat.game.description')}
-            placeholder={
-              games === null ? t('rulesChat.game.loading') : t('rulesChat.game.placeholder')
-            }
-            data={baseGames.map((game) => ({ value: game.gameId, label: game.title }))}
             value={gameId}
             onChange={onBaseGameChange}
+            locale={locale}
+            games={games}
+            basesOnly
             disabled={games === null || baseGames.length === 0 || picksLocked}
-            aria-busy={games === null}
+            placeholder={t('rulesChat.game.placeholder')}
             aria-describedby={expansionsCleared ? expansionsStatusId : undefined}
-            searchable
           />
           {expansionsCleared && (
             <Text id={expansionsStatusId} size="sm" c="dimmed" role="status" aria-live="polite">

@@ -1,8 +1,10 @@
 'use client';
 
-import { type GameSummary, isGameId } from '@bga/api-contract';
+import { isGameId } from '@bga/api-contract';
 import { ActivityProgress } from '@bga/components/activity-progress';
+import { GamePicker } from '@bga/components/game-picker';
 import { useEngineReadiness } from '@bga/hooks/use-engine-readiness';
+import { useGameCatalogue } from '@bga/hooks/use-game-catalogue';
 import {
   type ActivityView,
   blendUploadPercent,
@@ -10,7 +12,6 @@ import {
   sendingActivity,
 } from '@bga/utils/activity-progress';
 import { GAMES_CHANGED_EVENT } from '@bga/utils/desktop-bridge';
-import { isGameSummaryList } from '@bga/utils/game-summary';
 import { type IngestUploadSession, postIngestPdf } from '@bga/utils/ingest-upload';
 import {
   Alert,
@@ -21,7 +22,6 @@ import {
   Group,
   Paper,
   SegmentedControl,
-  Select,
   Stack,
   Text,
   TextInput,
@@ -85,12 +85,12 @@ const isImportMode = (value: string): value is ImportMode =>
   value === 'create' || value === 'attach';
 
 export const PdfDropZone: FC = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const locale = i18n.language === 'pl' ? 'pl' : 'en';
   const headingId = useId();
   const dropTitleId = useId();
   const dropHintId = useId();
   const [mode, setMode] = useState<ImportMode>('create');
-  const [games, setGames] = useState<GameSummary[] | null>(null);
   const [gameId, setGameId] = useState('');
   const [attachGameId, setAttachGameId] = useState<string | null>(null);
   const [gameTitle, setGameTitle] = useState('');
@@ -101,7 +101,8 @@ export const PdfDropZone: FC = () => {
   const [dragging, setDragging] = useState(false);
   const [busy, setBusy] = useState(false);
   const [activity, setActivity] = useState<ActivityView | null>(null);
-  const enginePhase = useEngineReadiness();
+  const { phase: enginePhase } = useEngineReadiness();
+  const { games } = useGameCatalogue();
   const gameIdRef = useRef<HTMLInputElement>(null);
   const documentTitleRef = useRef<HTMLInputElement>(null);
   const resetFileRef = useRef<() => void>(null);
@@ -114,47 +115,6 @@ export const PdfDropZone: FC = () => {
     };
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadGames = async (): Promise<void> => {
-      try {
-        const response = await fetch('/api/engine/games');
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-        const payload: unknown = await response.json();
-        if (!cancelled && isGameSummaryList(payload)) {
-          setGames(payload);
-        }
-      } catch {
-        if (!cancelled && enginePhase === 'offline') {
-          setGames([]);
-        }
-      }
-    };
-
-    void loadGames();
-    const onGamesChanged = (): void => {
-      void loadGames();
-    };
-    window.addEventListener(GAMES_CHANGED_EVENT, onGamesChanged);
-    const retry =
-      enginePhase === 'ready'
-        ? null
-        : window.setInterval(() => {
-            void loadGames();
-          }, 1_000);
-    return () => {
-      cancelled = true;
-      window.removeEventListener(GAMES_CHANGED_EVENT, onGamesChanged);
-      if (retry !== null) {
-        window.clearInterval(retry);
-      }
-    };
-  }, [enginePhase]);
-
-  const baseGames = (games ?? []).filter((game) => game.baseGameId === null);
   const importAllowed = enginePhase === 'ready';
   const controlsDisabled = busy || !importAllowed;
 
@@ -490,16 +450,17 @@ export const PdfDropZone: FC = () => {
                 onChange={handleGameTitleChange}
                 disabled={controlsDisabled}
               />
-              <Select
+              <GamePicker
                 label={t('pdfImport.baseGame.label')}
                 description={t('pdfImport.baseGame.description')}
-                placeholder={t('pdfImport.baseGame.placeholder')}
-                data={baseGames.map((game) => ({ value: game.gameId, label: game.title }))}
                 value={baseGameId}
                 onChange={setBaseGameId}
-                disabled={controlsDisabled || games === null}
+                locale={locale}
+                games={games}
+                basesOnly
                 clearable
-                searchable
+                disabled={controlsDisabled || games === null}
+                placeholder={t('pdfImport.baseGame.placeholder')}
               />
               <TextInput
                 ref={documentTitleRef}
@@ -522,25 +483,25 @@ export const PdfDropZone: FC = () => {
         ) : (
           <Fieldset legend={t('pdfImport.attachGame.legend')} variant="filled">
             <Stack gap="sm">
-              <Select
+              <GamePicker
                 label={t('pdfImport.attachGame.selectLabel')}
                 description={t('pdfImport.attachGame.selectDescription')}
+                value={attachGameId}
+                onChange={setAttachGameId}
+                locale={locale}
+                games={games}
+                disabled={controlsDisabled || games === null || games.length === 0}
                 placeholder={
                   games === null
                     ? t('pdfImport.attachGame.loading')
                     : t('pdfImport.attachGame.selectPlaceholder')
                 }
-                data={(games ?? []).map((game) => ({ value: game.gameId, label: game.title }))}
-                value={attachGameId}
-                onChange={setAttachGameId}
-                disabled={controlsDisabled || games === null || games.length === 0}
-                searchable
-                error={
-                  feedback.kind === 'unknown_game'
-                    ? t('pdfImport.error.unknownGameBody')
-                    : undefined
-                }
               />
+              {feedback.kind === 'unknown_game' && (
+                <Text size="sm" c="red">
+                  {t('pdfImport.error.unknownGameBody')}
+                </Text>
+              )}
               <TextInput
                 ref={documentTitleRef}
                 label={t('pdfImport.documentTitle.label')}

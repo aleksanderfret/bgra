@@ -17,6 +17,7 @@ const readyProbe = {
   reranker: true,
   retrievalLoading: false,
   layoutIngest: false,
+  warmStage: null as 'starting_assistant' | 'teaching_answers' | 'finding_rules' | null,
   missingModels: [] as string[],
   llm: 'chat',
   embedding: 'embed',
@@ -32,12 +33,14 @@ describe('parseHealthProbe', () => {
       },
       models: { llm: 'a', embedding: 'b' },
       missingModels: ['a'],
+      warmStage: 'teaching_answers',
     });
     expect(probe).toEqual({
       ollama: true,
       reranker: false,
       retrievalLoading: true,
       layoutIngest: false,
+      warmStage: 'teaching_answers',
       missingModels: ['a'],
       llm: 'a',
       embedding: 'b',
@@ -69,10 +72,14 @@ describe('liveProbeOk / gatePassed', () => {
 });
 
 describe('splashActivityFromProbe', () => {
-  it('prefers layout ingest over a generic search wait', () => {
+  it('prefers warmStage over a generic search wait', () => {
     expect(
-      splashActivityFromProbe({ ...readyProbe, layoutIngest: true, retrievalLoading: true }),
-    ).toBe('reading_layout');
+      splashActivityFromProbe({
+        ...readyProbe,
+        retrievalLoading: true,
+        warmStage: 'finding_rules',
+      }),
+    ).toBe('finding_rules');
     expect(splashActivityFromProbe({ ...readyProbe, retrievalLoading: true })).toBe(
       'preparing_search',
     );

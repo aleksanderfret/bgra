@@ -4,6 +4,8 @@ import { join } from 'node:path';
 export const SPLASH_ACTIVITY_CODES = [
   'checking_computer',
   'starting_assistant',
+  'teaching_answers',
+  'finding_rules',
   'preparing_search',
   'reading_layout',
 ] as const;

@@ -197,11 +197,23 @@ export interface GameSummary {
   documents: GameDocumentSummary[];
 }
 
+/** Blocking splash stages while the assistant warms (null when Ask-ready). */
+export type WarmStage = 'starting_assistant' | 'teaching_answers' | 'finding_rules';
+
 export interface HealthReport {
   status: 'ok' | 'degraded';
   components: Record<string, boolean>;
   models: Record<string, string>;
   missingModels: string[];
+  /** Null once blocking warm finished (or never started). */
+  warmStage: WarmStage | null;
+}
+
+/** Slim row for game pickers (no documents / chunk counts). */
+export interface GameCatalogueItem {
+  gameId: string;
+  title: string;
+  baseGameId: string | null;
 }
 
 export interface RetrievalReloadResponse {

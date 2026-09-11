@@ -121,6 +121,9 @@
     "speechMissing": {
       "title": "Odpowiedzi na głos nie są jeszcze gotowe",
       "body": "Mikrofon i głos mówiony wymagają jeszcze jednego pobrania na tym komputerze. Dokończ instalację na ekranie pierwszego uruchomienia, a potem spróbuj przytrzymać mikrofon ponownie."
+    },
+    "libraryCatchUp": {
+      "body": "Sprawdzam, czy wszystkie Twoje gry są gotowe do pytań. Jeśli zapytasz wcześniej, odpowiedź może chwilę poczekać."
     }
   },
   "startup": {
@@ -133,6 +136,8 @@
     "detail": "{{percent}}%",
     "checking_computer": "Sprawdzam ten komputer…",
     "starting_assistant": "Uruchamiam asystenta…",
+    "teaching_answers": "Uczę asystenta odpowiadać na pytania…",
+    "finding_rules": "Uczę się szybciej znajdować reguły w instrukcji…",
     "downloading_installer": "Pobieram instalator Ollamy…",
     "waiting_for_ollama": "Czekam, aż Ollama dokończy instalację i się uruchomi…",
     "pulling_models": "Pobieram modele na ten komputer…",
@@ -161,6 +166,16 @@
     "dark": "Ciemny",
     "auto": "System",
     "changed": "Motyw ustawiony na {{scheme}}"
+  },
+  "gamePicker": {
+    "recent": "Ostatnio używane",
+    "all": "Wszystkie",
+    "results": "Wyniki",
+    "placeholder": "Szukaj gry…",
+    "loading": "Wczytuję gry…",
+    "empty": "W bibliotece nie ma jeszcze gier",
+    "noResults": "Nie ma gry o takiej nazwie",
+    "clear": "Wyczyść wybór"
   },
   "rulesChat": {
     "engineOffline": {
@@ -254,6 +269,7 @@
     "retrieval_loading": "Wyszukiwanie nadal się uruchamia na tym komputerze. Poczekaj chwilę i zapytaj ponownie.",
     "checking_sources_carefully": "Sprawdzam dokładnie te strony, zanim odpowiem…",
     "preparing_assistant": "Przygotowuję się do napisania odpowiedzi…",
+    "preparing_game_search": "Przygotowuję tę grę do pytań…",
     "sources_disagree": "Te dokumenty nie są w pełni zgodne. Opieram się na mocniejszym źródle (errata i FAQ mają pierwszeństwo przed instrukcją).",
     "lesson_plan_failed": "Nie udało się ułożyć lekcji z tych instrukcji. Wczytaj jaśniejszą instrukcję albo otwórz Pytania i zapytaj o konkretną zasadę.",
     "lesson_expired": "Ta lekcja się skończyła albo wygasła. Zacznij nową, kiedy będziesz gotowy.",

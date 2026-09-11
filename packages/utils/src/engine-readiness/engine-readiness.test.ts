@@ -1,9 +1,28 @@
 import { describe, expect, it } from 'vitest';
-import { isEngineHealthSnapshot, phaseFromPoll } from './engine-readiness';
+import {
+  isEngineHealthSnapshot,
+  libraryCatchUpFromHealth,
+  phaseFromPoll,
+  warmStageFromHealth,
+} from './engine-readiness';
 
 describe('isEngineHealthSnapshot', () => {
   it('accepts a health object with components', () => {
     expect(isEngineHealthSnapshot({ status: 'ok', components: { ollama: true } })).toBe(true);
+  });
+
+  it('accepts optional warmStage', () => {
+    expect(
+      isEngineHealthSnapshot({
+        components: { ollama: true },
+        warmStage: 'teaching_answers',
+      }),
+    ).toBe(true);
+    expect(isEngineHealthSnapshot({ components: {}, warmStage: null })).toBe(true);
+  });
+
+  it('rejects an unknown warmStage', () => {
+    expect(isEngineHealthSnapshot({ components: {}, warmStage: 'nope' })).toBe(false);
   });
 
   it('rejects a games list payload', () => {
@@ -26,6 +45,23 @@ describe('phaseFromPoll', () => {
     expect(
       phaseFromPoll({
         health: { components: { retrieval_loading: false, reranker: true } },
+        failedForMs: 0,
+        offlineAfterMs: 20_000,
+      }),
+    ).toBe('ready');
+  });
+
+  it('stays ready during background layout and library catch-up', () => {
+    expect(
+      phaseFromPoll({
+        health: {
+          components: {
+            retrieval_loading: false,
+            reranker: true,
+            layout_ingest: true,
+            library_catch_up: true,
+          },
+        },
         failedForMs: 0,
         offlineAfterMs: 20_000,
       }),
@@ -62,7 +98,7 @@ describe('phaseFromPoll', () => {
     ).toBe('starting');
   });
 
-  it('is reading_layout while old PDFs are being re-read, even if search is still loading', () => {
+  it('is reading_layout while layout runs before Ask-ready', () => {
     expect(
       phaseFromPoll({
         health: {
@@ -72,6 +108,23 @@ describe('phaseFromPoll', () => {
         offlineAfterMs: 20_000,
       }),
     ).toBe('reading_layout');
+  });
+
+  it('stays ready while layout catch-up runs after Ask unlock', () => {
+    expect(
+      phaseFromPoll({
+        health: {
+          components: {
+            retrieval_loading: false,
+            reranker: true,
+            layout_ingest: true,
+            library_catch_up: true,
+          },
+        },
+        failedForMs: 0,
+        offlineAfterMs: 20_000,
+      }),
+    ).toBe('ready');
   });
 
   it('is starting when health cannot be reached yet', () => {
@@ -92,5 +145,19 @@ describe('phaseFromPoll', () => {
         offlineAfterMs: 20_000,
       }),
     ).toBe('offline');
+  });
+});
+
+describe('warmStageFromHealth / libraryCatchUpFromHealth', () => {
+  it('reads warmStage and library_catch_up', () => {
+    expect(warmStageFromHealth(null)).toBeNull();
+    expect(
+      warmStageFromHealth({
+        components: {},
+        warmStage: 'finding_rules',
+      }),
+    ).toBe('finding_rules');
+    expect(libraryCatchUpFromHealth({ components: { library_catch_up: true } })).toBe(true);
+    expect(libraryCatchUpFromHealth({ components: {} })).toBe(false);
   });
 });

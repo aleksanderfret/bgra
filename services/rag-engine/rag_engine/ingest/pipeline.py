@@ -790,6 +790,8 @@ def rebuild_search_index(storage_dir: Path) -> int:
 def ensure_search_index(
     storage_dir: Path,
     progress: ProgressCallback | None = None,
+    *,
+    only_game_id: str | None = None,
 ) -> int:
     """Re-index games whose on-disk chunks outnumber the search index.
 
@@ -798,6 +800,9 @@ def ensure_search_index(
     Uses on-disk chunk counts (not a stale ``games.json`` count) and migrates
     Stage 2 flat layouts before deciding to skip. One failed embed does not
     stop the rest of the library.
+
+    When ``only_game_id`` is set, only that game is considered (Ask / Learn
+    early path while a full-library catch-up may still be running).
     """
     from rag_engine.retrieval.indexer import IndexingError
     from rag_engine.retrieval.service import open_chunk_index
@@ -807,7 +812,10 @@ def ensure_search_index(
         return 0
     settings = get_settings()
     fixed = 0
-    for game in load_games(storage_dir):
+    games = load_games(storage_dir)
+    if only_game_id is not None:
+        games = [game for game in games if game.game_id == only_game_id]
+    for game in games:
         migrate_legacy_flat_pages(storage_dir, game.game_id)
         on_disk = count_chunks_for_game(storage_dir, game.game_id)
         if on_disk == 0:

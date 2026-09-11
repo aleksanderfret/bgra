@@ -14,10 +14,10 @@ describe('useEngineReadiness', () => {
 
     const { result } = renderHook(() => useEngineReadiness());
 
-    expect(result.current).toBe('starting');
+    expect(result.current.phase).toBe('starting');
 
     await waitFor(() => {
-      expect(result.current).toBe('ready');
+      expect(result.current.phase).toBe('ready');
     });
 
     await act(async () => {

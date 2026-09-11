@@ -4,6 +4,7 @@ import '@mantine/notifications/styles.css';
 import { AssistantReadyGate } from '@bga/components/assistant-ready-gate';
 import { DesktopGate } from '@bga/components/desktop-gate';
 import { DesktopWindowInset } from '@bga/components/desktop-window-inset';
+import { LibraryCatchUpBar } from '@bga/components/library-catch-up-bar';
 import { ColorSchemeScript, MantineProvider, mantineHtmlProps } from '@mantine/core';
 import { Notifications } from '@mantine/notifications';
 import type { Metadata } from 'next';
@@ -55,7 +56,10 @@ export default async function RootLayout({ children, params }: LayoutProps<'/[lo
             <Notifications />
             <DesktopGate locale={locale}>
               <DesktopWindowInset>
-                <AssistantReadyGate>{children}</AssistantReadyGate>
+                <AssistantReadyGate>
+                  {children}
+                  <LibraryCatchUpBar />
+                </AssistantReadyGate>
               </DesktopWindowInset>
             </DesktopGate>
           </MantineProvider>

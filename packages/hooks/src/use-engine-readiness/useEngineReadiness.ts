@@ -4,16 +4,29 @@ import {
   ENGINE_OFFLINE_AFTER_MS,
   type EnginePhase,
   isEngineHealthSnapshot,
+  libraryCatchUpFromHealth,
   phaseFromPoll,
+  type WarmStage,
+  warmStageFromHealth,
 } from '@bga/utils/engine-readiness';
 import { useEffect, useState } from 'react';
 
 const POLL_MS = 1_000;
 
+export interface EngineReadiness {
+  phase: EnginePhase;
+  warmStage: WarmStage | null;
+  libraryCatchUp: boolean;
+}
+
 export const useEngineReadiness = (
   offlineAfterMs: number = ENGINE_OFFLINE_AFTER_MS,
-): EnginePhase => {
-  const [phase, setPhase] = useState<EnginePhase>('starting');
+): EngineReadiness => {
+  const [state, setState] = useState<EngineReadiness>({
+    phase: 'starting',
+    warmStage: null,
+    libraryCatchUp: false,
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -43,13 +56,15 @@ export const useEngineReadiness = (
       if (cancelled) {
         return;
       }
-      setPhase(
-        phaseFromPoll({
+      setState({
+        phase: phaseFromPoll({
           health,
           failedForMs: failedSince === null ? 0 : now - failedSince,
           offlineAfterMs,
         }),
-      );
+        warmStage: warmStageFromHealth(health),
+        libraryCatchUp: libraryCatchUpFromHealth(health),
+      });
     };
 
     void poll();
@@ -62,5 +77,5 @@ export const useEngineReadiness = (
     };
   }, [offlineAfterMs]);
 
-  return phase;
+  return state;
 };

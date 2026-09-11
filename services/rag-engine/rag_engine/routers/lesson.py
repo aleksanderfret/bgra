@@ -381,6 +381,12 @@ async def _stream_unit(
                 )
                 return
 
+            if bool(getattr(http_request.app.state, "library_catch_up", False)):
+                from rag_engine.catch_up import ensure_games_search
+
+                yield encode_event(NoticeEvent(code="preparing_game_search", params={}))
+                await ensure_games_search(settings.storage_dir, game_ids)
+
             index = stack.open_index(settings.storage_dir)
             if index.count_for_games(game_ids) == 0:
                 if active_set_has_chunks(storage_dir, game_ids):
@@ -517,6 +523,12 @@ async def _stream_digression(
         )
         _save(storage_dir, session.model_copy(update={"status": "active"}))
         return
+
+    if bool(getattr(http_request.app.state, "library_catch_up", False)):
+        from rag_engine.catch_up import ensure_games_search
+
+        yield encode_event(NoticeEvent(code="preparing_game_search", params={}))
+        await ensure_games_search(settings.storage_dir, game_ids)
 
     preflight = await _model_preflight(settings)
     if preflight is not None:

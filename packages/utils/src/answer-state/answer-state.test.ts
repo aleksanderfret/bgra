@@ -223,5 +223,6 @@ describe('isBlockingNotice', () => {
   it('does not treat wait notices as blocking', () => {
     expect(isBlockingNotice('checking_sources_carefully')).toBe(false);
     expect(isBlockingNotice('preparing_assistant')).toBe(false);
+    expect(isBlockingNotice('preparing_game_search')).toBe(false);
   });
 });

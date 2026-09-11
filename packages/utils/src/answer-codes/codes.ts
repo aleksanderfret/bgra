@@ -23,6 +23,7 @@ export const NOTICE_CODES = [
   'retrieval_loading',
   'checking_sources_carefully',
   'preparing_assistant',
+  'preparing_game_search',
   'sources_disagree',
   'speech_empty',
   'speech_invalid_audio',

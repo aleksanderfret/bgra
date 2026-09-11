@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 
 export const EngineReadinessBanner: FC = () => {
   const { t } = useTranslation();
-  const phase = useEngineReadiness();
+  const { phase } = useEngineReadiness();
   const [retrying, setRetrying] = useState(false);
   const [speechMissing, setSpeechMissing] = useState(false);
 

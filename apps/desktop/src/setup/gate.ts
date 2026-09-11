@@ -5,6 +5,7 @@ export type HealthProbe = {
   reranker: boolean;
   retrievalLoading: boolean;
   layoutIngest: boolean;
+  warmStage: 'starting_assistant' | 'teaching_answers' | 'finding_rules' | null;
   missingModels: string[];
   llm: string;
   embedding: string;
@@ -54,11 +55,23 @@ export function parseHealthProbe(payload: unknown): HealthProbe | null {
   if (missingModels.length !== missingRaw.length) {
     return null;
   }
+  let warmStage: HealthProbe['warmStage'] = null;
+  const warmRaw = root.warmStage ?? root.warm_stage;
+  if (
+    warmRaw === 'starting_assistant' ||
+    warmRaw === 'teaching_answers' ||
+    warmRaw === 'finding_rules'
+  ) {
+    warmStage = warmRaw;
+  } else if (warmRaw !== null && warmRaw !== undefined) {
+    return null;
+  }
   return {
     ollama: comps.ollama,
     reranker: comps.reranker,
     retrievalLoading,
     layoutIngest,
+    warmStage,
     missingModels,
     llm: mods.llm,
     embedding: mods.embedding,
@@ -137,8 +150,8 @@ export function isGatedAllowedPath(path: string, locale: 'en' | 'pl'): boolean {
 }
 
 export function splashActivityFromProbe(probe: HealthProbe): SplashActivityCode | null {
-  if (probe.layoutIngest) {
-    return 'reading_layout';
+  if (probe.warmStage !== null) {
+    return probe.warmStage;
   }
   if (probe.retrievalLoading) {
     return 'preparing_search';

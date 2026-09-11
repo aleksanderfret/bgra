@@ -453,6 +453,11 @@ once per page while reading and drawing; fallback read may jump). A second impor
 one is running is still `409`. Failed search/offline is the banner. No hardcoded
 player-facing strings.
 
+**Later (not scheduled):** if a single shared search store plus full-library catch-up
+still hurts cold start at extreme library sizes after measurement, consider one search
+store per game loaded on selection. That would replace the “all your games” bottom bar
+with a per-game preparing state. Do not build this until measured.
+
 ---
 
 ## Stage 3D — Conversation thread ✅ **complete**
@@ -588,7 +593,7 @@ chrome; `pnpm verify` passes.
 **Goal:** a conversation without a keyboard on this computer. Speech is an extra pair
 of ears and a mouth on the **same written thread** from Stage 3D — never a voice-only
 mode. This slice is **localhost / Electron only** (`127.0.0.1`). Tablet, LAN bind,
-mkcert HTTPS, and enforcing CSP are **Stage 5B**.
+mkcert HTTPS, and enforcing CSP wait until the end of the roadmap (**Stage 5B**).
 
 - `uv sync --extra speech` (desktop product sync includes this extra automatically)
 - Speech-to-text behind one interface (`rag_engine.speech.SpeechToText`):
@@ -618,24 +623,6 @@ mkcert HTTPS, and enforcing CSP are **Stage 5B**.
 Windows**; the first sound arrives before the model finishes generating; the same
 words stay in the thread so they can be read later; read-aloud off stays silent;
 switching language prepares the matching Piper voice in the app.
-
----
-
-## Stage 5B — Voice on the home network (tablet)
-
-**Goal:** the same voice UX on a tablet at the table, with a locked door on the LAN.
-
-- A local HTTPS setup (`mkcert`) — `getUserMedia` does not work over HTTP outside
-  `localhost` (decision Z4)
-- Opening the LAN interface is **one change with the access check**, not a step before
-  it: Next.js stops binding `127.0.0.1` (D9) only in the same commit that fills in
-  `assertMayReachEngine` (D10). The Python engine stays on `127.0.0.1` either way
-- With HTTPS in place, the report-only CSP becomes enforcing, and `Strict-Transport-
-  Security` is added. Mantine's inline styles and `ColorSchemeScript` need nonces first,
-  which is why the policy is only recording today
-
-**Acceptance:** the microphone works on the tablet, not only on the Mac; a request
-from the tablet without credentials is refused by the proxy.
 
 ---
 
@@ -805,6 +792,26 @@ in the UI; `pnpm verify` passes.
 
 ---
 
+## Stage 5B — Voice on the home network (tablet)
+
+**Goal:** the same voice UX on a tablet at the table, with a locked door on the LAN.
+Do this **last** — after local voice (Stage 5) and the rest of the product stages —
+so the app is fully useful on this computer before anyone opens the home network.
+
+- A local HTTPS setup (`mkcert`) — `getUserMedia` does not work over HTTP outside
+  `localhost` (decision Z4)
+- Opening the LAN interface is **one change with the access check**, not a step before
+  it: Next.js stops binding `127.0.0.1` (D9) only in the same commit that fills in
+  `assertMayReachEngine` (D10). The Python engine stays on `127.0.0.1` either way
+- With HTTPS in place, the report-only CSP becomes enforcing, and `Strict-Transport-
+  Security` is added. Mantine's inline styles and `ColorSchemeScript` need nonces first,
+  which is why the policy is only recording today
+
+**Acceptance:** the microphone works on the tablet, not only on the Mac; a request
+from the tablet without credentials is refused by the proxy.
+
+---
+
 ## The order, if you want results fastest
 
 Stages 1 → 2 → 2A → 3 give you **a working rules arbiter over text**, and that is a
@@ -824,8 +831,9 @@ with checkboxes — Trash alone cannot run cleanup). Stage 6 is worth doing righ
 after 3 — before you start tuning prompts, because otherwise you are tuning by
 feel. Stage 6A (page layout) comes **after that measurement**: first learn how
 often columns and sidenotes cost us an answer, then decide whether a heavier
-import is worth it. Voice (5) and images (7) polish the experience; they are not
-a condition of usefulness. Online lookup (8) comes last because the app should be
-fully useful offline first — internet is a convenience, not a requirement.
-Stage 9 (context window) and 9A (when models sit in RAM) wait until that product
-exists; growing the window or rewriting load/unload earlier is guessing.
+import is worth it. Voice on this computer (5) and images (7) polish the experience;
+they are not a condition of usefulness. Online lookup (8) comes after the offline
+product is solid — internet is a convenience, not a requirement. Stage 9 (context
+window) and 9A (when models sit in RAM) wait until that product exists; growing the
+window or rewriting load/unload earlier is guessing. Tablet voice on the home
+network (5B) is last: open the LAN only after everything else works on localhost.

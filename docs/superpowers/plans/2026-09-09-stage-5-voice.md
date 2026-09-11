@@ -13,19 +13,19 @@ todos:
     status: completed
   - id: lesson-speak
     content: "Task 4: Lesson speak/audio + pause auto-advance while queue/stream speaking"
-    status: in_progress
+    status: completed
   - id: fe-voice-ui
     content: "Task 5: Hold-to-talk WAV, audio queue+abort, read-aloud toggle, thread transcript"
-    status: in_progress
+    status: completed
   - id: locale-voice
     content: "Task 6: ensure-voice API + language switch progress UI"
-    status: pending
+    status: completed
   - id: health-gate
     content: "Task 7: Health/setup missing STT/TTS notices + recovery in app"
-    status: pending
+    status: completed
   - id: docs-roadmap
     content: "Task 8: ROADMAP 5/5B + WebSocket footnote + README + mirror plan file"
-    status: pending
+    status: in_progress
   - id: verify-manual
     content: "Task 9: pnpm verify + Mac and Windows manual acceptance"
     status: pending
@@ -38,7 +38,7 @@ isProject: false
 
 **Goal:** Hold-to-talk questions on **Questions** and **Learn**, optional read-aloud, same written thread/log. **First spoken sentence starts before the LLM finishes.** Works on **macOS and Windows** at `127.0.0.1` / Electron.
 
-**Architecture:** Extend Ask / lesson **SSE**. Client sends **WAV** audio through `/api/engine/…` (multipart). Engine STT → `transcript` → existing retrieve/generate → **while tokens stream**, Piper emits `audio` frames **per completed sentence** (not after `done`). FE plays a queue and **stops immediately** on new hold or new typed submit. Stage 5B later: tablet / mkcert / LAN / CSP. ROADMAP footnote only: WebSocket audio channel if SSE interrupt proves inadequate.
+**Architecture:** Extend Ask / lesson **SSE**. Client sends **WAV** audio through `/api/engine/…` (multipart). Engine STT → `transcript` → existing retrieve/generate → **while tokens stream**, Piper emits `audio` frames **per completed sentence** (not after `done`). FE plays a queue and **stops immediately** on new hold or new typed submit. Stage 5B (tablet / mkcert / LAN / CSP) is deferred to the **end of the roadmap**. ROADMAP footnote only: WebSocket audio channel if SSE interrupt proves inadequate.
 
 **Tech stack:** MediaRecorder → FE WAV encode, FastAPI multipart + SSE, `piper-tts`, mlx-whisper (Darwin) / faster-whisper (else), Electron mic handler (already auto-grants), Mantine + `@bga/*`, i18n.
 
@@ -210,7 +210,7 @@ sequenceDiagram
 - Health components or fields for stt/tts ready; setup gate can pull voice; notices use catalogues.
 
 ### Task 8 — Docs
-- Rewrite Stage 5 acceptance to this slice; add **Stage 5B** tablet/HTTPS/CSP/`assertMayReachEngine`; footnote WebSocket audio; copy plan under `docs/superpowers/plans/`.
+- Rewrite Stage 5 acceptance to this slice; **Stage 5B** tablet/HTTPS/CSP sits at the **end of the roadmap**; footnote WebSocket audio; copy plan under `docs/superpowers/plans/`.
 
 ### Task 9 — Verify
 - `pnpm verify`.
@@ -220,7 +220,7 @@ sequenceDiagram
 
 ## Out of scope
 
-- LAN / mkcert / non-localhost bind / enforcing CSP / HSTS (Stage 5B)
+- LAN / mkcert / non-localhost bind / enforcing CSP / HSTS (Stage 5B — end of roadmap)
 - Web Speech API / cloud STT-TTS
 - Implementing WebSocket audio now
 - Fetching **both** Piper voices on every first run (only OS/UI locale; other on demand)

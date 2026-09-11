@@ -4,6 +4,8 @@ import type { EnginePhase } from '@bga/utils/engine-readiness';
 export const ACTIVITY_CODES = [
   'checking_computer',
   'starting_assistant',
+  'teaching_answers',
+  'finding_rules',
   'downloading_installer',
   'waiting_for_ollama',
   'pulling_models',
@@ -114,6 +116,15 @@ export const enginePhaseToActivity = (phase: EnginePhase): ActivityView | null =
     return { activity: 'reading_layout', percent: null };
   }
   return null;
+};
+
+export const warmStageToActivity = (
+  stage: 'starting_assistant' | 'teaching_answers' | 'finding_rules' | null,
+): ActivityView | null => {
+  if (stage === null) {
+    return null;
+  }
+  return { activity: stage, percent: null };
 };
 
 export const bootStageToActivity = (stage: ActivityCode): ActivityView => {

@@ -30,6 +30,8 @@ def maybe_index_document(
     embedding_model: str,
     on_batch: Callable[[int, int], None] | None = None,
 ) -> None:
+    from rag_engine.catch_up import INDEX_WRITE_LOCK
+
     index = open_chunk_index(storage_dir)
     if index is None:
         logger.warning(
@@ -39,7 +41,8 @@ def maybe_index_document(
         )
         return
     if not chunks:
-        index.delete_document(game_id, kind, doc_key)
+        with INDEX_WRITE_LOCK:
+            index.delete_document(game_id, kind, doc_key)
         return
     try:
         vectors = embed_texts_sync_batched(
@@ -63,8 +66,9 @@ def maybe_index_document(
                 update={"vector": vector}
             )
         )
-    index.delete_document(game_id, kind, doc_key)
-    try:
-        index.upsert(scored)
-    except Exception as error:
-        raise IndexingError(str(error)) from error
+    with INDEX_WRITE_LOCK:
+        index.delete_document(game_id, kind, doc_key)
+        try:
+            index.upsert(scored)
+        except Exception as error:
+            raise IndexingError(str(error)) from error

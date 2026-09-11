@@ -1,0 +1,13 @@
+.bar {
+  position: fixed;
+  z-index: 200;
+  left: 50%;
+  bottom: var(--mantine-spacing-md);
+  transform: translateX(-50%);
+  max-width: min(36rem, calc(100vw - 2rem));
+  width: max-content;
+}
+
+:global(body:has([data-library-catch-up="true"])) {
+  padding-bottom: 4.5rem;
+}

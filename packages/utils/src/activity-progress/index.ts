@@ -16,4 +16,5 @@ export {
   SERVER_BAND_WEIGHT,
   sendingActivity,
   UPLOAD_BAND_END,
+  warmStageToActivity,
 } from './activity-progress';

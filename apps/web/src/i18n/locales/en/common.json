@@ -121,6 +121,9 @@
     "speechMissing": {
       "title": "Spoken answers are not ready yet",
       "body": "The microphone and spoken voice need one more download on this computer. Finish installing on the first-run screen, then try hold-to-talk again."
+    },
+    "libraryCatchUp": {
+      "body": "Checking that all your games are ready for questions. If you ask before this finishes, the answer may take a little longer."
     }
   },
   "startup": {
@@ -133,6 +136,8 @@
     "detail": "{{percent}}%",
     "checking_computer": "Checking this computer…",
     "starting_assistant": "Starting the assistant…",
+    "teaching_answers": "Teaching the assistant to answer questions…",
+    "finding_rules": "Learning to find rules in the rulebook faster…",
     "downloading_installer": "Downloading the Ollama installer…",
     "waiting_for_ollama": "Waiting for Ollama to finish installing and start…",
     "pulling_models": "Downloading the models for this computer…",
@@ -161,6 +166,16 @@
     "dark": "Dark",
     "auto": "System",
     "changed": "Color scheme set to {{scheme}}"
+  },
+  "gamePicker": {
+    "recent": "Recently used",
+    "all": "All",
+    "results": "Results",
+    "placeholder": "Search for a game…",
+    "loading": "Loading games…",
+    "empty": "No games in the library yet",
+    "noResults": "No games match that name",
+    "clear": "Clear selection"
   },
   "rulesChat": {
     "engineOffline": {
@@ -254,6 +269,7 @@
     "retrieval_loading": "Search is still starting on this computer. Wait a moment, then ask again.",
     "checking_sources_carefully": "Checking these pages carefully before answering…",
     "preparing_assistant": "Getting ready to write the answer…",
+    "preparing_game_search": "Getting this game ready for questions…",
     "sources_disagree": "These documents do not fully agree. I am following the stronger source (errata and FAQ beat the rulebook).",
     "lesson_plan_failed": "I could not build a lesson from these rulebooks yet. Import a clearer rulebook, or open Questions to ask about a specific rule.",
     "lesson_expired": "This lesson has ended or timed out. Start a new one when you are ready.",

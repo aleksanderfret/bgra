@@ -81,6 +81,7 @@ async def read_health(
         "reranker": retrieval_ready,
         "retrieval_loading": retrieval_loading,
         "layout_ingest": layout_ingest,
+        "library_catch_up": bool(getattr(request.app.state, "library_catch_up", False)),
         "speech_stt": speech_stt_pkg,
         "speech_tts": speech_tts_pkg and tts_ready,
     }
@@ -98,10 +99,12 @@ async def read_health(
         models["vision"] = profile.vision
 
     degraded = (not ollama_up) or (not storage_ok) or len(missing) > 0
+    warm_stage = getattr(request.app.state, "warm_stage", None)
 
     return HealthReport(
         status="degraded" if degraded else "ok",
         components=components,
         models=models,
         missing_models=missing,
+        warm_stage=warm_stage,
     )

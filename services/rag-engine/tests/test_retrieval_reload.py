@@ -152,6 +152,112 @@ async def test_schedule_bumps_generation_and_sets_loading(
 
 
 @pytest.mark.asyncio
+async def test_warm_unlocks_ask_before_library_catch_up_finishes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    application = FastAPI()
+    application.state.retrieval_load_generation = 1
+    application.state.retrieval_loading = True
+    application.state.retrieval_stack = None
+    application.state.library_catch_up = False
+
+    stack = object()
+    catch_up_started = asyncio.Event()
+    allow_catch_up_finish = asyncio.Event()
+
+    async def slow_layout(_app: FastAPI, _settings: Settings) -> None:
+        catch_up_started.set()
+        await allow_catch_up_finish.wait()
+
+    async def pin(_settings: Settings) -> None:
+        return None
+
+    monkeypatch.setattr("rag_engine.main.try_load", lambda _id: stack)
+    monkeypatch.setattr("rag_engine.main._pin_ollama_weights", pin)
+    monkeypatch.setattr("rag_engine.main._resize_oversized_chunks", pin)
+    monkeypatch.setattr("rag_engine.main._ensure_section_maps", pin)
+    monkeypatch.setattr("rag_engine.main._ensure_layout_ingest", slow_layout)
+    monkeypatch.setattr(
+        "rag_engine.main.get_settings",
+        lambda: Settings(storage_dir=Path("/tmp/bga-test-unused")),
+    )
+
+    task = asyncio.create_task(_warm_retrieval(application, "reranker-id", generation=1))
+    await asyncio.wait_for(catch_up_started.wait(), timeout=2)
+    assert application.state.retrieval_loading is False
+    assert application.state.retrieval_stack is stack
+    assert application.state.library_catch_up is True
+    allow_catch_up_finish.set()
+    await task
+    assert application.state.library_catch_up is False
+
+
+@pytest.mark.asyncio
+async def test_background_search_catch_up_runs_one_game_at_a_time(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    application = FastAPI()
+    application.state.retrieval_load_generation = 1
+    application.state.retrieval_loading = True
+
+    class _Game:
+        def __init__(self, game_id: str) -> None:
+            self.game_id = game_id
+
+    calls: list[str] = []
+    hold = threading.Event()
+    first_entered = threading.Event()
+
+    def fake_ensure(
+        _storage: Path,
+        _progress: object = None,
+        *,
+        only_game_id: str | None = None,
+    ) -> int:
+        assert only_game_id is not None
+        calls.append(only_game_id)
+        if only_game_id == "a":
+            first_entered.set()
+            hold.wait(timeout=2)
+        return 0
+
+    async def noop(_settings: Settings) -> None:
+        return None
+
+    async def noop_layout(_app: FastAPI, _settings: Settings) -> None:
+        return None
+
+    monkeypatch.setattr("rag_engine.main.try_load", lambda _id: object())
+    monkeypatch.setattr("rag_engine.main._pin_ollama_weights", noop)
+    monkeypatch.setattr("rag_engine.main._resize_oversized_chunks", noop)
+    monkeypatch.setattr("rag_engine.main._ensure_section_maps", noop)
+    monkeypatch.setattr("rag_engine.main._ensure_layout_ingest", noop_layout)
+    monkeypatch.setattr("rag_engine.main.load_games", lambda _storage: [_Game("a"), _Game("b")])
+    monkeypatch.setattr("rag_engine.main.ensure_search_index", fake_ensure)
+    monkeypatch.setattr(
+        "rag_engine.main.get_settings",
+        lambda: Settings(storage_dir=Path("/tmp/bga-test-unused")),
+    )
+
+    task = asyncio.create_task(_warm_retrieval(application, "reranker-id", generation=1))
+    await asyncio.to_thread(first_entered.wait, 2)
+    assert application.state.library_catch_up is True
+    assert calls == ["a"]
+    hold.set()
+    await task
+    assert calls == ["a", "b"]
+    assert application.state.library_catch_up is False
+
+
+def test_index_write_lock_is_reentrant() -> None:
+    from rag_engine.catch_up import INDEX_WRITE_LOCK
+
+    with INDEX_WRITE_LOCK, INDEX_WRITE_LOCK:
+        assert INDEX_WRITE_LOCK.acquire(blocking=False)
+        INDEX_WRITE_LOCK.release()
+
+
+@pytest.mark.asyncio
 async def test_layout_ingest_flag_is_on_only_while_re_reading(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

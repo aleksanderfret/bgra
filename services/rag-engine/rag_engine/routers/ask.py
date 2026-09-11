@@ -136,6 +136,13 @@ async def _stream_answer(
         yield encode_event(DoneEvent(answer_id=uuid4().hex, groundedness="insufficient_evidence"))
         return
 
+    game_ids = active_game_ids(payload.game_id, payload.expansion_ids)
+    if bool(getattr(http_request.app.state, "library_catch_up", False)):
+        from rag_engine.catch_up import ensure_games_search
+
+        yield encode_event(NoticeEvent(code="preparing_game_search", params={}))
+        await ensure_games_search(settings.storage_dir, game_ids)
+
     try:
         tags = await installed_ollama_tags(settings.ollama_url)
     except OllamaUnreachableError:
@@ -159,7 +166,6 @@ async def _stream_answer(
     if await http_request.is_disconnected():
         return
 
-    game_ids = active_game_ids(payload.game_id, payload.expansion_ids)
     index = stack.open_index(settings.storage_dir)
     if index.count_for_games(game_ids) == 0:
         if active_set_has_chunks(settings.storage_dir, game_ids):

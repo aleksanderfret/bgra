@@ -120,7 +120,11 @@ export const selectVisibleFigures = (state: AnswerState): VisibleFigure[] => {
 };
 
 /** Notices that describe a wait, so the status line says them instead of the stage. */
-const WAIT_NOTICES = ['checking_sources_carefully', 'preparing_assistant'] as const;
+const WAIT_NOTICES = [
+  'checking_sources_carefully',
+  'preparing_assistant',
+  'preparing_game_search',
+] as const;
 
 /** Mic / WAV failures — not "the rulebook had nothing". */
 const SPEECH_NOTICES = ['speech_empty', 'speech_invalid_audio'] as const;

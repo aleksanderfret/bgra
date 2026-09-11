@@ -12,6 +12,7 @@ from rag_engine.contract import (
     AskRequest,
     AssistantEvent,
     DocumentKind,
+    GameCatalogueItem,
     GameDocumentSummary,
     GameSummary,
     Groundedness,
@@ -31,6 +32,7 @@ from rag_engine.contract import (
     PipelineStage,
     RetrievalReloadResponse,
     RetrievedSource,
+    WarmStage,
 )
 from rag_engine.settings import SERVICE_ROOT
 
@@ -147,6 +149,19 @@ def test_game_document_summary_fields_match() -> None:
 def test_health_report_fields_match() -> None:
     ts_fields = _interface_fields(_source(), "HealthReport")
     python_fields = {to_camel(name) for name in HealthReport.model_fields}
+
+    assert ts_fields == python_fields
+
+
+def test_warm_stages_match() -> None:
+    ts_stages = _quoted(_declaration(_source(), "export type WarmStage ="))
+
+    assert ts_stages == set(get_args(WarmStage))
+
+
+def test_game_catalogue_item_fields_match() -> None:
+    ts_fields = _interface_fields(_source(), "GameCatalogueItem")
+    python_fields = {to_camel(name) for name in GameCatalogueItem.model_fields}
 
     assert ts_fields == python_fields
 

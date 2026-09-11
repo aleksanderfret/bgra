@@ -18,6 +18,7 @@ export {
   type EnsureVoiceRequest,
   type EnsureVoiceResponse,
   GAME_ID_PATTERN,
+  type GameCatalogueItem,
   type GameDocumentSummary,
   type GameSummary,
   type Groundedness,
@@ -39,4 +40,5 @@ export {
   type PipelineStage,
   type RetrievalReloadResponse,
   type RetrievedSource,
+  type WarmStage,
 } from './types';

@@ -225,11 +225,21 @@ class GameSummary(WireModel):
     documents: list[GameDocumentSummary] = Field(default_factory=list)
 
 
+WarmStage = Literal["starting_assistant", "teaching_answers", "finding_rules"]
+
+
 class HealthReport(WireModel):
     status: Literal["ok", "degraded"]
     components: dict[str, bool]
     models: dict[str, str]
     missing_models: list[str] = Field(default_factory=list)
+    warm_stage: WarmStage | None = None
+
+
+class GameCatalogueItem(WireModel):
+    game_id: str = Field(pattern=GAME_ID_PATTERN)
+    title: str
+    base_game_id: str | None = None
 
 
 class RetrievalReloadResponse(WireModel):
